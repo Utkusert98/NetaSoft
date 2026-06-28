@@ -81,7 +81,7 @@ export default function Sidebar() {
   };
 
   const handleLogout = async () => {
-    await signOut({ redirect: true, redirectUrl: "/giris" });
+    await signOut({ redirectTo: "/giris" });
   };
 
   return (
