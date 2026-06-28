@@ -1,0 +1,735 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ================================
+// KİMLİK DOĞRULAMA MODELLERİ
+// (NextAuth.js v5 uyumlu)
+// ================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ================================
+// KULLANICI VE ECZANE MODELLERİ
+// ================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String?   @db.Text // bcrypt hash
+
+  // Eczacı alanları
+  pharmacistName String? @map("pharmacist_name")
+
+  // Durum
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  // Zaman damgaları
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // İlişkiler
+  accounts      Account[]
+  sessions      Session[]
+  pharmacyRoles UserPharmacyRole[]
+  fileImports   FileImport[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Pharmacy {
+  id            String  @id @default(cuid())
+  name          String // Eczane Adı
+  taxNumber     String? @unique @map("tax_number") // Vergi No
+  licenseNumber String? @unique @map("license_number") // Ruhsat No
+  address       String? @db.Text
+  phone         String?
+  email         String?
+  city          String?
+  district      String?
+
+  // Durum
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // İlişkiler
+  userRoles        UserPharmacyRole[]
+  transactions     Transaction[]
+  invoices         Invoice[]
+  products         Product[]
+  stockMovements   StockMovement[]
+  suppliers        Supplier[]
+  fileImports      FileImport[]
+  auditLogs        AuditLog[]
+  promissoryNotes  PromissoryNote[]
+  fixedExpenses    FixedExpense[]
+  employees        Employee[]
+  employeeExpenses EmployeeExpense[]
+  dailyRegisters   DailyRegister[]
+  sgkInvoices      SgkInvoice[]
+  platformIncomes  PlatformIncome[]
+
+  @@index([name])
+  @@index([deletedAt])
+  @@map("pharmacies")
+}
+
+model UserPharmacyRole {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  pharmacyId String   @map("pharmacy_id")
+  role       UserRole @default(OWNER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pharmacyId])
+  @@index([userId])
+  @@index([pharmacyId])
+  @@map("user_pharmacy_roles")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  ACCOUNTANT
+  VIEWER
+}
+
+// ================================
+// FİNANSAL MODELLER
+// ================================
+
+model TransactionCategory {
+  id          String          @id @default(cuid())
+  name        String
+  type        TransactionType
+  color       String? // HEX renk kodu
+  icon        String? // İkon adı
+  description String?         @db.Text
+  isSystem    Boolean         @default(false) @map("is_system") // Sistem kategorisi (silinemez)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  transactions Transaction[]
+
+  @@index([type])
+  @@map("transaction_categories")
+}
+
+model Transaction {
+  id         String  @id @default(cuid())
+  pharmacyId String  @map("pharmacy_id")
+  categoryId String? @map("category_id")
+
+  type     TransactionType
+  amount   Decimal         @db.Decimal(15, 2)
+  currency String          @default("TRY")
+
+  description     String?  @db.Text
+  reference       String? // Fatura no, çek no vb.
+  transactionDate DateTime @map("transaction_date")
+
+  // Fatura ilişkisi (opsiyonel)
+  invoiceId String? @map("invoice_id")
+
+  // Dosya kaynağı (import edilmişse)
+  fileImportId String? @map("file_import_id")
+
+  // Metadata (analiz için)
+  tags  String[] // Etiketler
+  notes String?  @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy   Pharmacy             @relation(fields: [pharmacyId], references: [id])
+  category   TransactionCategory? @relation(fields: [categoryId], references: [id])
+  invoice    Invoice?             @relation(fields: [invoiceId], references: [id])
+  fileImport FileImport?          @relation(fields: [fileImportId], references: [id])
+
+  // Analiz sorguları için composite index
+  @@index([pharmacyId, transactionDate])
+  @@index([pharmacyId, type, transactionDate])
+  @@index([pharmacyId, categoryId, transactionDate])
+  @@index([deletedAt])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  INCOME // Gelir
+  EXPENSE // Gider
+}
+
+model Invoice {
+  id         String  @id @default(cuid())
+  pharmacyId String  @map("pharmacy_id")
+  supplierId String? @map("supplier_id")
+
+  invoiceNumber String        @map("invoice_number")
+  type          InvoiceType
+  status        InvoiceStatus @default(PENDING)
+
+  invoiceDate DateTime  @map("invoice_date")
+  dueDate     DateTime? @map("due_date")
+
+  subtotal       Decimal @db.Decimal(15, 2)
+  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(15, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(15, 2)
+
+  currency String  @default("TRY")
+  notes    String? @db.Text
+
+  // Dosya kaynağı
+  fileImportId String? @map("file_import_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy     Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id])
+  items        InvoiceItem[]
+  transactions Transaction[]
+  fileImport   FileImport?   @relation(fields: [fileImportId], references: [id])
+
+  @@unique([pharmacyId, invoiceNumber])
+  @@index([pharmacyId, invoiceDate])
+  @@index([pharmacyId, status])
+  @@index([deletedAt])
+  @@map("invoices")
+}
+
+enum InvoiceType {
+  PURCHASE // Alış faturası
+  SALE // Satış faturası
+  RETURN // İade faturası
+}
+
+enum InvoiceStatus {
+  PENDING // Bekliyor
+  PAID // Ödendi
+  OVERDUE // Gecikmiş
+  CANCELLED // İptal
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String  @map("invoice_id")
+  productId String? @map("product_id")
+
+  name       String // Ürün/hizmet adı
+  quantity   Decimal @db.Decimal(10, 3)
+  unit       String? // Adet, Kutu, ML vb.
+  unitPrice  Decimal @map("unit_price") @db.Decimal(15, 2)
+  taxRate    Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  discount   Decimal @default(0) @db.Decimal(15, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
+  @@map("invoice_items")
+}
+
+// ================================
+// STOK MODELLERİ
+// ================================
+
+model Supplier {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  name        String
+  taxNumber   String? @map("tax_number")
+  contactName String? @map("contact_name")
+  phone       String?
+  email       String?
+  address     String? @db.Text
+
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy  @relation(fields: [pharmacyId], references: [id])
+  invoices Invoice[]
+  products Product[]
+
+  @@index([pharmacyId])
+  @@index([deletedAt])
+  @@map("suppliers")
+}
+
+model Product {
+  id         String  @id @default(cuid())
+  pharmacyId String  @map("pharmacy_id")
+  supplierId String? @map("supplier_id")
+
+  name        String
+  barcode     String?
+  barcodeType String? @map("barcode_type") // EAN13, QR vb.
+  sku         String? // Stok kodu
+
+  category String?
+  unit     String? // Adet, Kutu, ML
+
+  purchasePrice Decimal? @map("purchase_price") @db.Decimal(15, 2)
+  salePrice     Decimal? @map("sale_price") @db.Decimal(15, 2)
+  taxRate       Decimal  @default(8) @map("tax_rate") @db.Decimal(5, 2)
+
+  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(10, 3)
+  minStock     Decimal  @default(0) @map("min_stock") @db.Decimal(10, 3)
+  maxStock     Decimal? @map("max_stock") @db.Decimal(10, 3)
+
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy       Pharmacy        @relation(fields: [pharmacyId], references: [id])
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  invoiceItems   InvoiceItem[]
+  stockMovements StockMovement[]
+
+  @@index([pharmacyId, name])
+  @@index([pharmacyId, barcode])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model StockMovement {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+  productId  String @map("product_id")
+
+  type     StockMovementType
+  quantity Decimal           @db.Decimal(10, 3)
+  unitCost Decimal?          @map("unit_cost") @db.Decimal(15, 2)
+
+  reference String? // Fatura no vb.
+  notes     String? @db.Text
+
+  // Stok öncesi/sonrası (audit için)
+  stockBefore Decimal @map("stock_before") @db.Decimal(10, 3)
+  stockAfter  Decimal @map("stock_after") @db.Decimal(10, 3)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([pharmacyId, productId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  IN // Giriş (satın alma)
+  OUT // Çıkış (satış)
+  RETURN // İade
+  ADJUST // Düzeltme
+  WASTE // Fire/Zayi
+}
+
+// ================================
+// DOSYA YÜKLEME MODELLERİ
+// ================================
+
+model FileImport {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+  userId     String @map("user_id")
+
+  fileName String   @map("file_name")
+  fileSize Int      @map("file_size") // bytes
+  fileType FileType @map("file_type")
+  mimeType String   @map("mime_type")
+
+  module ImportModule // Hangi modüle import ediliyor
+  status ImportStatus @default(PENDING)
+
+  // Parse edilen satır sayıları
+  totalRows    Int @default(0) @map("total_rows")
+  validRows    Int @default(0) @map("valid_rows")
+  errorRows    Int @default(0) @map("error_rows")
+  importedRows Int @default(0) @map("imported_rows")
+
+  // Hata mesajı (varsa)
+  errorMessage String? @map("error_message") @db.Text
+
+  // Onay zamanı
+  approvedAt DateTime? @map("approved_at")
+  approvedBy String?   @map("approved_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  pharmacy     Pharmacy        @relation(fields: [pharmacyId], references: [id])
+  user         User            @relation(fields: [userId], references: [id])
+  rows         FileImportRow[]
+  transactions Transaction[]
+  invoices     Invoice[]
+
+  @@index([pharmacyId, status])
+  @@index([pharmacyId, module])
+  @@index([userId])
+  @@map("file_imports")
+}
+
+model FileImportRow {
+  id           String @id @default(cuid())
+  fileImportId String @map("file_import_id")
+  rowIndex     Int    @map("row_index")
+
+  rawData    Json  @map("raw_data") // Orijinal parse edilen veri
+  parsedData Json? @map("parsed_data") // Kullanıcının düzenlediği veri
+
+  isValid    Boolean @default(true) @map("is_valid")
+  errors     Json? // Satır bazlı hatalar
+  isImported Boolean @default(false) @map("is_imported")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  fileImport FileImport @relation(fields: [fileImportId], references: [id], onDelete: Cascade)
+
+  @@index([fileImportId, isImported])
+  @@index([fileImportId, isValid])
+  @@map("file_import_rows")
+}
+
+enum FileType {
+  PDF
+  EXCEL
+  CSV
+}
+
+enum ImportModule {
+  TRANSACTIONS // İşlemler
+  INVOICES // Faturalar
+  PRODUCTS // Ürünler
+  SUPPLIERS // Tedarikçiler
+}
+
+enum ImportStatus {
+  PENDING // Parse ediliyor
+  REVIEW // Kullanıcı incelemesi bekliyor
+  APPROVED // Onaylandı, import edildi
+  REJECTED // Reddedildi
+  ERROR // Hata
+}
+
+// ================================
+// DENETİM KAYITLARI
+// ================================
+
+model AuditLog {
+  id         String  @id @default(cuid())
+  pharmacyId String? @map("pharmacy_id")
+  userId     String? @map("user_id")
+
+  action     String // CREATE, UPDATE, DELETE, LOGIN, LOGOUT vb.
+  entityType String  @map("entity_type") // "Transaction", "Invoice" vb.
+  entityId   String? @map("entity_id")
+
+  oldData Json? @map("old_data") // Önceki değer
+  newData Json? @map("new_data") // Yeni değer
+
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([pharmacyId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// ================================
+// VERİ GİRİŞ MODÜLLERİ (CRUD)
+// ================================
+
+model PromissoryNote {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  noteNumber String   @map("note_number")
+  issueDate  DateTime @map("issue_date")
+  dueDate    DateTime @map("due_date")
+  amount     Decimal  @db.Decimal(15, 2)
+  currency   String   @default("TRY")
+
+  notes              String? @db.Text
+  isPaid             Boolean @default(false) @map("is_paid")
+  installmentGroupId String? @map("installment_group_id") // Taksit gruplaması için
+  installmentNumber  Int?    @map("installment_number") // Kaçıncı taksit
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, dueDate])
+  @@index([installmentGroupId])
+  @@index([deletedAt])
+  @@map("promissory_notes")
+}
+
+model FixedExpense {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  type       FixedExpenseType
+  customType String?          @map("custom_type") // Type "OTHER" ise kullanıcının girdiği tip
+
+  amount      Decimal  @db.Decimal(15, 2)
+  currency    String   @default("TRY")
+  expenseDate DateTime @map("expense_date")
+  notes       String?  @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, expenseDate])
+  @@index([pharmacyId, type])
+  @@index([deletedAt])
+  @@map("fixed_expenses")
+}
+
+enum FixedExpenseType {
+  INVOICE // Fatura
+  ACCOUNTING // Muhasebe
+  TAX // Vergi
+  RENT // Kira
+  OTHER // Diğer
+}
+
+model Employee {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  identityNumber String?   @map("identity_number") // TC Kimlik vb.
+  phone          String?
+  startDate      DateTime? @map("start_date")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy          @relation(fields: [pharmacyId], references: [id])
+  expenses EmployeeExpense[]
+
+  @@index([pharmacyId, isActive])
+  @@index([deletedAt])
+  @@map("employees")
+}
+
+model EmployeeExpense {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+  employeeId String @map("employee_id")
+
+  expenseDate DateTime @map("expense_date") // Giderin ait olduğu ay/tarih
+
+  salaryAmount    Decimal @default(0) @map("salary_amount") @db.Decimal(15, 2)
+  sgkAmount       Decimal @default(0) @map("sgk_amount") @db.Decimal(15, 2)
+  foodAmount      Decimal @default(0) @map("food_amount") @db.Decimal(15, 2)
+  transportAmount Decimal @default(0) @map("transport_amount") @db.Decimal(15, 2)
+
+  totalAmount Decimal @map("total_amount") @db.Decimal(15, 2)
+  currency    String  @default("TRY")
+
+  notes String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([pharmacyId, expenseDate])
+  @@index([employeeId, expenseDate])
+  @@index([deletedAt])
+  @@map("employee_expenses")
+}
+
+// ================================
+// GELİR YÖNETİMİ MODÜLLERİ
+// ================================
+
+model DailyRegister {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  registerDate DateTime @map("register_date") // Gün tarihi (saat bilgisi önemsiz, sadece tarih)
+
+  posAmount            Decimal @default(0) @map("pos_amount") @db.Decimal(15, 2)
+  cashAmount           Decimal @default(0) @map("cash_amount") @db.Decimal(15, 2)
+  wireAmount           Decimal @default(0) @map("wire_amount") @db.Decimal(15, 2)
+  foreignCurrencyAmount Decimal @default(0) @map("foreign_currency_amount") @db.Decimal(15, 2)
+  foreignCurrencyType  String  @default("USD") @map("foreign_currency_type") // USD, EUR, GBP, CHF vb.
+
+  notes String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@unique([pharmacyId, registerDate])
+  @@index([pharmacyId, registerDate])
+  @@index([deletedAt])
+  @@map("daily_registers")
+}
+
+enum SgkInvoiceType {
+  GROUP_A          // A Grubu
+  GROUP_B          // B Grubu
+  GROUP_C          // C Grubu
+  SEQ_MOR_TURUNCU  // Mor/Turuncu Reçete
+  SEQ_ISYERI       // İşyeri Hekimi Reçetesi
+  SEQ_DIYALIZ      // Diyaliz
+  SEQ_ORGAN_NAKLI  // Organ Nakli
+  SEQ_ONKOLOJI     // Onkoloji (Kanser)
+  SEQ_PSIKIYATRI   // Psikiyatri
+  SEQ_YASLI_BAKIM  // Yaşlılara Yönelik Bakım
+  SEQ_PALYATIF     // Palyatif Bakım
+  SEQ_EVDE_SAGLIK  // Evde Sağlık Hizmetleri
+  SEQ_FIZIK_TEDAVI // Fizik Tedavi & Rehabilitasyon
+  SEQ_YOL_GIDERI   // Yol Gideri Reçetesi
+}
+
+model SgkInvoice {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  invoiceDate          DateTime       @map("invoice_date")
+  invoiceType          SgkInvoiceType @map("invoice_type")
+  amount               Decimal        @db.Decimal(15, 2)
+  expectedPaymentDate  DateTime       @map("expected_payment_date") // invoiceDate + 3 ay (API'de otomatik hesaplanır)
+
+  notes String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, invoiceDate])
+  @@index([pharmacyId, expectedPaymentDate])
+  @@index([deletedAt])
+  @@map("sgk_invoices")
+}
+
+enum PlatformIncomeStatus {
+  PENDING   // Bekliyor
+  RECEIVED  // Hesaba Yattı
+  CANCELLED // İptal
+}
+
+model PlatformIncome {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  platformName        String               @map("platform_name") // Farmazon, Capsule vb.
+  amount              Decimal              @db.Decimal(15, 2)
+  incomeDate          DateTime             @map("income_date")          // Girilen tarih
+  expectedPaymentDate DateTime             @map("expected_payment_date") // incomeDate + 15 gün
+  status              PlatformIncomeStatus @default(PENDING)
+
+  notes String? @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, incomeDate])
+  @@index([pharmacyId, status])
+  @@index([pharmacyId, expectedPaymentDate])
+  @@index([deletedAt])
+  @@map("platform_incomes")
+}
