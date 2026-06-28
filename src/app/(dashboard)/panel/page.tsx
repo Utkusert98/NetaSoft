@@ -118,8 +118,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const sumDecimal = (arr: { amount?: unknown; posAmount?: unknown; cashAmount?: unknown; wireAmount?: unknown; totalAmount?: unknown }[], key: string) =>
     arr.reduce((s, r) => s + Number((r as Record<string, unknown>)[key] ?? 0), 0);
 
-  const cashIncome = (arr: typeof currentDailyRegs) =>
-    arr.reduce((s, r) => s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
+  const cashIncome = (arr: typeof currentDailyRegs) => 
+  arr.reduce((s, r) => s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount) /* ... */ , 0)
 
   const currentCash = cashIncome(currentDailyRegs);
   const prevCash = cashIncome(prevDailyRegs);
