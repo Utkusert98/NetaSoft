@@ -452,6 +452,7 @@ export default function EnvanterPage() {
         moduleName="INVENTORY"
         onConfirm={handleConfirm}
         acceptedTypes=".xlsx,.xls,.csv,.pdf"
+        maxFileSizeMB={100}
       />
     </main>
   );

@@ -643,11 +643,11 @@ model DailyRegister {
 
   registerDate DateTime @map("register_date") // Gün tarihi (saat bilgisi önemsiz, sadece tarih)
 
-  posAmount            Decimal @default(0) @map("pos_amount") @db.Decimal(15, 2)
-  cashAmount           Decimal @default(0) @map("cash_amount") @db.Decimal(15, 2)
-  wireAmount           Decimal @default(0) @map("wire_amount") @db.Decimal(15, 2)
+  posAmount             Decimal @default(0) @map("pos_amount") @db.Decimal(15, 2)
+  cashAmount            Decimal @default(0) @map("cash_amount") @db.Decimal(15, 2)
+  wireAmount            Decimal @default(0) @map("wire_amount") @db.Decimal(15, 2)
   foreignCurrencyAmount Decimal @default(0) @map("foreign_currency_amount") @db.Decimal(15, 2)
-  foreignCurrencyType  String  @default("USD") @map("foreign_currency_type") // USD, EUR, GBP, CHF vb.
+  foreignCurrencyType   String  @default("USD") @map("foreign_currency_type") // USD, EUR, GBP, CHF vb.
 
   notes String? @db.Text
 
@@ -664,30 +664,30 @@ model DailyRegister {
 }
 
 enum SgkInvoiceType {
-  GROUP_A          // A Grubu
-  GROUP_B          // B Grubu
-  GROUP_C          // C Grubu
-  SEQ_MOR_TURUNCU  // Mor/Turuncu Reçete
-  SEQ_ISYERI       // İşyeri Hekimi Reçetesi
-  SEQ_DIYALIZ      // Diyaliz
-  SEQ_ORGAN_NAKLI  // Organ Nakli
-  SEQ_ONKOLOJI     // Onkoloji (Kanser)
-  SEQ_PSIKIYATRI   // Psikiyatri
-  SEQ_YASLI_BAKIM  // Yaşlılara Yönelik Bakım
-  SEQ_PALYATIF     // Palyatif Bakım
-  SEQ_EVDE_SAGLIK  // Evde Sağlık Hizmetleri
+  GROUP_A // A Grubu
+  GROUP_B // B Grubu
+  GROUP_C // C Grubu
+  SEQ_MOR_TURUNCU // Mor/Turuncu Reçete
+  SEQ_ISYERI // İşyeri Hekimi Reçetesi
+  SEQ_DIYALIZ // Diyaliz
+  SEQ_ORGAN_NAKLI // Organ Nakli
+  SEQ_ONKOLOJI // Onkoloji (Kanser)
+  SEQ_PSIKIYATRI // Psikiyatri
+  SEQ_YASLI_BAKIM // Yaşlılara Yönelik Bakım
+  SEQ_PALYATIF // Palyatif Bakım
+  SEQ_EVDE_SAGLIK // Evde Sağlık Hizmetleri
   SEQ_FIZIK_TEDAVI // Fizik Tedavi & Rehabilitasyon
-  SEQ_YOL_GIDERI   // Yol Gideri Reçetesi
+  SEQ_YOL_GIDERI // Yol Gideri Reçetesi
 }
 
 model SgkInvoice {
   id         String @id @default(cuid())
   pharmacyId String @map("pharmacy_id")
 
-  invoiceDate          DateTime       @map("invoice_date")
-  invoiceType          SgkInvoiceType @map("invoice_type")
-  amount               Decimal        @db.Decimal(15, 2)
-  expectedPaymentDate  DateTime       @map("expected_payment_date") // invoiceDate + 3 ay (API'de otomatik hesaplanır)
+  invoiceDate         DateTime       @map("invoice_date")
+  invoiceType         SgkInvoiceType @map("invoice_type")
+  amount              Decimal        @db.Decimal(15, 2)
+  expectedPaymentDate DateTime       @map("expected_payment_date") // invoiceDate + 3 ay (API'de otomatik hesaplanır)
 
   notes String? @db.Text
 
@@ -704,8 +704,8 @@ model SgkInvoice {
 }
 
 enum PlatformIncomeStatus {
-  PENDING   // Bekliyor
-  RECEIVED  // Hesaba Yattı
+  PENDING // Bekliyor
+  RECEIVED // Hesaba Yattı
   CANCELLED // İptal
 }
 
@@ -715,7 +715,7 @@ model PlatformIncome {
 
   platformName        String               @map("platform_name") // Farmazon, Capsule vb.
   amount              Decimal              @db.Decimal(15, 2)
-  incomeDate          DateTime             @map("income_date")          // Girilen tarih
+  incomeDate          DateTime             @map("income_date") // Girilen tarih
   expectedPaymentDate DateTime             @map("expected_payment_date") // incomeDate + 15 gün
   status              PlatformIncomeStatus @default(PENDING)
 

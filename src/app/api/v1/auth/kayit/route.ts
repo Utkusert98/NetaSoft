@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<Response> {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Transaction içinde kullanıcı + eczane + rol oluştur
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => {
       // 1. Kullanıcı oluştur
       const user = await tx.user.create({
         data: {

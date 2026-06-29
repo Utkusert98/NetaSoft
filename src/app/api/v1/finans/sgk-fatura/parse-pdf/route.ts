@@ -94,6 +94,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     let pdfjs: typeof import("pdfjs-dist");
     try {
       pdfjs = await import("pdfjs-dist");
+      // Node.js ortamında worker gereksiz — devre dışı bırak
+      if (pdfjs.GlobalWorkerOptions) {
+        pdfjs.GlobalWorkerOptions.workerSrc = "";
+      }
     } catch {
       return apiError("PDF modülü yüklenemedi", "PDF_MODULE_ERROR", 500);
     }

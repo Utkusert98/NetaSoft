@@ -6,7 +6,7 @@ import type { DashboardData } from "./DashboardClient";
 import DashboardClient from "./DashboardClient";
 
 export const metadata: Metadata = {
-  title: "Gösterge Paneli | NetaSoft",
+  title: "Gösterge Paneli",
 };
 
 async function getPharmacyId(userId: string): Promise<string | null> {
@@ -36,6 +36,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     currentEmpExp,
     prevFixedExp,
     prevEmpExp,
+    currentNotes,
+    prevNotes,
     promissoryNotes,
     upcomingSgk,
     monthlyTrend,
@@ -81,6 +83,16 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       where: { pharmacyId, expenseDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
       select: { totalAmount: true },
     }),
+    // Promissory notes due current month (ödendi ya da vadeli — senet = gider taahhüdü)
+    prisma.promissoryNote.findMany({
+      where: { pharmacyId, deletedAt: null, dueDate: { gte: startOfMonth, lte: endOfMonth } },
+      select: { amount: true },
+    }),
+    // Promissory notes due prev month
+    prisma.promissoryNote.findMany({
+      where: { pharmacyId, deletedAt: null, dueDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+      select: { amount: true },
+    }),
     // Promissory notes upcoming 60 days
     prisma.promissoryNote.findMany({
       where: {
@@ -118,8 +130,9 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const sumDecimal = (arr: { amount?: unknown; posAmount?: unknown; cashAmount?: unknown; wireAmount?: unknown; totalAmount?: unknown }[], key: string) =>
     arr.reduce((s, r) => s + Number((r as Record<string, unknown>)[key] ?? 0), 0);
 
-  const cashIncome = (arr: typeof currentDailyRegs) => 
-  arr.reduce((s, r) => s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount) /* ... */ , 0)
+  const cashIncome = (arr: { posAmount: unknown; cashAmount: unknown; wireAmount: unknown }[]): number =>
+    arr.reduce((s: number, r: { posAmount: unknown; cashAmount: unknown; wireAmount: unknown }) =>
+      s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0)
 
   const currentCash = cashIncome(currentDailyRegs);
   const prevCash = cashIncome(prevDailyRegs);
@@ -131,10 +144,12 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
 
   const totalExpense =
     sumDecimal(currentFixedExp, "amount") +
-    sumDecimal(currentEmpExp, "totalAmount");
+    sumDecimal(currentEmpExp, "totalAmount") +
+    sumDecimal(currentNotes, "amount");
   const prevExpense =
     sumDecimal(prevFixedExp, "amount") +
-    sumDecimal(prevEmpExp, "totalAmount");
+    sumDecimal(prevEmpExp, "totalAmount") +
+    sumDecimal(prevNotes, "amount");
 
   const pct = (cur: number, prev: number) =>
     prev === 0 ? 0 : ((cur - prev) / prev) * 100;
@@ -155,7 +170,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       incomeChange: pct(totalIncome, prevIncome),
       expenseChange: pct(totalExpense, prevExpense),
     },
-    promissoryNotes: promissoryNotes.map((n) => ({
+    promissoryNotes: promissoryNotes.map((n: typeof promissoryNotes[number]) => ({
       id: n.id,
       noteNumber: n.noteNumber,
       dueDate: n.dueDate.toISOString(),
@@ -164,13 +179,13 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     })),
     sgkVsCash,
     monthlyTrend,
-    upcomingSgk: upcomingSgk.map((s) => ({
+    upcomingSgk: upcomingSgk.map((s: typeof upcomingSgk[number]) => ({
       id: s.id,
       invoiceType: s.invoiceType,
       amount: Number(s.amount),
       expectedPaymentDate: s.expectedPaymentDate.toISOString(),
     })),
-    platformIncome: platformIncomeList.map((p) => ({
+    platformIncome: platformIncomeList.map((p: typeof platformIncomeList[number]) => ({
       platformName: p.platformName,
       amount: Number(p._sum.amount ?? 0),
       status: p.status,
@@ -188,17 +203,19 @@ async function buildMonthlyTrend(pharmacyId: string): Promise<DashboardData["mon
     const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
     const label = start.toLocaleDateString("tr-TR", { month: "short", year: "2-digit" });
 
-    const [daily, sgk, platform, fixed, emp] = await Promise.all([
+    const [daily, sgk, platform, fixed, emp, notes] = await Promise.all([
       prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: start, lte: end } }, select: { posAmount: true, cashAmount: true, wireAmount: true } }),
       prisma.sgkInvoice.aggregate({ where: { pharmacyId, deletedAt: null, invoiceDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.platformIncome.aggregate({ where: { pharmacyId, deletedAt: null, incomeDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.fixedExpense.aggregate({ where: { pharmacyId, deletedAt: null, expenseDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.employeeExpense.aggregate({ where: { pharmacyId, expenseDate: { gte: start, lte: end } }, _sum: { totalAmount: true } }),
+      prisma.promissoryNote.aggregate({ where: { pharmacyId, deletedAt: null, dueDate: { gte: start, lte: end } }, _sum: { amount: true } }),
     ]);
 
-    const cash = daily.reduce((s, r) => s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
+    const cash = daily.reduce((s: number, r: { posAmount: unknown; cashAmount: unknown; wireAmount: unknown }) =>
+      s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
     const gelir = cash + Number(sgk._sum.amount ?? 0) + Number(platform._sum.amount ?? 0);
-    const gider = Number(fixed._sum.amount ?? 0) + Number(emp._sum.totalAmount ?? 0);
+    const gider = Number(fixed._sum.amount ?? 0) + Number(emp._sum.totalAmount ?? 0) + Number(notes._sum.amount ?? 0);
 
     result.push({ month: label, gelir, gider, kar: gelir - gider });
   }

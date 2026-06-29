@@ -9,6 +9,8 @@ export default function SabitGiderPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     type: "INVOICE",
@@ -69,10 +71,24 @@ export default function SabitGiderPage() {
       });
       
       fetchExpenses();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Bir hata oluştu");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/v1/finans/sabit-gider/${deleteId}`, { method: "DELETE" });
+      setDeleteId(null);
+      await fetchExpenses();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -159,6 +175,7 @@ export default function SabitGiderPage() {
                     <th>Tür</th>
                     <th>Tutar</th>
                     <th>Notlar</th>
+                    <th style={{ textAlign: "right" }}>İşlem</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,6 +189,14 @@ export default function SabitGiderPage() {
                       </td>
                       <td style={{ fontWeight: 600 }}>{Number(exp.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</td>
                       <td style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{exp.notes || "-"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          onClick={() => setDeleteId(exp.id)}
+                          style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}
+                        >
+                          Sil
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,6 +205,24 @@ export default function SabitGiderPage() {
           )}
         </div>
       </div>
+
+      {deleteId && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card" style={{ width: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>Gideri Sil</h3>
+            <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
+              Bu gider kaydını silmek istediğinizden emin misiniz?
+            </p>
+            <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => setDeleteId(null)}>İptal</button>
+              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }} onClick={() => void handleDelete()} disabled={deleting}>
+                {deleting ? "Siliniyor..." : "Evet, Sil"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

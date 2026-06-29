@@ -5,9 +5,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | NetaSoft",
-    default: "Gösterge Paneli | NetaSoft",
+    template: "%s — NetaSoft",
+    default: "NetaSoft | Eczane Yönetim Sistemi",
   },
+  description: "Eczaneler için finansal yönetim sistemi",
 };
 
 export default async function DashboardLayout({
