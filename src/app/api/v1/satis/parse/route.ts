@@ -230,7 +230,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     } else if (name.endsWith(".pdf")) {
       let pdfjs: typeof import("pdfjs-dist");
       try {
-        pdfjs = await import("pdfjs-dist");
+        pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs") as unknown as typeof import("pdfjs-dist");
         if (pdfjs.GlobalWorkerOptions) pdfjs.GlobalWorkerOptions.workerSrc = "";
       } catch {
         return apiError("PDF modülü yüklenemedi", "PDF_MODULE_ERROR", 500);
