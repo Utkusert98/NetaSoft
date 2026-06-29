@@ -39,7 +39,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     });
     if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
 
-    const updateData: any = { ...validated };
+    const updateData: {
+      posAmount?: number; cashAmount?: number; wireAmount?: number;
+      foreignCurrencyAmount?: number; foreignCurrencyType?: string;
+      notes?: string | null; registerDate?: Date;
+    } = {
+      ...(validated.posAmount !== undefined && { posAmount: validated.posAmount }),
+      ...(validated.cashAmount !== undefined && { cashAmount: validated.cashAmount }),
+      ...(validated.wireAmount !== undefined && { wireAmount: validated.wireAmount }),
+      ...(validated.foreignCurrencyAmount !== undefined && { foreignCurrencyAmount: validated.foreignCurrencyAmount }),
+      ...(validated.foreignCurrencyType !== undefined && { foreignCurrencyType: validated.foreignCurrencyType }),
+      ...(validated.notes !== undefined && { notes: validated.notes }),
+    };
 
     if (validated.registerDate) {
       const dateStr = validated.registerDate.split("T")[0];

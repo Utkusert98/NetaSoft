@@ -10,12 +10,19 @@ const TT = { background: "var(--color-surface)", border: "1px solid var(--color-
 
 interface MonthData {
   month: string; gelir: number; gider: number; kar: number;
-  kasa: number; sgk: number; platform: number; sabitGider: number; personelGider: number;
+  kasa: number; sgk: number; platform: number;
+  sabitGider: number; personelGider: number;
+  senetGider: number; depoHavalesi: number;
 }
+
+interface PromissoryNoteRow { dueDate: string; amount: number; isPaid: boolean; noteNumber: string; }
+interface SupplierTransferRow { transferDate: string; supplierName: string; amount: number; }
 
 interface ReportData {
   monthly: MonthData[];
   summary: { totalIncome: number; totalExpense: number; netProfit: number };
+  promissoryNotes?: PromissoryNoteRow[];
+  supplierTransfers?: SupplierTransferRow[];
 }
 
 function pctChange(cur: number, prev: number): { value: number; positive: boolean } | null {
@@ -54,12 +61,19 @@ export default function AylikOzetPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // YYYY-MM-DD string — UTC timezone sorununu önlemek için ISO dönüşümü yapma
+  const toDate = (y: number, m: number, d: number) => {
+    const mm = String(m + 1).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    return `${y}-${mm}-${dd}`;
+  };
+  const lastDay = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+
   const fetchData = useCallback(async (y: number, m: number) => {
     setLoading(true);
     try {
-      // Seçili ay + önceki ay
-      const start = new Date(y, m, 1).toISOString();
-      const end = new Date(y, m + 1, 0, 23, 59, 59).toISOString();
+      const start = toDate(y, m, 1);
+      const end = toDate(y, m, lastDay(y, m));
       const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setData(json.data);
@@ -73,8 +87,8 @@ export default function AylikOzetPage() {
   const fetchPrev = useCallback(async (y: number, m: number) => {
     const prevM = m === 0 ? 11 : m - 1;
     const prevY = m === 0 ? y - 1 : y;
-    const start = new Date(prevY, prevM, 1).toISOString();
-    const end = new Date(prevY, prevM + 1, 0, 23, 59, 59).toISOString();
+    const start = toDate(prevY, prevM, 1);
+    const end = toDate(prevY, prevM, lastDay(prevY, prevM));
     const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
     const json = await res.json() as { success: boolean; data?: ReportData };
     if (json.success && json.data) setPrevData(json.data);
@@ -94,8 +108,8 @@ export default function AylikOzetPage() {
   const [yearTrend, setYearTrend] = useState<MonthData[]>([]);
   useEffect(() => {
     const load = async () => {
-      const start = new Date(year, 0, 1).toISOString();
-      const end = new Date(year, 11, 31, 23, 59, 59).toISOString();
+      const start = `${year}-01-01`;
+      const end = `${year}-12-31`;
       const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setYearTrend(json.data.monthly);
@@ -176,6 +190,8 @@ export default function AylikOzetPage() {
                 <>
                   <StatRow label="🧾 Sabit Giderler" cur={data.monthly[0].sabitGider} prev={prevData?.monthly[0]?.sabitGider ?? 0} />
                   <StatRow label="👥 Personel Giderleri" cur={data.monthly[0].personelGider} prev={prevData?.monthly[0]?.personelGider ?? 0} />
+                  <StatRow label="📄 Senetler (Vadeli)" cur={data.monthly[0].senetGider ?? 0} prev={prevData?.monthly[0]?.senetGider ?? 0} />
+                  <StatRow label="🏦 Depo Havalesi / EFT" cur={data.monthly[0].depoHavalesi ?? 0} prev={prevData?.monthly[0]?.depoHavalesi ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
                     <span>Toplam Gider</span>
                     <span style={{ color: "#e74c3c" }}>{fmt(data.monthly[0].gider)}</span>
@@ -197,6 +213,81 @@ export default function AylikOzetPage() {
               )}
             </div>
           </div>
+
+          {/* Senetler Tablosu */}
+          {data?.promissoryNotes && data.promissoryNotes.length > 0 && (
+            <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
+              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)" }}>
+                📄 Bu Ay Vadesi Gelen Senetler
+              </h3>
+              <div style={{ overflowX: "auto" }}>
+                <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th>Senet No</th>
+                      <th>Vade Tarihi</th>
+                      <th>Tutar</th>
+                      <th>Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.promissoryNotes.map((n, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{n.noteNumber}</td>
+                        <td>{new Date(n.dueDate).toLocaleDateString("tr-TR")}</td>
+                        <td style={{ fontWeight: 700 }}>{n.amount.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</td>
+                        <td>
+                          <span style={{ padding: "2px 10px", borderRadius: "99px", fontSize: "12px", fontWeight: 600,
+                            background: n.isPaid ? "#e8f5e9" : "#fff3e0",
+                            color: n.isPaid ? "#2e7d32" : "#e65100" }}>
+                            {n.isPaid ? "Ödendi" : "Bekliyor"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Depo Havaleleri Tablosu */}
+          {data?.supplierTransfers && data.supplierTransfers.length > 0 && (
+            <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
+              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)" }}>
+                🏦 Bu Ay Depo Havaleleri
+              </h3>
+              <div style={{ overflowX: "auto" }}>
+                <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th>Tarih</th>
+                      <th>Depo</th>
+                      <th>Tutar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.supplierTransfers.map((t, i) => (
+                      <tr key={i}>
+                        <td>{new Date(t.transferDate).toLocaleDateString("tr-TR")}</td>
+                        <td style={{ fontWeight: 600 }}>{t.supplierName}</td>
+                        <td style={{ fontWeight: 700, color: "#e74c3c" }}>{t.amount.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: "2px solid var(--color-border)" }}>
+                      <td colSpan={2} style={{ fontWeight: 700, paddingTop: "10px" }}>Toplam</td>
+                      <td style={{ fontWeight: 800, color: "#e74c3c", paddingTop: "10px" }}>
+                        {data.supplierTransfers.reduce((s, t) => s + t.amount, 0)
+                          .toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Yıllık Trend */}
           {yearTrend.length > 0 && (

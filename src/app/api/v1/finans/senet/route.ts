@@ -11,7 +11,7 @@ const senetSchema = z.object({
   amount: z.number().min(0.01, "Tutar 0'dan büyük olmalıdır"),
   notes: z.string().optional(),
   isInstallment: z.boolean().default(false),
-  installmentCount: z.number().min(3).optional(),
+  installmentCount: z.number().min(2).optional(),
 });
 
 export async function POST(req: Request) {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const baseDueDate = new Date(validated.dueDate);
     const issueDate = new Date(validated.issueDate);
 
-    if (validated.isInstallment && validated.installmentCount && validated.installmentCount >= 3) {
+    if (validated.isInstallment && validated.installmentCount && validated.installmentCount >= 2) {
       const count = validated.installmentCount;
       const amountPerInstallment = validated.amount / count;
       const groupId = `grp_${Date.now()}_${Math.random().toString(36).substring(7)}`;

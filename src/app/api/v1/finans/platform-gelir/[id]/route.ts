@@ -37,24 +37,29 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     });
     if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
 
-    const updateData: any = { ...validated };
-
+    const dateFields: { incomeDate?: Date; expectedPaymentDate?: Date } = {};
     if (validated.incomeDate) {
       const dateStr = validated.incomeDate.split("T")[0];
-      updateData.incomeDate = new Date(`${dateStr}T00:00:00.000Z`);
-      updateData.expectedPaymentDate = addDays(updateData.incomeDate, 15);
+      dateFields.incomeDate = new Date(`${dateStr}T00:00:00.000Z`);
+      dateFields.expectedPaymentDate = addDays(dateFields.incomeDate, 15);
     }
 
     const updated = await prisma.platformIncome.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...(validated.platformName !== undefined && { platformName: validated.platformName }),
+        ...(validated.amount !== undefined && { amount: validated.amount }),
+        ...(validated.status !== undefined && { status: validated.status }),
+        ...(validated.notes !== undefined && { notes: validated.notes }),
+        ...dateFields,
+      },
     });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error("Platform PUT Error:", error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
     return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }

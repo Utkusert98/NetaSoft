@@ -29,11 +29,17 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Finans",
     items: [
       { href: "/finans/kasa", label: "Günlük Kasa", icon: "🏦" },
-      { href: "/finans/senet", label: "Senet Girişi", icon: "📄" },
-      { href: "/finans/sabit-gider", label: "Sabit Giderler", icon: "💸" },
-      { href: "/finans/calisan", label: "Personel Giderleri", icon: "👥" },
       { href: "/finans/sgk-fatura", label: "SGK Fatura", icon: "🏥" },
       { href: "/finans/platform-gelir", label: "Platform Gelirleri", icon: "📈" },
+      { href: "/finans/senet", label: "Senet & Depo Havalesi", icon: "📄" },
+      { href: "/finans/sabit-gider", label: "Sabit Giderler", icon: "💸" },
+      { href: "/finans/calisan", label: "Personel Giderleri", icon: "👥" },
+    ],
+  },
+  {
+    title: "Satış",
+    items: [
+      { href: "/satis/rapor", label: "Satış Raporları", icon: "🧾" },
     ],
   },
   {

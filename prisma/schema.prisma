@@ -121,7 +121,9 @@ model Pharmacy {
   employeeExpenses EmployeeExpense[]
   dailyRegisters   DailyRegister[]
   sgkInvoices      SgkInvoice[]
-  platformIncomes  PlatformIncome[]
+  platformIncomes   PlatformIncome[]
+  supplierTransfers SupplierTransfer[]
+  saleRecords       SaleRecord[]
 
   @@index([name])
   @@index([deletedAt])
@@ -531,9 +533,10 @@ model PromissoryNote {
   currency   String   @default("TRY")
 
   notes              String? @db.Text
-  isPaid             Boolean @default(false) @map("is_paid")
-  installmentGroupId String? @map("installment_group_id") // Taksit gruplaması için
-  installmentNumber  Int?    @map("installment_number") // Kaçıncı taksit
+  isPaid             Boolean   @default(false) @map("is_paid")
+  paidDate           DateTime? @map("paid_date")
+  installmentGroupId String?   @map("installment_group_id") // Taksit gruplaması için
+  installmentNumber  Int?      @map("installment_number") // Kaçıncı taksit
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -732,4 +735,59 @@ model PlatformIncome {
   @@index([pharmacyId, expectedPaymentDate])
   @@index([deletedAt])
   @@map("platform_incomes")
+}
+
+// ── Depo / Tedarikçi Havalesi ─────────────────────────────────────
+model SupplierTransfer {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  supplierName String   @map("supplier_name") // Depo adı (Bağfaş, Hedef vb.)
+  amount       Decimal  @db.Decimal(15, 2)
+  currency     String   @default("TRY")
+  transferDate DateTime @map("transfer_date")
+  notes        String?  @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, transferDate])
+  @@index([deletedAt])
+  @@map("supplier_transfers")
+}
+
+// ── Satış Kayıtları ───────────────────────────────────────────────
+model SaleRecord {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+
+  productGroup   String?  @map("product_group")
+  productName    String   @map("product_name")
+  saleDate       DateTime @map("sale_date")
+  price          Decimal  @db.Decimal(15, 2)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  saleType       SaleType @default(RETAIL) @map("sale_type") // PRESCRIPTION | RETAIL
+  quantity       Int      @default(1)
+
+  importBatchId String? @map("import_batch_id") // Grup yüklemeleri eşleştirme
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, saleDate])
+  @@index([pharmacyId, saleType])
+  @@index([pharmacyId, productGroup])
+  @@index([deletedAt])
+  @@map("sale_records")
+}
+
+enum SaleType {
+  PRESCRIPTION // Reçeteli / SGK
+  RETAIL       // Perakende / Elden
 }

@@ -95,16 +95,34 @@ export default function SenetPage() {
     }
   };
 
+  const [paidError, setPaidError] = useState("");
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
   const handleMarkPaid = async (id: string, isPaid: boolean) => {
+    setMarkingId(id);
+    setPaidError("");
+    // Optimistic update
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, isPaid } : n));
     try {
-      await fetch(`/api/v1/finans/senet/${id}`, {
+      const res = await fetch(`/api/v1/finans/senet/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isPaid }),
       });
-      await fetchNotes();
-    } catch (e) {
-      console.error(e);
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !json.success) {
+        // Hata varsa geri al
+        setNotes(prev => prev.map(n => n.id === id ? { ...n, isPaid: !isPaid } : n));
+        setPaidError(json.error ?? "İşlem başarısız oldu. Lütfen tekrar deneyin.");
+      } else {
+        // Sunucu verisini doğrula
+        await fetchNotes();
+      }
+    } catch {
+      setNotes(prev => prev.map(n => n.id === id ? { ...n, isPaid: !isPaid } : n));
+      setPaidError("Bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setMarkingId(null);
     }
   };
 
@@ -160,9 +178,15 @@ export default function SenetPage() {
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>Senet Yönetimi</h1>
-        <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>Senet girişi, takibi, ödeme işaretleme</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "var(--spacing-6)" }}>
+        <div>
+          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>Senet Yönetimi</h1>
+          <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>Senet girişi, takibi, ödeme işaretleme</p>
+        </div>
+        <a href="/finans/depo-havalesi"
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontWeight: 600, fontSize: "14px", textDecoration: "none" }}>
+          🏦 Depo Havalesi / EFT
+        </a>
       </div>
 
       {/* Özet kartları */}
@@ -290,6 +314,11 @@ export default function SenetPage() {
             <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 600, marginBottom: "var(--spacing-4)", color: "var(--color-warning)" }}>
               Bekleyen Senetler ({unpaid.length})
             </h2>
+            {paidError && (
+              <div style={{ marginBottom: "var(--spacing-3)", padding: "10px 14px", background: "var(--color-danger-pale, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", fontWeight: 500 }}>
+                ⚠ {paidError}
+              </div>
+            )}
             {loading ? (
               <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
             ) : unpaid.length === 0 ? (
@@ -333,9 +362,10 @@ export default function SenetPage() {
                             <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
                               <button
                                 onClick={() => void handleMarkPaid(note.id, true)}
-                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-success)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 600 }}
+                                disabled={markingId === note.id}
+                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-success)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", fontWeight: 600, opacity: markingId === note.id ? 0.7 : 1 }}
                               >
-                                Ödendi
+                                {markingId === note.id ? "..." : "Ödendi"}
                               </button>
                               <button
                                 onClick={() => openEdit(note)}
@@ -392,9 +422,10 @@ export default function SenetPage() {
                           <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
                             <button
                               onClick={() => void handleMarkPaid(note.id, false)}
-                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-warning)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}
+                              disabled={markingId === note.id}
+                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-warning)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", opacity: markingId === note.id ? 0.7 : 1 }}
                             >
-                              Ödenmedi
+                              {markingId === note.id ? "..." : "Ödenmedi"}
                             </button>
                             <button
                               onClick={() => setDeleteId(note.id)}

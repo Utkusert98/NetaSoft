@@ -22,11 +22,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   const startParam = searchParams.get("start");
   const endParam = searchParams.get("end");
 
-  const start = startParam ? new Date(startParam) : new Date(new Date().getFullYear(), 0, 1);
-  const end = endParam ? new Date(endParam) : new Date();
-  end.setHours(23, 59, 59, 999);
+  // Tarihleri "YYYY-MM-DD" formatında al, UTC gece yarısı olarak parse et
+  const start = startParam
+    ? new Date(startParam.slice(0, 10) + "T00:00:00.000Z")
+    : new Date(Date.UTC(new Date().getFullYear(), 0, 1));
+  const end = endParam
+    ? new Date(endParam.slice(0, 10) + "T23:59:59.999Z")
+    : new Date();
 
-  const [dailyRegs, sgkInvoices, platformIncomes, fixedExpenses, employeeExpenses, promissoryNotes] =
+  const [dailyRegs, sgkInvoices, platformIncomes, fixedExpenses, employeeExpenses, promissoryNotes, supplierTransfers] =
     await Promise.all([
       prisma.dailyRegister.findMany({
         where: { pharmacyId, deletedAt: null, registerDate: { gte: start, lte: end } },
@@ -49,7 +53,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         orderBy: { expenseDate: "asc" },
       }),
       prisma.employeeExpense.findMany({
-        where: { pharmacyId, expenseDate: { gte: start, lte: end } },
+        where: { pharmacyId, deletedAt: null, expenseDate: { gte: start, lte: end } },
         select: { expenseDate: true, salaryAmount: true, sgkAmount: true, totalAmount: true },
         orderBy: { expenseDate: "asc" },
       }),
@@ -58,6 +62,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         select: { dueDate: true, amount: true, isPaid: true, noteNumber: true },
         orderBy: { dueDate: "asc" },
       }),
+      prisma.supplierTransfer.findMany({
+        where: { pharmacyId, deletedAt: null, transferDate: { gte: start, lte: end } },
+        select: { transferDate: true, supplierName: true, amount: true },
+        orderBy: { transferDate: "asc" },
+      }),
     ]);
 
   // Aylık gruplama
@@ -65,6 +74,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     month: string; gelir: number; gider: number;
     kasa: number; sgk: number; platform: number;
     sabitGider: number; personelGider: number;
+    senetGider: number; depoHavalesi: number;
   }>();
 
   const getKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -73,7 +83,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const ensureMonth = (d: Date) => {
     const key = getKey(d);
     if (!monthlyMap.has(key)) {
-      monthlyMap.set(key, { month: getLabel(d), gelir: 0, gider: 0, kasa: 0, sgk: 0, platform: 0, sabitGider: 0, personelGider: 0 });
+      monthlyMap.set(key, { month: getLabel(d), gelir: 0, gider: 0, kasa: 0, sgk: 0, platform: 0, sabitGider: 0, personelGider: 0, senetGider: 0, depoHavalesi: 0 });
     }
     return monthlyMap.get(key)!;
   };
@@ -99,6 +109,14 @@ export async function GET(req: NextRequest): Promise<Response> {
     const m = ensureMonth(new Date(r.expenseDate));
     m.personelGider += Number(r.totalAmount); m.gider += Number(r.totalAmount);
   });
+  promissoryNotes.forEach(r => {
+    const m = ensureMonth(new Date(r.dueDate));
+    m.senetGider += Number(r.amount); m.gider += Number(r.amount);
+  });
+  supplierTransfers.forEach(r => {
+    const m = ensureMonth(new Date(r.transferDate));
+    m.depoHavalesi += Number(r.amount); m.gider += Number(r.amount);
+  });
 
   const monthly = Array.from(monthlyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -115,6 +133,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   });
   const totalEmpExp = employeeExpenses.reduce((s, r) => s + Number(r.totalAmount), 0);
   if (totalEmpExp > 0) expenseByType["PERSONEL"] = totalEmpExp;
+  const totalNotes = promissoryNotes.reduce((s, r) => s + Number(r.amount), 0);
+  if (totalNotes > 0) expenseByType["SENET"] = totalNotes;
+  const totalTransfers = supplierTransfers.reduce((s, r) => s + Number(r.amount), 0);
+  if (totalTransfers > 0) expenseByType["DEPO_HAVALESI"] = totalTransfers;
 
   // Gelir kaynakları
   const incomeBySource = {
@@ -141,6 +163,11 @@ export async function GET(req: NextRequest): Promise<Response> {
       amount: Number(n.amount),
       isPaid: n.isPaid,
       noteNumber: n.noteNumber,
+    })),
+    supplierTransfers: supplierTransfers.map(t => ({
+      transferDate: t.transferDate.toISOString(),
+      supplierName: t.supplierName,
+      amount: Number(t.amount),
     })),
   });
 }

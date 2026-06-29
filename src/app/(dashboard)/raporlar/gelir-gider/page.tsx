@@ -61,10 +61,12 @@ export default function GelirGiderPage() {
   const [customEnd, setCustomEnd] = useState("");
   const [showCustom, setShowCustom] = useState(false);
 
+  const toDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
   const fetchReport = useCallback(async (start: Date, end: Date) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/raporlar/ozet?start=${start.toISOString()}&end=${end.toISOString()}`);
+      const res = await fetch(`/api/v1/raporlar/ozet?start=${toDateStr(start)}&end=${toDateStr(end)}`);
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setData(json.data);
     } finally {

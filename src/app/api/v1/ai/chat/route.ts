@@ -4,32 +4,30 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError } from "@/lib/utils";
 
-const SYSTEM_PROMPT = `Sen NetaSoft Eczane Yönetim Sistemi'nin yapay zeka asistanısın.
+const SYSTEM_PROMPT = `KRITIK KURAL: Yanıtlarının HER KELİMESİ Türkçe olmalıdır. İngilizce, Fransızca, Almanca veya başka herhangi bir dilden tek bir kelime bile kullanma. "only", "the", "and", "but", "also", "however", "therefore" gibi İngilizce kelimeler KESİNLİKLE YASAKTIR. Türkçe karşılıklarını kullan: "sadece", "bu", "ve", "ama", "ayrıca", "ancak", "bu nedenle".
 
-## KİMLİĞİN
-Sadece NetaSoft sisteminde kayıtlı verilere dayanarak konuşursun. Kullanıcının eczanesine ait sisteme girilmiş gerçek veriler dışında HİÇBİR bilgi, örnek, tahmini rakam veya genel tavsiye vermezsin.
+Sen NetaSoft Eczane Yönetim Sistemi'nin Türkçe yapay zeka asistanısın.
 
-## KONUŞMA KURALLARI (İSTİSNASIZ)
-1. YALNIZCA Türkçe konuşursun. Başka dil kullanamazsın, başka dilden kelime karıştıramazsın.
-2. Sisteme girilmiş veri yoksa "Sistemde bu konuya ait kayıt bulunamadı. Lütfen önce ilgili modüle veri girin." dersin. Asla örnek rakam veya senaryo uydurmazsın.
-3. Genel finansal tavsiye, genel muhasebe bilgisi veya genel eczacılık bilgisi vermezsin. Sadece "bu eczaneye ait sisteme girilmiş veriler" hakkında yorum yaparsın.
-4. Tıbbi, hukuki veya ilaç konularında hiçbir şey söylemezsin.
-5. NetaSoft dışı hiçbir konuda (haber, siyaset, teknoloji, günlük yaşam vb.) yanıt vermezsin. Bu tür sorulara "Bu konuda yardımcı olamam. Eczane yönetimi veya finans konularında soru sorabilirsiniz." dersin.
+KIMLIĞIN:
+Yalnızca NetaSoft sistemine girilmiş gerçek verilere dayanarak konuşursun. Sisteme girilmemiş hiçbir veri hakkında yorum yapmazsın, örnek rakam üretmezsin, senaryo uydurmaz veya genel tavsiye vermezsin.
 
-## YAPABİLECEKLERİN
-Kullanıcı sisteme veri girdiyse ve sana o veriyi paylaşırsa şunları yapabilirsin:
-- Girilen gelir/gider verilerinden net kâr hesabı
-- SGK fatura tutarlarından beklenen ödeme takibi
-- Senet vadelerinden ödeme planı yorumu
-- Platform gelirlerinin karşılaştırması
-- Stok hareketlerinden trend yorumu
+KESIN KURALLAR:
+1. Her yanıt yüzde yüz Türkçe olacak. Yabancı dil kelimesi kullanmak yasaktır.
+2. Veri yoksa: "Sistemde bu konuya ait kayıt bulunamadı." dersin. Başka bir şey söylemezsin.
+3. Genel finansal, muhasebe, tıbbi veya hukuki tavsiye vermezsin.
+4. NetaSoft dışı konulara yanıt vermezsin.
 
-## YASAK DAVRANIŞLAR
-- Örnek rakam üretmek ("Örneğin 100.000 TL...")
-- Başka dilden kelime kullanmak
-- "Necesario", "όπως" gibi yabancı kelimeler
-- Sisteme girilmemiş veriyi varmış gibi yorumlamak
-- Genel tavsiye vermek ("Giderlerinizi azaltın", "Tasarruf edin" vb.)`;
+YAPABİLECEKLERİN (yalnızca sisteme girilmiş veriler için):
+- Aylık gelir/gider ve net kâr yorumu
+- SGK fatura ödeme takibi
+- Senet vade planı yorumu
+- Platform geliri karşılaştırması
+
+YASAK:
+- Yabancı kelime kullanmak (only, the, also, however, therefore, systémde vb.)
+- Sisteme girilmemiş veriyi varmış gibi göstermek
+- Genel tavsiye vermek`;
+
 
 
 async function getFinancialContext(userId: string): Promise<string> {
@@ -45,13 +43,18 @@ async function getFinancialContext(userId: string): Promise<string> {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [dailyRegs, sgkInvoices, platformIncomes, fixedExpenses, empExpenses, promissoryNotes, pharmacy] = await Promise.all([
-      prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: startOfMonth, lte: endOfMonth } }, select: { posAmount: true, cashAmount: true, wireAmount: true, registerDate: true } }),
-      prisma.sgkInvoice.findMany({ where: { pharmacyId, deletedAt: null, invoiceDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, invoiceType: true, invoiceDate: true } }),
+    const [dailyRegs, sgkInvoices, platformIncomes, fixedExpenses, empExpenses, monthNotes, upcomingNotes, supplierTransfers, pharmacy] = await Promise.all([
+      prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: startOfMonth, lte: endOfMonth } }, select: { posAmount: true, cashAmount: true, wireAmount: true } }),
+      prisma.sgkInvoice.findMany({ where: { pharmacyId, deletedAt: null, invoiceDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, invoiceType: true } }),
       prisma.platformIncome.findMany({ where: { pharmacyId, deletedAt: null, incomeDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, platformName: true, status: true } }),
       prisma.fixedExpense.findMany({ where: { pharmacyId, deletedAt: null, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, type: true, customType: true, notes: true } }),
-      prisma.employeeExpense.findMany({ where: { pharmacyId, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, select: { totalAmount: true, notes: true } }),
-      prisma.promissoryNote.findMany({ where: { pharmacyId, deletedAt: null, isPaid: false, dueDate: { gte: now } }, select: { amount: true, noteNumber: true, dueDate: true }, orderBy: { dueDate: "asc" }, take: 10 }),
+      prisma.employeeExpense.findMany({ where: { pharmacyId, deletedAt: null, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, select: { totalAmount: true } }),
+      // Bu ay vadesi gelen TÜM senetler (ödendi veya ödenmedik — gösterge paneli ile aynı formül)
+      prisma.promissoryNote.findMany({ where: { pharmacyId, deletedAt: null, dueDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, noteNumber: true, isPaid: true }, orderBy: { isPaid: "asc" } }),
+      // Gelecek vadeli ödenmemiş senetler (bilgilendirme amaçlı)
+      prisma.promissoryNote.findMany({ where: { pharmacyId, deletedAt: null, isPaid: false, dueDate: { gt: endOfMonth } }, select: { amount: true, noteNumber: true, dueDate: true }, orderBy: { dueDate: "asc" }, take: 10 }),
+      // Bu ay depo havaleleri
+      prisma.supplierTransfer.findMany({ where: { pharmacyId, deletedAt: null, transferDate: { gte: startOfMonth, lte: endOfMonth } }, select: { amount: true, supplierName: true } }),
       prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true } }),
     ]);
 
@@ -60,54 +63,73 @@ async function getFinancialContext(userId: string): Promise<string> {
     const platformTotal = platformIncomes.reduce((s, r) => s + Number(r.amount), 0);
     const fixedExp = fixedExpenses.reduce((s, r) => s + Number(r.amount), 0);
     const empExp = empExpenses.reduce((s, r) => s + Number(r.totalAmount), 0);
-    const notesDue = promissoryNotes.reduce((s, r) => s + Number(r.amount), 0);
+    // Gösterge paneli ile aynı formül: bu ay vadesi gelen tüm senetler gider
+    const notesTotal = monthNotes.reduce((s, r) => s + Number(r.amount), 0);
+    const supplierTotal = supplierTransfers.reduce((s, r) => s + Number(r.amount), 0);
+    const upcomingTotal = upcomingNotes.reduce((s, r) => s + Number(r.amount), 0);
 
     const totalIncome = cashIncome + sgkTotal + platformTotal;
-    const totalExpense = fixedExp + empExp;
+    // Gösterge paneli ile birebir aynı: sabit + personel + bu ay vadeli senetler
+    const totalExpense = fixedExp + empExp + notesTotal;
     const monthLabel = now.toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+    const fmt = (v: number) => v.toLocaleString("tr-TR", { minimumFractionDigits: 2 });
+
+    const paidNotes = monthNotes.filter(n => n.isPaid);
+    const unpaidMonthNotes = monthNotes.filter(n => !n.isPaid);
 
     const lines: string[] = [
-      `## Eczane: ${pharmacy?.name ?? "Bilinmiyor"}`,
-      `## ${monthLabel} Finansal Özeti`,
+      `Eczane: ${pharmacy?.name ?? "Bilinmiyor"}`,
+      `Dönem: ${monthLabel}`,
       ``,
-      `### GELİRLER`,
-      `- Kasa (Nakit+POS+Havale): ${cashIncome.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (${dailyRegs.length} gün)`,
-      `- SGK Faturaları: ${sgkTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (${sgkInvoices.length} fatura)`,
-      `- Platform Gelirleri: ${platformTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`,
-      `- **TOPLAM GELİR: ${totalIncome.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL**`,
+      `GELİRLER`,
+      `- Kasa (Nakit+POS+Havale): ${fmt(cashIncome)} TL (${dailyRegs.length} gün)`,
+      `- SGK Faturaları: ${fmt(sgkTotal)} TL (${sgkInvoices.length} fatura)`,
+      `- Platform Gelirleri: ${fmt(platformTotal)} TL (${platformIncomes.length} kayıt)`,
+      `- TOPLAM GELİR: ${fmt(totalIncome)} TL`,
       ``,
-      `### GİDERLER`,
-      `- Sabit Giderler: ${fixedExp.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (${fixedExpenses.length} kalem)`,
+      `GİDERLER (Gösterge Paneli ile aynı hesaplama)`,
+      `- Sabit Giderler: ${fmt(fixedExp)} TL (${fixedExpenses.length} kalem)`,
     ];
 
     if (fixedExpenses.length > 0) {
-      const typeLabel = (type: string, custom?: string | null) => ({ INVOICE: "Fatura", ACCOUNTING: "Muhasebe", TAX: "Vergi", RENT: "Kira", OTHER: custom ?? "Diğer" }[type] ?? type);
-      fixedExpenses.forEach(e => lines.push(`  • ${typeLabel(e.type, e.customType)}${e.notes ? " — " + e.notes : ""}: ${Number(e.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`));
+      const typeLabel = (type: string, custom?: string | null): string =>
+        ({ INVOICE: "Fatura", ACCOUNTING: "Muhasebe", TAX: "Vergi", RENT: "Kira", OTHER: custom ?? "Diğer" }[type] ?? type);
+      fixedExpenses.forEach(e => lines.push(`  * ${typeLabel(e.type, e.customType)}${e.notes ? " (" + e.notes + ")" : ""}: ${fmt(Number(e.amount))} TL`));
     }
 
-    lines.push(`- Personel Giderleri: ${empExp.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (${empExpenses.length} kayıt)`);
+    lines.push(`- Personel Giderleri: ${fmt(empExp)} TL (${empExpenses.length} kayıt)`);
+    lines.push(`- Bu Ay Vadeli Senetler: ${fmt(notesTotal)} TL (${monthNotes.length} senet — ${paidNotes.length} ödendi, ${unpaidMonthNotes.length} bekliyor)`);
+    if (monthNotes.length > 0) {
+      monthNotes.forEach(n => lines.push(`  * Senet ${n.noteNumber}: ${fmt(Number(n.amount))} TL — ${n.isPaid ? "Ödendi" : "Bekliyor"}`));
+    }
+
+    if (supplierTotal > 0) {
+      lines.push(`- Depo Havaleleri / EFT: ${fmt(supplierTotal)} TL (${supplierTransfers.length} transfer — bu kalem gösterge paneline dahil değildir)`);
+      supplierTransfers.forEach(t => lines.push(`  * ${t.supplierName}: ${fmt(Number(t.amount))} TL`));
+    }
 
     lines.push(
-      `- **TOPLAM GİDER: ${totalExpense.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL**`,
+      `- TOPLAM GİDER: ${fmt(totalExpense)} TL`,
       ``,
-      `### NET KÂR/ZARAR`,
-      `- **${(totalIncome - totalExpense).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL**`,
+      `NET KAR/ZARAR: ${fmt(totalIncome - totalExpense)} TL`,
       ``,
     );
 
-    if (promissoryNotes.length > 0) {
-      lines.push(`### YAKLAŞAN SENET VADELERİ (Toplam: ${notesDue.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL)`);
-      promissoryNotes.forEach(n => {
+    if (upcomingNotes.length > 0) {
+      lines.push(`GELECEK VADELI ÖDENMEMIŞ SENETLER (Toplam: ${fmt(upcomingTotal)} TL)`);
+      upcomingNotes.forEach(n => {
         const dateStr = new Date(n.dueDate).toLocaleDateString("tr-TR");
-        lines.push(`  • Senet ${n.noteNumber}: ${Number(n.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL — Vade: ${dateStr}`);
+        lines.push(`  * Senet ${n.noteNumber}: ${fmt(Number(n.amount))} TL — Vade: ${dateStr}`);
       });
-    } else {
-      lines.push("### SENETLER: Yaklaşan ödenmemiş senet yok.");
+      lines.push(``);
     }
 
     if (platformIncomes.length > 0) {
-      lines.push(``, `### PLATFORM GELİRLERİ DETAYI`);
-      platformIncomes.forEach(p => lines.push(`  • ${p.platformName} (${p.status}): ${Number(p.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`));
+      lines.push(`PLATFORM GELİRLERİ DETAYI`);
+      platformIncomes.forEach(p => {
+        const durum = p.status === "PENDING" ? "Beklemede" : p.status === "RECEIVED" ? "Alındı" : "İptal";
+        lines.push(`  * ${p.platformName} (${durum}): ${fmt(Number(p.amount))} TL`);
+      });
     }
 
     return lines.join("\n");
