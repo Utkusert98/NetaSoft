@@ -10,6 +10,7 @@ export interface ParsedSaleRow {
   discountAmount: number;
   saleType: "PRESCRIPTION" | "RETAIL";
   quantity: number;
+  netRevenue: number;
 }
 
 export interface ColumnMap {
@@ -20,9 +21,20 @@ export interface ColumnMap {
   date: string;
   group: string;
   type: string;
+  priceIsNet: boolean;
 }
 
-// Satır tipi eşleme — yaygın Türkçe ifadeler
+export interface ColumnOverride {
+  price?: string;
+  quantity?: string;
+  discount?: string;
+  name?: string;
+  date?: string;
+  group?: string;
+  type?: string;
+  priceIsNet?: boolean;
+}
+
 function parseSaleType(raw: string): "PRESCRIPTION" | "RETAIL" {
   const v = raw.toLowerCase().trim();
   if (v.includes("reçete") || v.includes("recete") || v.includes("sgk") || v.includes("prescription")) {
@@ -31,14 +43,12 @@ function parseSaleType(raw: string): "PRESCRIPTION" | "RETAIL" {
   return "RETAIL";
 }
 
-// Türkçe tarih biçimleri: dd.MM.yyyy, dd/MM/yyyy, yyyy-MM-dd → ISO datetime
 function parseDate(raw: string): string {
   const s = String(raw).trim();
   const dmy = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T00:00:00.000Z`;
   const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}T00:00:00.000Z`;
-  // Excel serial date number
   const n = Number(s);
   if (!isNaN(n) && n > 40000) {
     const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
@@ -51,17 +61,14 @@ function parseNum(raw: unknown): number {
   if (typeof raw === "number") return isNaN(raw) ? 0 : Math.abs(raw);
   const s = String(raw ?? "0").trim().replace(/\s/g, "");
   if (!s || s === "-") return 0;
-  // Türkçe format: hem "." hem "," var → "1.234,56" → 1234.56
   if (s.includes(",") && s.includes(".")) {
     const n = parseFloat(s.replace(/\./g, "").replace(",", "."));
     return isNaN(n) ? 0 : Math.abs(n);
   }
-  // Sadece "," var → ondalık ayracı: "1234,56" → 1234.56
   if (s.includes(",")) {
     const n = parseFloat(s.replace(",", "."));
     return isNaN(n) ? 0 : Math.abs(n);
   }
-  // Sadece "." var → 3 basamaklıysa binlik ayraç: "1.234" → 1234
   if (s.includes(".")) {
     const afterDot = s.split(".").pop() ?? "";
     if (afterDot.length === 3) {
@@ -73,61 +80,112 @@ function parseNum(raw: unknown): number {
   return isNaN(n) ? 0 : Math.abs(n);
 }
 
-// Kolon adlarını normalize et
-function normalizeHeader(h: string): string {
+function norm(h: string): string {
   return h.toLowerCase().trim()
     .replace(/\s+/g, " ")
     .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g")
     .replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
 }
 
-// Kolon adını bul ve hem değeri hem bulunan başlığı döndür
-function getWithHeader(headers: string[], row: unknown[], keys: string[]): { value: unknown; header: string } {
+function findIdx(headers: string[], keys: string[]): number {
   for (const k of keys) {
-    const idx = headers.findIndex(h => normalizeHeader(h).includes(k));
-    if (idx >= 0) return { value: row[idx], header: headers[idx] ?? "" };
+    const idx = headers.findIndex(h => norm(h).includes(k));
+    if (idx >= 0) return idx;
   }
-  return { value: "", header: "(bulunamadı)" };
+  return -1;
 }
 
-interface MappedRow { row: ParsedSaleRow; columnMap: ColumnMap }
+function findByName(headers: string[], name: string): number {
+  return headers.findIndex(h => norm(h) === norm(name));
+}
 
-function mapRow(headers: string[], row: unknown[]): MappedRow {
-  const date   = getWithHeader(headers, row, ["tarih", "date", "satis tarihi", "sale date", "islem tarihi"]);
-  const price  = getWithHeader(headers, row, ["birim fiyat", "liste fiyati", "satis fiyati", "fiyat", "price", "birim", "unit price", "tutar", "amount", "net tutar"]);
-  const disc   = getWithHeader(headers, row, ["iskonto tutari", "iskonto tutar", "indirim tutari", "iskonto", "discount amount", "discount", "indirim", "ind."]);
-  const discR  = getWithHeader(headers, row, ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
-  const type   = getWithHeader(headers, row, ["satis tipi", "satis turu", "tip", "type", "recete", "prescription", "recete"]);
-  const group  = getWithHeader(headers, row, ["urun grubu", "grup", "group", "product group", "kategori", "category", "ana grup"]);
-  const name   = getWithHeader(headers, row, ["urun adi", "ilac adi", "stok adi", "product name", "urun", "product", "adi", "name", "stok"]);
-  const qty    = getWithHeader(headers, row, ["adet", "miktar", "quantity", "qty", "sayi", "satis adedi"]);
+// Kolon adının "net tutar" / "tutar" gibi bir toplam gelir kolonu olup olmadığını kontrol et
+function isNetCol(colName: string): boolean {
+  const n = norm(colName);
+  return ["net tutar", "tutar", "toplam tutar", "satis tutari", "net amount", "toplam"].some(k => n === k);
+}
 
-  const qtyNum = Math.max(1, Math.round(parseNum(qty.value) || 1));
-  const priceNum = parseNum(price.value);
-  let discountAmount = parseNum(disc.value);
-  if (discountAmount === 0 && discR.value) {
-    const rate = parseNum(discR.value);
-    if (rate > 0 && rate <= 100) discountAmount = priceNum * qtyNum * (rate / 100);
+interface MappedRow { row: ParsedSaleRow; colMap: ColumnMap }
+
+function mapRow(headers: string[], row: unknown[], override: ColumnOverride): MappedRow {
+  const gi = (col: string | undefined, keys: string[]) =>
+    col ? findByName(headers, col) : findIdx(headers, keys);
+  const gv = (i: number) => i >= 0 ? row[i] : "";
+  const gh = (i: number) => i >= 0 ? (headers[i] ?? "") : "(bulunamadı)";
+
+  const dateIdx  = gi(override.date,     ["tarih", "date", "satis tarihi", "sale date", "islem tarihi"]);
+  const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "urun", "product", "adi", "name", "stok"]);
+  const groupIdx = gi(override.group,    ["urun grubu", "grup", "group", "product group", "kategori", "category", "ana grup"]);
+  const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "tip", "type", "recete", "prescription"]);
+  const qtyIdx   = gi(override.quantity, ["adet", "miktar", "quantity", "qty", "sayi", "satis adedi"]);
+  const discIdx  = gi(override.discount, ["iskonto tutari", "iskonto tutar", "indirim tutari", "iskonto", "discount amount", "discount", "indirim", "ind."]);
+  const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
+
+  let priceIdx = -1;
+  let priceIsNet = override.priceIsNet ?? false;
+
+  if (override.price) {
+    priceIdx = findByName(headers, override.price);
+    if (override.priceIsNet === undefined) priceIsNet = isNetCol(override.price);
+  } else {
+    // Önce birim fiyat kolonlarını ara
+    priceIdx = findIdx(headers, ["birim fiyat", "liste fiyati", "satis fiyati", "fiyat", "price", "birim", "unit price"]);
+    if (priceIdx < 0) {
+      // Yoksa net tutar türü kolonları bul — otomatik olarak net mod
+      priceIdx = findIdx(headers, ["net tutar", "tutar", "toplam", "amount", "net amount"]);
+      if (priceIdx >= 0) priceIsNet = true;
+    }
+  }
+
+  const priceNum = parseNum(gv(priceIdx));
+  const qtyNum = Math.max(1, Math.round(parseNum(gv(qtyIdx)) || 1));
+
+  let discountAmount = parseNum(gv(discIdx));
+  if (discountAmount === 0 && discRIdx >= 0) {
+    const rate = parseNum(gv(discRIdx));
+    if (rate > 0 && rate <= 100) {
+      discountAmount = priceIsNet ? priceNum * (rate / 100) : priceNum * qtyNum * (rate / 100);
+    }
+  }
+
+  let finalPrice: number;
+  let finalQty: number;
+  let finalDiscount: number;
+  let netRevenue: number;
+
+  if (priceIsNet) {
+    // priceNum zaten toplam gelir — adete bölme, quantity=1
+    finalPrice   = priceNum;
+    finalQty     = 1;
+    finalDiscount = discountAmount;
+    netRevenue   = priceNum - discountAmount;
+  } else {
+    finalPrice   = priceNum;
+    finalQty     = qtyNum;
+    finalDiscount = discountAmount;
+    netRevenue   = finalPrice * finalQty - finalDiscount;
   }
 
   return {
     row: {
-      productGroup: String(group.value ?? "").trim() || "Genel",
-      productName: String(name.value ?? "").trim() || "Bilinmiyor",
-      saleDate: parseDate(String(date.value ?? "")),
-      price: priceNum,
-      discountAmount,
-      saleType: parseSaleType(String(type.value ?? "")),
-      quantity: qtyNum,
+      productGroup:   String(gv(groupIdx) ?? "").trim() || "Genel",
+      productName:    String(gv(nameIdx) ?? "").trim() || "Bilinmiyor",
+      saleDate:       parseDate(String(gv(dateIdx) ?? "")),
+      price:          finalPrice,
+      discountAmount: finalDiscount,
+      saleType:       parseSaleType(String(gv(typeIdx) ?? "")),
+      quantity:       finalQty,
+      netRevenue,
     },
-    columnMap: {
-      price: price.header,
-      quantity: qty.header,
-      discount: disc.header !== "(bulunamadı)" ? disc.header : discR.header,
-      name: name.header,
-      date: date.header,
-      group: group.header,
-      type: type.header,
+    colMap: {
+      price:      gh(priceIdx),
+      quantity:   priceIsNet ? "—" : gh(qtyIdx),
+      discount:   gh(discIdx >= 0 ? discIdx : discRIdx),
+      name:       gh(nameIdx),
+      date:       gh(dateIdx),
+      group:      gh(groupIdx),
+      type:       gh(typeIdx),
+      priceIsNet,
     },
   };
 }
@@ -141,42 +199,34 @@ export async function POST(req: NextRequest): Promise<Response> {
     const file = formData.get("file");
     if (!file || typeof file === "string") return apiError("Dosya bulunamadı", "NO_FILE", 400);
 
+    const overrideRaw = formData.get("columnOverride");
+    const override: ColumnOverride = overrideRaw && typeof overrideRaw === "string"
+      ? (JSON.parse(overrideRaw) as ColumnOverride)
+      : {};
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const name = file.name.toLowerCase();
-    const rows: ParsedSaleRow[] = [];
 
-    let columnMap: ColumnMap | null = null;
+    let headers: string[] = [];
+    let dataRows: unknown[][] = [];
 
     if (name.endsWith(".csv")) {
       const text = buffer.toString("utf-8");
       const lines = text.split(/\r?\n/).filter(l => l.trim());
       if (lines.length < 2) return apiError("CSV boş veya geçersiz", "EMPTY_FILE", 400);
-
       const sep = lines[0].includes(";") ? ";" : ",";
-      const headers = lines[0].split(sep).map(h => h.replace(/^"|"$/g, "").trim());
+      headers = lines[0].split(sep).map(h => h.replace(/^"|"$/g, "").trim());
+      dataRows = lines.slice(1).map(l => l.split(sep).map(c => c.replace(/^"|"$/g, "").trim()));
 
-      for (let i = 1; i < lines.length; i++) {
-        const cells = lines[i].split(sep).map(c => c.replace(/^"|"$/g, "").trim());
-        if (cells.every(c => !c)) continue;
-        const mapped = mapRow(headers, cells);
-        if (!columnMap) columnMap = mapped.columnMap;
-        rows.push(mapped.row);
-      }
     } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
       if (data.length < 2) return apiError("Excel boş veya geçersiz", "EMPTY_FILE", 400);
+      headers = (data[0] as unknown[]).map(h => String(h));
+      dataRows = data.slice(1) as unknown[][];
 
-      const headers = (data[0] as unknown[]).map(h => String(h));
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i] as unknown[];
-        if (row.every(c => !c)) continue;
-        const mapped = mapRow(headers, row);
-        if (!columnMap) columnMap = mapped.columnMap;
-        rows.push(mapped.row);
-      }
     } else if (name.endsWith(".pdf")) {
       let pdfjs: typeof import("pdfjs-dist");
       try {
@@ -191,33 +241,47 @@ export async function POST(req: NextRequest): Promise<Response> {
       for (let p = 1; p <= pdf.numPages; p++) {
         const page = await pdf.getPage(p);
         const content = await page.getTextContent();
-        const pageText = content.items.filter(i => "str" in i).map(i => (i as { str: string }).str).join(" ");
-        lines.push(pageText);
+        lines.push(content.items.filter(i => "str" in i).map(i => (i as { str: string }).str).join(" "));
       }
-      // PDF'den basit satır bazlı parse
       const fullText = lines.join("\n");
-      const textRows = fullText.split(/\n/).filter(l => l.trim().length > 5);
-      for (const line of textRows.slice(1)) {
-        const parts = line.trim().split(/\s{2,}|\t/);
-        if (parts.length >= 3) {
-          rows.push({
+      const pdfRows: ParsedSaleRow[] = fullText.split(/\n/)
+        .filter(l => l.trim().length > 5)
+        .slice(1)
+        .flatMap(line => {
+          const parts = line.trim().split(/\s{2,}|\t/);
+          if (parts.length < 3) return [];
+          const priceNum = parseNum(parts[2]);
+          return [{
             productGroup: "Genel",
             productName: parts[0] ?? "Bilinmiyor",
             saleDate: parseDate(parts[1] ?? ""),
-            price: parseNum(parts[2]),
+            price: priceNum,
             discountAmount: parseNum(parts[3]),
             saleType: parseSaleType(parts[4] ?? ""),
             quantity: 1,
-          });
-        }
-      }
+            netRevenue: priceNum,
+          }];
+        });
+      if (!pdfRows.length) return apiError("PDF'den satış verisi okunamadı", "NO_DATA", 400);
+      return apiResponse({ rows: pdfRows, total: pdfRows.length, columnMap: null, headers: [] });
+
     } else {
       return apiError("Desteklenmeyen dosya formatı. CSV, Excel veya PDF yükleyin.", "INVALID_FORMAT", 400);
     }
 
+    const rows: ParsedSaleRow[] = [];
+    let columnMap: ColumnMap | null = null;
+
+    for (const rowData of dataRows) {
+      if ((rowData as unknown[]).every(c => !c)) continue;
+      const mapped = mapRow(headers, rowData as unknown[], override);
+      if (!columnMap) columnMap = mapped.colMap;
+      rows.push(mapped.row);
+    }
+
     if (!rows.length) return apiError("Dosyadan satış verisi okunamadı", "NO_DATA", 400);
 
-    return apiResponse({ rows, total: rows.length, columnMap });
+    return apiResponse({ rows, total: rows.length, columnMap, headers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Dosya işlenemedi";
     return apiError(msg, "PARSE_ERROR", 500);

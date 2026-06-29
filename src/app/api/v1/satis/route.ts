@@ -10,6 +10,7 @@ const rowSchema = z.object({
   saleDate: z.string().datetime(),
   price: z.number().min(0),
   discountAmount: z.number().min(0).default(0),
+  netRevenue: z.number().min(0).default(0),
   saleType: z.enum(["PRESCRIPTION", "RETAIL"]).default("RETAIL"),
   quantity: z.number().int().min(1).default(1),
 });
@@ -47,6 +48,7 @@ export async function POST(req: Request): Promise<Response> {
       saleDate: new Date(r.saleDate),
       price: r.price,
       discountAmount: r.discountAmount,
+      netRevenue: r.netRevenue > 0 ? r.netRevenue : r.price * r.quantity - r.discountAmount,
       saleType: r.saleType,
       quantity: r.quantity,
       importBatchId: batchId,
@@ -99,22 +101,24 @@ export async function GET(req: NextRequest): Promise<Response> {
       orderBy: { saleDate: "desc" },
     });
 
-    // Özet hesapla
-    const totalRevenue = records.reduce((s, r) => s + Number(r.price) * r.quantity - Number(r.discountAmount), 0);
+    // netRevenue alanı varsa kullan, yoksa hesapla (eski kayıtlar için fallback)
+    type SaleRow = typeof records[number];
+    const getNet = (r: SaleRow) => {
+      const nr = Number((r as SaleRow & { netRevenue?: unknown }).netRevenue ?? 0);
+      if (nr > 0) return nr;
+      return Number(r.price) * r.quantity - Number(r.discountAmount);
+    };
+
+    const totalRevenue = records.reduce((s, r) => s + getNet(r), 0);
     const prescriptionCount = records.filter(r => r.saleType === "PRESCRIPTION").length;
     const retailCount = records.filter(r => r.saleType === "RETAIL").length;
-    const prescriptionRevenue = records
-      .filter(r => r.saleType === "PRESCRIPTION")
-      .reduce((s, r) => s + Number(r.price) * r.quantity - Number(r.discountAmount), 0);
-    const retailRevenue = records
-      .filter(r => r.saleType === "RETAIL")
-      .reduce((s, r) => s + Number(r.price) * r.quantity - Number(r.discountAmount), 0);
+    const prescriptionRevenue = records.filter(r => r.saleType === "PRESCRIPTION").reduce((s, r) => s + getNet(r), 0);
+    const retailRevenue = records.filter(r => r.saleType === "RETAIL").reduce((s, r) => s + getNet(r), 0);
 
-    // Ürün grubu bazlı özet
     const byGroup: Record<string, number> = {};
     records.forEach(r => {
       const g = r.productGroup ?? "Genel";
-      byGroup[g] = (byGroup[g] ?? 0) + Number(r.price) * r.quantity - Number(r.discountAmount);
+      byGroup[g] = (byGroup[g] ?? 0) + getNet(r);
     });
 
     return apiResponse({
@@ -125,6 +129,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         saleDate: r.saleDate.toISOString(),
         price: Number(r.price),
         discountAmount: Number(r.discountAmount),
+        netRevenue: getNet(r),
         saleType: r.saleType,
         quantity: r.quantity,
       })),
