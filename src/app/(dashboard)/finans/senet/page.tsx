@@ -51,7 +51,7 @@ export default function SenetPage() {
 
   const fetchNotes = async () => {
     try {
-      const res = await fetch("/api/v1/finans/senet");
+      const res = await fetch("/api/v1/finans/senet", { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: PromissoryNote[] };
       if (json.success && json.data) setNotes(json.data);
     } catch (e) {
@@ -84,7 +84,7 @@ export default function SenetPage() {
       };
       const res = await fetch("/api/v1/finans/senet", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json() as { success: boolean; error?: string };
@@ -109,7 +109,7 @@ export default function SenetPage() {
     try {
       const res = await fetch(`/api/v1/finans/senet/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ isPaid }),
       });
       const json = await res.json() as { success?: boolean; error?: string };
@@ -145,7 +145,7 @@ export default function SenetPage() {
     try {
       await fetch(`/api/v1/finans/senet/${editNote.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({
           amount: parseFloat(editForm.amount),
           dueDate: editForm.dueDate + "T00:00:00.000Z",
@@ -165,7 +165,7 @@ export default function SenetPage() {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      await fetch(`/api/v1/finans/senet/${deleteId}`, { method: "DELETE" });
+      await fetch(`/api/v1/finans/senet/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       setDeleteId(null);
       await fetchNotes();
     } catch (e) {

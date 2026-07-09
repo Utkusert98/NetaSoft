@@ -68,7 +68,7 @@ export default function GelirGiderPage() {
   const fetchReport = useCallback(async (start: Date, end: Date) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/raporlar/ozet?start=${toDateStr(start)}&end=${toDateStr(end)}`);
+      const res = await fetch(`/api/v1/raporlar/ozet?start=${toDateStr(start)}&end=${toDateStr(end)}`, { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setData(json.data);
     } finally {

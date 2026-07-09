@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { apiError, apiResponse } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 export interface ParsedSgkInvoice {
   fileName: string;
@@ -110,7 +111,8 @@ function normDate(raw: string): string {
 
 export async function POST(req: NextRequest): Promise<Response> {
   const session = await auth();
-  if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+  const lang = getLang(req);
+  if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
   try {
     const formData = await req.formData();

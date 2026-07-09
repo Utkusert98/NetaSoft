@@ -87,7 +87,7 @@ export default function KayitPage() {
     try {
       const response = await fetch("/api/v1/auth/kayit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify(formData),
       });
 

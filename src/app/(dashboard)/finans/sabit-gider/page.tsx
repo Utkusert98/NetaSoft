@@ -29,7 +29,7 @@ export default function SabitGiderPage() {
 
   const fetchExpenses = async () => {
     try {
-      const res = await fetch("/api/v1/finans/sabit-gider");
+      const res = await fetch("/api/v1/finans/sabit-gider", { headers: { "Accept-Language": lang } });
       const json = await res.json();
       if (json.success) setExpenses(json.data);
     } catch (e) {
@@ -58,7 +58,7 @@ export default function SabitGiderPage() {
 
       const res = await fetch("/api/v1/finans/sabit-gider", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
 
@@ -85,7 +85,7 @@ export default function SabitGiderPage() {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      await fetch(`/api/v1/finans/sabit-gider/${deleteId}`, { method: "DELETE" });
+      await fetch(`/api/v1/finans/sabit-gider/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       setDeleteId(null);
       await fetchExpenses();
     } catch (e) {

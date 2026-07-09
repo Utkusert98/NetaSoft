@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const SYSTEM_PROMPT_TR = `KRITIK KURAL: Yanıtlarının HER KELİMESİ Türkçe olmalıdır. İngilizce veya başka herhangi bir dilden tek bir kelime bile kullanma.
 
@@ -156,8 +157,9 @@ async function getFinancialContext(userId: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const reqLang = getLang(req);
   const session = await auth();
-  if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+  if (!session?.user?.id) return apiError(m("unauthorized", reqLang), "UNAUTHORIZED", 401);
 
   const body = await req.json() as { messages: Array<{ role: "user" | "assistant"; content: string }>; lang?: string };
   const { messages, lang } = body;

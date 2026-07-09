@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError, apiResponse } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 async function getPharmacyId(userId: string): Promise<string | null> {
   const role = await prisma.userPharmacyRole.findFirst({
@@ -10,12 +11,13 @@ async function getPharmacyId(userId: string): Promise<string | null> {
   return role?.pharmacyId ?? null;
 }
 
-export async function DELETE(): Promise<Response> {
+export async function DELETE(req: Request): Promise<Response> {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return apiError("Eczane bulunamadı", "NO_PHARMACY", 404);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { count } = await prisma.saleRecord.updateMany({
       where: { pharmacyId, deletedAt: null },
@@ -24,6 +26,6 @@ export async function DELETE(): Promise<Response> {
 
     return apiResponse({ deleted: count });
   } catch {
-    return apiError("Sunucu hatası", "SERVER_ERROR", 500);
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

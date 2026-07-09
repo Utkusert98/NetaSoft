@@ -50,7 +50,7 @@ export default function PlatformGelirPage() {
   const fetchIncomes = useCallback(async () => {
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : "";
-      const res = await fetch(`/api/v1/finans/platform-gelir${qs}`);
+      const res = await fetch(`/api/v1/finans/platform-gelir${qs}`, { headers: { "Accept-Language": lang } });
       const json = await res.json();
       if (json.success) setIncomes(json.data);
     } catch (e) {
@@ -84,7 +84,7 @@ export default function PlatformGelirPage() {
       const payload = { ...formData, amount: parseFloat(formData.amount) };
       const res = await fetch("/api/v1/finans/platform-gelir", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -121,7 +121,7 @@ export default function PlatformGelirPage() {
       const payload = { ...editForm, amount: parseFloat(editForm.amount) };
       const res = await fetch(`/api/v1/finans/platform-gelir/${editRecord.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -139,7 +139,7 @@ export default function PlatformGelirPage() {
     try {
       const res = await fetch(`/api/v1/finans/platform-gelir/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("Durum güncellenemedi");
@@ -153,7 +153,7 @@ export default function PlatformGelirPage() {
     if (!deleteId) return;
     setDeleteSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/finans/platform-gelir/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/v1/finans/platform-gelir/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       if (!res.ok) throw new Error("Silme işlemi başarısız");
       setDeleteId(null);
       await fetchIncomes();

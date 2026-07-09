@@ -190,7 +190,7 @@ export default function AyarlarPage() {
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
   const loadPharmacy = useCallback(async () => {
-    const res = await fetch("/api/v1/ayarlar/eczane");
+    const res = await fetch("/api/v1/ayarlar/eczane", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: PharmacyData };
     if (json.success && json.data) {
       setPharmacy(json.data);
@@ -208,7 +208,7 @@ export default function AyarlarPage() {
   }, []);
 
   const loadUser = useCallback(async () => {
-    const res = await fetch("/api/v1/ayarlar/profil");
+    const res = await fetch("/api/v1/ayarlar/profil", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: UserData };
     if (json.success && json.data) {
       setUser(json.data);
@@ -231,7 +231,7 @@ export default function AyarlarPage() {
   const savePharmacy = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError(""); setSuccess("");
     try {
-      const res = await fetch("/api/v1/ayarlar/eczane", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pharForm) });
+      const res = await fetch("/api/v1/ayarlar/eczane", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(pharForm) });
       const json = await res.json() as { success: boolean; error?: string };
       if (!json.success) throw new Error(json.error ?? "Kayıt hatası");
       setSuccess(tx(t.settings.updatePharmacy, lang));
@@ -243,7 +243,7 @@ export default function AyarlarPage() {
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError(""); setSuccess("");
     try {
-      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profileForm) });
+      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(profileForm) });
       const json = await res.json() as { success: boolean; error?: string };
       if (!json.success) throw new Error(json.error ?? "Kayıt hatası");
       setSuccess(tx(t.settings.updateProfile, lang));
@@ -255,7 +255,7 @@ export default function AyarlarPage() {
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError(""); setSuccess("");
     try {
-      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "change-password", ...pwForm }) });
+      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify({ action: "change-password", ...pwForm }) });
       const json = await res.json() as { success: boolean; error?: string };
       if (!json.success) throw new Error(json.error ?? "Hata oluştu");
       setSuccess(tx(t.settings.updatePassword, lang));

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const kasaUpdateSchema = z.object({
   registerDate: z.string().optional(),
@@ -22,12 +23,13 @@ async function getPharmacyId(userId: string) {
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { id } = await params;
     const body = await req.json();
@@ -37,7 +39,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const existing = await prisma.dailyRegister.findFirst({
       where: { id, pharmacyId, deletedAt: null },
     });
-    if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
+    if (!existing) return NextResponse.json({ success: false, error: m("notFound", lang), code: "NOT_FOUND" }, { status: 404 });
 
     const updateData: {
       posAmount?: number; cashAmount?: number; wireAmount?: number;
@@ -84,24 +86,25 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { id } = await params;
 
     const existing = await prisma.dailyRegister.findFirst({
       where: { id, pharmacyId, deletedAt: null },
     });
-    if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
+    if (!existing) return NextResponse.json({ success: false, error: m("notFound", lang), code: "NOT_FOUND" }, { status: 404 });
 
     await prisma.dailyRegister.update({
       where: { id },
@@ -111,6 +114,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Kasa DELETE Error:", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }

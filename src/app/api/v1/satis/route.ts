@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { apiError, apiResponse } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const rowSchema = z.object({
   productGroup: z.string().default("Genel"),
@@ -30,11 +31,12 @@ async function getPharmacyId(userId: string): Promise<string | null> {
 
 // POST /api/v1/satis  — onaylanan satışları kaydet
 export async function POST(req: Request): Promise<Response> {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const body = await req.json();
     const { rows, importBatchId } = confirmSchema.parse(body);
@@ -65,17 +67,18 @@ export async function POST(req: Request): Promise<Response> {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
 // GET /api/v1/satis?start=&end=&type=&group=
 export async function GET(req: NextRequest): Promise<Response> {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return apiError("Eczane bulunamadı", "NO_PHARMACY", 404);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { searchParams } = new URL(req.url);
     const startParam = searchParams.get("start");
@@ -144,6 +147,6 @@ export async function GET(req: NextRequest): Promise<Response> {
       },
     });
   } catch {
-    return apiError("Sunucu hatası", "SERVER_ERROR", 500);
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

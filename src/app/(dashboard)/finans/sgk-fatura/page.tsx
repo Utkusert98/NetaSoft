@@ -29,7 +29,7 @@ function PdfUploadReview({
     try {
       const fd = new FormData();
       Array.from(files).forEach((f) => fd.append("files", f));
-      const res = await fetch("/api/v1/finans/sgk-fatura/parse-pdf", { method: "POST", body: fd });
+      const res = await fetch("/api/v1/finans/sgk-fatura/parse-pdf", { method: "POST", headers: { "Accept-Language": lang }, body: fd });
       const json = await res.json() as { success: boolean; data?: ParsedSgkInvoice[]; error?: string };
       if (!json.success) throw new Error(json.error ?? "PDF işlenemedi");
       setRows(json.data ?? []);
@@ -51,7 +51,7 @@ function PdfUploadReview({
       await Promise.all(rows.map((row) =>
         fetch("/api/v1/finans/sgk-fatura", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json" , "Accept-Language": lang },
           body: JSON.stringify({
             invoiceDate: row.invoiceDate,
             invoiceType: row.invoiceType,
@@ -278,7 +278,7 @@ export default function SgkFaturaPage() {
 
   const fetchInvoices = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/finans/sgk-fatura");
+      const res = await fetch("/api/v1/finans/sgk-fatura", { headers: { "Accept-Language": lang } });
       const json = await res.json();
       if (json.success) setInvoices(json.data);
     } catch (e) {
@@ -312,7 +312,7 @@ export default function SgkFaturaPage() {
       const payload = { ...formData, amount: parseFloat(formData.amount) };
       const res = await fetch("/api/v1/finans/sgk-fatura", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -349,7 +349,7 @@ export default function SgkFaturaPage() {
       const payload = { ...editForm, amount: parseFloat(editForm.amount) };
       const res = await fetch(`/api/v1/finans/sgk-fatura/${editRecord.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -367,7 +367,7 @@ export default function SgkFaturaPage() {
     if (!deleteId) return;
     setDeleteSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/finans/sgk-fatura/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/v1/finans/sgk-fatura/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       if (!res.ok) throw new Error("Silme işlemi başarısız");
       setDeleteId(null);
       await fetchInvoices();

@@ -41,8 +41,8 @@ export default function CalisanPage() {
     setLoading(true);
     try {
       const [empRes, expRes] = await Promise.all([
-        fetch("/api/v1/finans/calisan"),
-        fetch("/api/v1/finans/calisan-gider")
+        fetch("/api/v1/finans/calisan", { headers: { "Accept-Language": lang } }),
+        fetch("/api/v1/finans/calisan-gider", { headers: { "Accept-Language": lang } })
       ]);
       
       const empJson = await empRes.json();
@@ -83,7 +83,7 @@ export default function CalisanPage() {
     try {
       const res = await fetch("/api/v1/finans/calisan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(empData),
       });
 
@@ -116,7 +116,7 @@ export default function CalisanPage() {
 
       const res = await fetch("/api/v1/finans/calisan-gider", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
 

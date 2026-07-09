@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError, apiResponse } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 import { z } from "zod";
 
 async function getPharmacyId(userId: string): Promise<string | null> {
@@ -23,12 +24,13 @@ const schema = z.object({
   district: z.string().optional().nullable(),
 });
 
-export async function GET(): Promise<Response> {
+export async function GET(req: NextRequest): Promise<Response> {
+  const lang = getLang(req);
   const session = await auth();
-  if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+  if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
   const pharmacyId = await getPharmacyId(session.user.id);
-  if (!pharmacyId) return apiError("Eczane bulunamadı", "NO_PHARMACY", 404);
+  if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
@@ -39,16 +41,17 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PUT(req: NextRequest): Promise<Response> {
+  const lang = getLang(req);
   const session = await auth();
-  if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+  if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
   const pharmacyId = await getPharmacyId(session.user.id);
-  if (!pharmacyId) return apiError("Eczane bulunamadı", "NO_PHARMACY", 404);
+  if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
   const body = await req.json() as unknown;
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return apiError(parsed.error.issues[0]?.message ?? "Geçersiz veri", "VALIDATION_ERROR", 400);
+    return apiError(translateZod(parsed.error.issues[0]?.message ?? "", lang), "VALIDATION_ERROR", 400);
   }
 
   const data = { ...parsed.data, email: parsed.data.email || null };

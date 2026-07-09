@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError, apiResponse } from "@/lib/utils";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
@@ -36,32 +37,33 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PUT(req: NextRequest): Promise<Response> {
+  const lang = getLang(req);
   const session = await auth();
-  if (!session?.user?.id) return apiError("Yetkisiz", "UNAUTHORIZED", 401);
+  if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
   const body = await req.json() as { action?: string } & Record<string, unknown>;
 
   if (body.action === "change-password") {
     const parsed = passwordSchema.safeParse(body);
     if (!parsed.success) {
-      return apiError(parsed.error.issues[0]?.message ?? "Geçersiz veri", "VALIDATION_ERROR", 400);
+      return apiError(translateZod(parsed.error.issues[0]?.message ?? "", lang), "VALIDATION_ERROR", 400);
     }
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { password: true, email: true } });
-    if (!user?.password) return apiError("Şifre değiştirme desteklenmiyor", "NO_PASSWORD", 400);
+    if (!user?.password) return apiError(m("noPassword", lang), "NO_PASSWORD", 400);
 
     const valid = await bcrypt.compare(parsed.data.currentPassword, user.password);
-    if (!valid) return apiError("Mevcut şifre hatalı", "WRONG_PASSWORD", 400);
+    if (!valid) return apiError(m("wrongPassword", lang), "WRONG_PASSWORD", 400);
 
-    if (parsed.data.newPassword === user.email) return apiError("Şifre e-posta ile aynı olamaz", "SAME_AS_EMAIL", 400);
+    if (parsed.data.newPassword === user.email) return apiError(m("sameAsEmail", lang), "SAME_AS_EMAIL", 400);
 
     const hashed = await bcrypt.hash(parsed.data.newPassword, 12);
     await prisma.user.update({ where: { id: session.user.id }, data: { password: hashed } });
-    return apiResponse({ message: "Şifre başarıyla güncellendi" });
+    return apiResponse({ message: lang === "en" ? "Password updated successfully" : "Şifre başarıyla güncellendi" });
   }
 
   const parsed = profileSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError(parsed.error.issues[0]?.message ?? "Geçersiz veri", "VALIDATION_ERROR", 400);
+    return apiError(translateZod(parsed.error.issues[0]?.message ?? "", lang), "VALIDATION_ERROR", 400);
   }
   const user = await prisma.user.update({
     where: { id: session.user.id },

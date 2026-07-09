@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const kasaSchema = z.object({
   registerDate: z.string().min(1, "Tarih gereklidir"),
@@ -22,12 +23,13 @@ async function getPharmacyId(userId: string) {
 }
 
 export async function GET(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { searchParams } = new URL(req.url);
     const year = searchParams.get("year");
@@ -36,9 +38,9 @@ export async function GET(req: Request) {
     const where: any = { pharmacyId, deletedAt: null };
 
     if (year && month) {
-      const y = Number(year); const m = Number(month);
-      const mm = String(m).padStart(2, "0");
-      const lastDay = new Date(y, m, 0).getDate();
+      const y = Number(year); const mo = Number(month);
+      const mm = String(mo).padStart(2, "0");
+      const lastDay = new Date(y, mo, 0).getDate();
       const start = new Date(`${y}-${mm}-01T00:00:00.000Z`);
       const end = new Date(`${y}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`);
       where.registerDate = { gte: start, lte: end };
@@ -52,17 +54,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: true, data: records });
   } catch (error) {
     console.error("Kasa GET Error:", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const body = await req.json();
     const validated = kasaSchema.parse(body);
@@ -102,6 +105,6 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }

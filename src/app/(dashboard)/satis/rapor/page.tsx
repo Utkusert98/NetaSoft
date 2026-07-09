@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import type { ParsedSaleRow, ColumnMap, ColumnOverride } from "@/app/api/v1/satis/parse/route";
@@ -28,6 +29,7 @@ const badge = (t: string) => ({
 type UploadStep = "select" | "mapping" | "preview";
 
 export default function SatisRaporPage() {
+  const { lang } = useLangContext();
   const [tab, setTab] = useState<"upload" | "list">("list");
 
   // Upload state
@@ -59,7 +61,7 @@ export default function SatisRaporPage() {
     try {
       const p = new URLSearchParams({ start: startDate, end: endDate });
       if (filterType) p.set("type", filterType);
-      const res = await fetch(`/api/v1/satis?${p}`);
+      const res = await fetch(`/api/v1/satis?${p}`, { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: { records: SaleRecord[]; summary: SaleSummary } };
       if (json.success && json.data) { setRecords(json.data.records); setSummary(json.data.summary); }
     } catch { /* silent */ } finally { setListLoading(false); }
@@ -87,7 +89,7 @@ export default function SatisRaporPage() {
       if (Object.keys(overrideData).length > 0) {
         fd.append("columnOverride", JSON.stringify(overrideData));
       }
-      const res = await fetch("/api/v1/satis/parse", { method: "POST", body: fd });
+      const res = await fetch("/api/v1/satis/parse", { method: "POST", headers: { "Accept-Language": lang }, body: fd });
       const json = await res.json() as {
         success: boolean;
         data?: { rows: ParsedSaleRow[]; columnMap: ColumnMap; headers: string[] };
@@ -117,7 +119,7 @@ export default function SatisRaporPage() {
     try {
       const res = await fetch("/api/v1/satis", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ rows: previewRows }),
       });
       const json = await res.json() as { success: boolean; count?: number; error?: string };
@@ -135,7 +137,7 @@ export default function SatisRaporPage() {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      await fetch(`/api/v1/satis/${deleteId}`, { method: "DELETE" });
+      await fetch(`/api/v1/satis/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       setDeleteId(null);
       await fetchRecords();
     } catch { /* silent */ } finally { setDeleting(false); }
@@ -145,7 +147,7 @@ export default function SatisRaporPage() {
     if (!confirm("Tüm satış kayıtları silinecek. Emin misiniz?")) return;
     setClearingAll(true);
     try {
-      await fetch("/api/v1/satis/clear-all", { method: "DELETE" });
+      await fetch("/api/v1/satis/clear-all", { method: "DELETE", headers: { "Accept-Language": lang } });
       await fetchRecords();
     } catch { /* silent */ } finally { setClearingAll(false); }
   };

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { addMonths } from "date-fns";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const senetSchema = z.object({
   noteNumber: z.string().min(1, "Senet no gereklidir"),
@@ -15,10 +16,11 @@ const senetSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+      return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
     }
 
     // Get user's pharmacy
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
     });
 
     if (!userRole) {
-      return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+      return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
     }
 
     const body = await req.json();
@@ -78,15 +80,16 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
 export async function GET(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+      return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
     }
 
     const userRole = await prisma.userPharmacyRole.findFirst({
@@ -94,7 +97,7 @@ export async function GET(req: Request) {
       select: { pharmacyId: true },
     });
 
-    if (!userRole) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!userRole) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const notes = await prisma.promissoryNote.findMany({
       where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
@@ -103,6 +106,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, data: notes });
   } catch (error) {
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }

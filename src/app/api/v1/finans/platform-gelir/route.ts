@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { addDays } from "date-fns";
+import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const platformSchema = z.object({
   platformName: z.string().min(1, "Platform adı gereklidir"),
@@ -20,12 +21,13 @@ async function getPharmacyId(userId: string) {
 }
 
 export async function GET(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
@@ -43,17 +45,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: true, data: incomes });
   } catch (error) {
     console.error("Platform GET Error:", error);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
+  const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ error: "Eczane bulunamadı" }, { status: 404 });
+    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const body = await req.json();
     const validated = platformSchema.parse(body);
@@ -82,6 +85,6 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
     }
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
   }
 }

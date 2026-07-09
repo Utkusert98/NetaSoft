@@ -48,7 +48,7 @@ export default function KasaPage() {
 
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/finans/kasa");
+      const res = await fetch("/api/v1/finans/kasa", { headers: { "Accept-Language": lang } });
       const json = await res.json();
       if (json.success) setRecords(json.data);
     } catch (e) {
@@ -86,7 +86,7 @@ export default function KasaPage() {
       };
       const res = await fetch("/api/v1/finans/kasa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -132,7 +132,7 @@ export default function KasaPage() {
       };
       const res = await fetch(`/api/v1/finans/kasa/${editRecord.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -150,7 +150,7 @@ export default function KasaPage() {
     if (!deleteId) return;
     setDeleteSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/finans/kasa/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/v1/finans/kasa/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       if (!res.ok) throw new Error("Silme işlemi başarısız");
       setDeleteId(null);
       await fetchRecords();

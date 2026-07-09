@@ -77,7 +77,7 @@ export default function AylikOzetPage() {
     try {
       const start = toDate(y, m, 1);
       const end = toDate(y, m, lastDay(y, m));
-      const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
+      const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`, { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setData(json.data);
     } finally {
@@ -92,7 +92,7 @@ export default function AylikOzetPage() {
     const prevY = m === 0 ? y - 1 : y;
     const start = toDate(prevY, prevM, 1);
     const end = toDate(prevY, prevM, lastDay(prevY, prevM));
-    const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
+    const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`, { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: ReportData };
     if (json.success && json.data) setPrevData(json.data);
   }, []);
@@ -113,7 +113,7 @@ export default function AylikOzetPage() {
     const load = async () => {
       const start = `${year}-01-01`;
       const end = `${year}-12-31`;
-      const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`);
+      const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`, { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: ReportData };
       if (json.success && json.data) setYearTrend(json.data.monthly);
     };

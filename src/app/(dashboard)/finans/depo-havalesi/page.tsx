@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
@@ -21,6 +22,7 @@ const EMPTY = {
 };
 
 export default function DepoHavalesiPage() {
+  const { lang } = useLangContext();
   const [transfers, setTransfers] = useState<SupplierTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +35,7 @@ export default function DepoHavalesiPage() {
 
   const fetchTransfers = async () => {
     try {
-      const res = await fetch("/api/v1/finans/depo-havalesi");
+      const res = await fetch("/api/v1/finans/depo-havalesi", { headers: { "Accept-Language": lang } });
       const json = await res.json() as { success: boolean; data?: SupplierTransfer[] };
       if (json.success && json.data) setTransfers(json.data);
     } catch (e) { console.error(e); }
@@ -51,7 +53,7 @@ export default function DepoHavalesiPage() {
     try {
       const res = await fetch("/api/v1/finans/depo-havalesi", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({
           supplierName: form.supplierName,
           amount: parseFloat(form.amount),
@@ -74,7 +76,7 @@ export default function DepoHavalesiPage() {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      await fetch(`/api/v1/finans/depo-havalesi/${deleteId}`, { method: "DELETE" });
+      await fetch(`/api/v1/finans/depo-havalesi/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       setDeleteId(null);
       await fetchTransfers();
     } catch (e) { console.error(e); }

@@ -133,7 +133,7 @@ export default function AiDestek() {
 
       const res = await fetch("/api/v1/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ messages: apiMessages, lang }),
       });
 
