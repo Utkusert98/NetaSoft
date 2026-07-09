@@ -108,7 +108,7 @@ export default function CalisanPage() {
         sgkAmount: parseFloat(expData.sgkAmount || "0"),
         foodAmount: parseFloat(expData.foodAmount || "0"),
         transportAmount: parseFloat(expData.transportAmount || "0"),
-        expenseDate: new Date(expData.expenseDate).toISOString()
+        expenseDate: expData.expenseDate + "T00:00:00.000Z"
       };
 
       const res = await fetch("/api/v1/finans/calisan-gider", {

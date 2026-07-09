@@ -74,8 +74,8 @@ export default function SenetPage() {
     try {
       const payload = {
         ...formData,
-        issueDate: new Date(formData.issueDate).toISOString(),
-        dueDate: new Date(formData.dueDate).toISOString(),
+        issueDate: formData.issueDate + "T00:00:00.000Z",
+        dueDate: formData.dueDate + "T00:00:00.000Z",
         amount: parseFloat(formData.amount),
         installmentCount: formData.isInstallment ? parseInt(String(formData.installmentCount)) : undefined,
       };
@@ -145,7 +145,7 @@ export default function SenetPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: parseFloat(editForm.amount),
-          dueDate: new Date(editForm.dueDate).toISOString(),
+          dueDate: editForm.dueDate + "T00:00:00.000Z",
           notes: editForm.notes,
         }),
       });

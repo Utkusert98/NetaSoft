@@ -36,8 +36,11 @@ export async function GET(req: Request) {
     const where: any = { pharmacyId, deletedAt: null };
 
     if (year && month) {
-      const start = new Date(Number(year), Number(month) - 1, 1);
-      const end = new Date(Number(year), Number(month), 0, 23, 59, 59, 999);
+      const y = Number(year); const m = Number(month);
+      const mm = String(m).padStart(2, "0");
+      const lastDay = new Date(y, m, 0).getDate();
+      const start = new Date(`${y}-${mm}-01T00:00:00.000Z`);
+      const end = new Date(`${y}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`);
       where.registerDate = { gte: start, lte: end };
     }
 

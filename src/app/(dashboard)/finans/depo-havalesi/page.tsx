@@ -55,7 +55,7 @@ export default function DepoHavalesiPage() {
         body: JSON.stringify({
           supplierName: form.supplierName,
           amount: parseFloat(form.amount),
-          transferDate: new Date(form.transferDate).toISOString(),
+          transferDate: form.transferDate + "T00:00:00.000Z",
           notes: form.notes,
         }),
       });

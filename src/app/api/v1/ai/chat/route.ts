@@ -40,8 +40,11 @@ async function getFinancialContext(userId: string): Promise<string> {
 
     const pharmacyId = userRole.pharmacyId;
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const y = now.getUTCFullYear(); const m = now.getUTCMonth() + 1;
+    const mm = String(m).padStart(2, "0");
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const startOfMonth = new Date(`${y}-${mm}-01T00:00:00.000Z`);
+    const endOfMonth = new Date(`${y}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`);
 
     const [dailyRegs, sgkInvoices, platformIncomes, fixedExpenses, empExpenses, monthNotes, upcomingNotes, supplierTransfers, pharmacy] = await Promise.all([
       prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: startOfMonth, lte: endOfMonth } }, select: { posAmount: true, cashAmount: true, wireAmount: true } }),

@@ -93,10 +93,10 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     let pdfjs: typeof import("pdfjs-dist");
     try {
-      // legacy build: Node.js'te DOMMatrix gerektirmeyen sürüm
       pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs") as unknown as typeof import("pdfjs-dist");
       if (pdfjs.GlobalWorkerOptions) {
-        pdfjs.GlobalWorkerOptions.workerSrc = "";
+        // Node.js'te worker dosyasını file:// ile işaret et — boş string worker'ı devre dışı bırakmaz
+        pdfjs.GlobalWorkerOptions.workerSrc = `file://${process.cwd()}/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs`;
       }
     } catch {
       return apiError("PDF modülü yüklenemedi", "PDF_MODULE_ERROR", 500);

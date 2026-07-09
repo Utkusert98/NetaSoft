@@ -19,12 +19,18 @@ async function getPharmacyId(userId: string): Promise<string | null> {
 
 async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const y = now.getUTCFullYear(); const m = now.getUTCMonth() + 1;
+  const mm = String(m).padStart(2, "0");
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const startOfMonth = new Date(`${y}-${mm}-01T00:00:00.000Z`);
+  const endOfMonth = new Date(`${y}-${mm}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`);
 
   // Previous month for change %
-  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  const pm = m === 1 ? 12 : m - 1; const py = m === 1 ? y - 1 : y;
+  const pmm = String(pm).padStart(2, "0");
+  const lastDayPrev = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+  const startOfPrevMonth = new Date(`${py}-${pmm}-01T00:00:00.000Z`);
+  const endOfPrevMonth = new Date(`${py}-${pmm}-${String(lastDayPrev).padStart(2, "0")}T23:59:59.999Z`);
 
   // ── Parallel queries ──────────────────────────────────────────────────
   const [
@@ -199,9 +205,15 @@ async function buildMonthlyTrend(pharmacyId: string): Promise<DashboardData["mon
   const result: DashboardData["monthlyTrend"] = [];
 
   for (let i = MONTHS - 1; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
-    const label = start.toLocaleDateString("tr-TR", { month: "short", year: "2-digit" });
+    const baseYear = now.getUTCFullYear(); const baseMonth = now.getUTCMonth() + 1;
+    const totalMonths = baseMonth - i;
+    const tYear = baseYear + Math.floor((totalMonths - 1) / 12);
+    const tMonth = ((totalMonths - 1 + 12 * 12) % 12) + 1;
+    const tmm = String(tMonth).padStart(2, "0");
+    const tLastDay = new Date(Date.UTC(tYear, tMonth, 0)).getUTCDate();
+    const start = new Date(`${tYear}-${tmm}-01T00:00:00.000Z`);
+    const end = new Date(`${tYear}-${tmm}-${String(tLastDay).padStart(2, "0")}T23:59:59.999Z`);
+    const label = new Date(tYear, tMonth - 1, 1).toLocaleDateString("tr-TR", { month: "short", year: "2-digit" });
 
     const [daily, sgk, platform, fixed, emp, notes] = await Promise.all([
       prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: start, lte: end } }, select: { posAmount: true, cashAmount: true, wireAmount: true } }),

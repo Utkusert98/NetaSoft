@@ -50,7 +50,7 @@ export default function SabitGiderPage() {
       const payload = {
         ...formData,
         amount: parseFloat(formData.amount),
-        expenseDate: new Date(formData.expenseDate).toISOString()
+        expenseDate: formData.expenseDate + "T00:00:00.000Z"
       };
 
       const res = await fetch("/api/v1/finans/sabit-gider", {
