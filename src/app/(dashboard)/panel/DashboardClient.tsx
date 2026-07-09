@@ -6,6 +6,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface DashboardData {
@@ -48,6 +50,7 @@ function StatCard({ label, value, change, icon, accent }: {
   label: string; value: string; change?: number; icon: string;
   accent: "income" | "expense" | "profit";
 }) {
+  const { lang } = useLangContext();
   const colors = { income: GREEN, expense: RED, profit: BLUE };
   const bgs = { income: "#f0fce8", expense: "#fff5f5", profit: "#ebf8ff" };
   return (
@@ -70,7 +73,7 @@ function StatCard({ label, value, change, icon, accent }: {
       <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color: colors[accent], lineHeight: 1.1 }}>{value}</p>
       {change !== undefined && change !== 0 && (
         <p style={{ fontSize: "var(--font-size-xs)", color: change > 0 ? GREEN : RED, fontWeight: 500 }}>
-          {change > 0 ? "▲" : "▼"} %{Math.abs(change).toFixed(1)} geçen aya göre
+          {change > 0 ? "▲" : "▼"} %{Math.abs(change).toFixed(1)} {tx(t.dashboard.vsLastMonth, lang)}
         </p>
       )}
     </div>
@@ -104,6 +107,9 @@ export default function DashboardClient({ data, pharmacistName }: {
   pharmacistName: string;
 }) {
   const [exporting, setExporting] = useState(false);
+  const { lang } = useLangContext();
+  const d = t.dashboard;
+  const c = t.common;
 
   const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome } = data;
 
@@ -131,10 +137,10 @@ export default function DashboardClient({ data, pharmacistName }: {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "var(--spacing-8)", flexWrap: "wrap", gap: "var(--spacing-4)" }}>
         <div>
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "4px" }}>
-            Hoş Geldiniz, {pharmacistName}! 👋
+            {tx(d.welcome, lang)}, {pharmacistName}! 👋
           </h1>
           <p style={{ color: "var(--color-text-muted)" }}>
-            {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })} · Aylık Finansal Özet
+            {new Date().toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "long", year: "numeric" })} · {tx(d.subtitle, lang)}
           </p>
         </div>
         <button
@@ -144,21 +150,21 @@ export default function DashboardClient({ data, pharmacistName }: {
           style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}
         >
           {exporting ? (
-            <><span className="spinner" style={{ width: 16, height: 16 }} /> PDF Hazırlanıyor...</>
+            <><span className="spinner" style={{ width: 16, height: 16 }} /> {lang === "en" ? "Preparing PDF..." : "PDF Hazırlanıyor..."}</>
           ) : (
-            <>📄 PDF Olarak İndir</>
+            <>📄 {tx(d.downloadPdf, lang)}</>
           )}
         </button>
       </div>
 
       {/* ── Özet Kartlar ── */}
       <div className="grid-4 stat-grid" style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
-        <StatCard label="Bu Ay Toplam Gelir" value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon="📈" accent="income" />
-        <StatCard label="Bu Ay Toplam Gider" value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon="📉" accent="expense" />
-        <StatCard label="Net Kâr" value={formatCurrency(summary.netProfit)} icon="💰" accent="profit" />
+        <StatCard label={tx(d.totalIncome, lang)} value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon="📈" accent="income" />
+        <StatCard label={tx(d.totalExpense, lang)} value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon="📉" accent="expense" />
+        <StatCard label={tx(d.netProfit, lang)} value={formatCurrency(summary.netProfit)} icon="💰" accent="profit" />
         <StatCard
-          label="Ödenmemiş Senet"
-          value={unpaidNotes.length > 0 ? formatCurrency(unpaidTotal) : "Yok"}
+          label={tx(d.unpaidNote, lang)}
+          value={unpaidNotes.length > 0 ? formatCurrency(unpaidTotal) : tx(d.none, lang)}
           icon="📄"
           accent={unpaidNotes.length > 0 ? "expense" : "profit"}
         />
@@ -167,7 +173,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       {/* ── Ana Grid (trend + SGK pasta) ── */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Aylık Trend */}
-        <ChartCard title="Aylık Gelir / Gider / Kâr Trendi">
+        <ChartCard title={tx(d.trend, lang)}>
           <div style={{ height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyTrend} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
@@ -185,7 +191,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
-                <Legend formatter={(v) => v === "gelir" ? "Gelir" : v === "gider" ? "Gider" : "Kâr"} />
+                <Legend formatter={(v) => v === "gelir" ? tx(d.income, lang) : v === "gider" ? tx(d.expense, lang) : tx(d.profit, lang)} />
                 <Area type="monotone" dataKey="gelir" stroke={GREEN} fill="url(#gGelir)" strokeWidth={2} />
                 <Area type="monotone" dataKey="gider" stroke={RED} fill="url(#gGider)" strokeWidth={2} />
                 <Area type="monotone" dataKey="kar" stroke={BLUE} fill="none" strokeWidth={2} strokeDasharray="4 2" />
@@ -195,13 +201,13 @@ export default function DashboardClient({ data, pharmacistName }: {
         </ChartCard>
 
         {/* SGK vs Elden */}
-        <ChartCard title="SGK / Elden Satış Oranı">
+        <ChartCard title={tx(d.sgkRatio, lang)}>
           <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={[
                   { name: "SGK", value: sgkVsCash.sgkTotal },
-                  { name: "Elden (POS/Nakit)", value: sgkVsCash.cashTotal },
+                  { name: tx(d.cashSales, lang), value: sgkVsCash.cashTotal },
                 ]} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                   <Cell fill={GREEN} />
                   <Cell fill={ORANGE} />
@@ -212,7 +218,7 @@ export default function DashboardClient({ data, pharmacistName }: {
             </ResponsiveContainer>
           </div>
           <p style={{ textAlign: "center", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "var(--spacing-2)" }}>
-            SGK oranı: <strong>%{sgkRatio.toFixed(0)}</strong>
+            {tx(d.sgkRate, lang)}: <strong>%{sgkRatio.toFixed(0)}</strong>
           </p>
         </ChartCard>
       </div>
@@ -220,9 +226,9 @@ export default function DashboardClient({ data, pharmacistName }: {
       {/* ── Platform Geliri + Yaklaşan SGK ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Platform gelirleri */}
-        <ChartCard title="Platform Gelirleri (Bu Ay)">
+        <ChartCard title={tx(d.platformIncome, lang)}>
           {platformIncome.length === 0 ? (
-            <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "32px" }}>Henüz kayıt yok</p>
+            <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "32px" }}>{tx(d.noRecords, lang)}</p>
           ) : (
             <div style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -239,9 +245,9 @@ export default function DashboardClient({ data, pharmacistName }: {
         </ChartCard>
 
         {/* Yaklaşan SGK ödemeleri */}
-        <ChartCard title="Yaklaşan SGK Ödemeleri">
+        <ChartCard title={tx(d.upcomingSgk, lang)}>
           {upcomingSgk.length === 0 ? (
-            <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "32px" }}>Yaklaşan SGK ödemesi yok</p>
+            <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "32px" }}>{tx(d.noUpcoming, lang)}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
               {upcomingSgk.slice(0, 5).map((item) => (
@@ -254,7 +260,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                   <div>
                     <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{item.invoiceType.replace(/_/g, " ")}</p>
                     <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
-                      {new Date(item.expectedPaymentDate).toLocaleDateString("tr-TR")} tahmini
+                      {new Date(item.expectedPaymentDate).toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")} {lang === "en" ? "est." : "tahmini"}
                     </p>
                   </div>
                   <span style={{ fontWeight: 700, color: GREEN, fontSize: "var(--font-size-sm)" }}>
@@ -269,12 +275,12 @@ export default function DashboardClient({ data, pharmacistName }: {
 
       {/* ── Senetler ── */}
       {unpaidNotes.length > 0 && (
-        <ChartCard title={`Yaklaşan Senetler (${unpaidNotes.length} adet · ${formatCurrency(unpaidTotal)})`}>
+        <ChartCard title={lang === "en" ? `Upcoming Notes (${unpaidNotes.length} · ${formatCurrency(unpaidTotal)})` : `Yaklaşan Senetler (${unpaidNotes.length} adet · ${formatCurrency(unpaidTotal)})`}>
           {/* Progress bar */}
           <div style={{ marginBottom: "var(--spacing-4)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "6px" }}>
-              <span>Ödenen: {promissoryNotes.filter(n => n.isPaid).length}</span>
-              <span>Ödenecek: {unpaidNotes.length}</span>
+              <span>{lang === "en" ? "Paid" : "Ödenen"}: {promissoryNotes.filter(n => n.isPaid).length}</span>
+              <span>{lang === "en" ? "Pending" : "Ödenecek"}: {unpaidNotes.length}</span>
             </div>
             <div style={{ height: 8, background: "var(--color-border)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
               <div style={{
@@ -301,9 +307,9 @@ export default function DashboardClient({ data, pharmacistName }: {
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
                     <span style={{ fontSize: "16px" }}>{urgent ? "⚠️" : "📄"}</span>
                     <div>
-                      <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>Senet #{note.noteNumber}</p>
+                      <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Note" : "Senet"} #{note.noteNumber}</p>
                       <p style={{ fontSize: "var(--font-size-xs)", color: urgent ? "var(--color-danger)" : "var(--color-text-muted)" }}>
-                        {due.toLocaleDateString("tr-TR")} · {daysLeft <= 0 ? "Süresi geçti!" : `${daysLeft} gün kaldı`}
+                        {due.toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")} · {daysLeft <= 0 ? (lang === "en" ? "Overdue!" : "Süresi geçti!") : (lang === "en" ? `${daysLeft} days left` : `${daysLeft} gün kaldı`)}
                       </p>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfjs-dist", "pdfjs-dist/legacy/build/pdf.mjs"],
+  serverExternalPackages: ["pdf-parse"],
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000"],

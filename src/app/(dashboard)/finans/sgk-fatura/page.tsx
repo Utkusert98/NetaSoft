@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format, addMonths } from "date-fns";
@@ -13,6 +15,7 @@ function PdfUploadReview({
   onSaved: () => void;
   onError: (msg: string) => void;
 }) {
+  const { lang } = useLangContext();
   const inputRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<ParsedSgkInvoice[]>([]);
@@ -73,7 +76,7 @@ function PdfUploadReview({
     <div className="card" style={{ marginBottom: "var(--spacing-6)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
         <div>
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>📂 PDF'den Fatura Yükle</h2>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>{lang === "en" ? "📂 Upload Invoice from PDF" : "📂 PDF'den Fatura Yükle"}</h2>
           <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
             Birden fazla SGK faturası PDF dosyası seçin — sistem otomatik okur, siz düzenler ve onaylarsınız.
           </p>
@@ -113,67 +116,84 @@ function PdfUploadReview({
       )}
 
       {step === "review" && rows.length > 0 && (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ background: "var(--color-bg)" }}>
-                  <th style={TH}>Dosya Adı</th>
-                  <th style={TH}>Fatura Tarihi</th>
-                  <th style={TH}>Fatura Türü</th>
-                  <th style={{ ...TH, textAlign: "right" }}>Tutar (₺)</th>
-                  <th style={TH}>Notlar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={TD}>
-                      <span style={{ fontSize: "11px", color: "var(--color-text-muted)", wordBreak: "break-all" }}>{row.fileName}</span>
-                      {row.amount === null && (
-                        <span style={{ display: "block", fontSize: "10px", color: "var(--color-warning)", marginTop: "2px" }}>⚠️ Tutar okunamadı, lütfen girin</span>
-                      )}
-                    </td>
-                    <td style={TD}>
-                      <input type="date" value={row.invoiceDate}
-                        onChange={(e) => updateRow(i, "invoiceDate", e.target.value)}
-                        style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px", width: "130px" }} />
-                    </td>
-                    <td style={TD}>
-                      <select value={row.invoiceType}
-                        onChange={(e) => updateRow(i, "invoiceType", e.target.value)}
-                        style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "4px 6px", fontSize: "12px" }}>
-                        {SGK_INVOICE_TYPES.filter(t => t.value && !t.disabled).map(t => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td style={{ ...TD, textAlign: "right" }}>
-                      <input type="number" step="0.01" min="0"
-                        value={row.amount ?? ""}
-                        onChange={(e) => updateRow(i, "amount", parseFloat(e.target.value) || 0)}
-                        style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px", width: "110px", textAlign: "right",
-                          borderColor: row.amount === null ? "var(--color-danger)" : "var(--color-border)" }} />
-                    </td>
-                    <td style={TD}>
-                      <input type="text" value={row.notes}
-                        onChange={(e) => updateRow(i, "notes", e.target.value)}
-                        placeholder="İsteğe bağlı..."
-                        style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px", width: "160px" }} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+          {rows.map((row, i) => (
+            <div key={i} style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+              {/* Başlık — dosya adı + PDF'ten okunan referans bilgileri */}
+              <div style={{ padding: "12px 16px", background: "var(--color-bg)", borderBottom: "1px solid var(--color-border)", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)" }}>📄 {row.fileName}</span>
+                {row.invoiceNo && (
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "var(--radius-sm)", background: "rgba(99,102,241,0.1)", color: "#6366f1", fontWeight: 600 }}>
+                    No: {row.invoiceNo}
+                  </span>
+                )}
+                {row.eczaneName && (
+                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>🏥 {row.eczaneName}</span>
+                )}
+                {row.periodStart && row.periodEnd && (
+                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                    📅 Dönem: {row.periodStart} — {row.periodEnd}
+                  </span>
+                )}
+                {row.amount === null && (
+                  <span style={{ fontSize: "11px", color: "var(--color-danger)", fontWeight: 600 }}>⚠️ Tutar okunamadı</span>
+                )}
+              </div>
+
+              {/* Düzenlenebilir alanlar */}
+              <div style={{ padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", alignItems: "end" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Fatura Tarihi
+                  </label>
+                  <input type="date" value={row.invoiceDate}
+                    onChange={(e) => updateRow(i, "invoiceDate", e.target.value)}
+                    style={{ width: "100%", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", background: "var(--color-bg)" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Fatura Türü
+                  </label>
+                  <select value={row.invoiceType}
+                    onChange={(e) => updateRow(i, "invoiceType", e.target.value)}
+                    style={{ width: "100%", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", background: "var(--color-bg)" }}>
+                    {SGK_INVOICE_TYPES.filter(t => t.value && !t.disabled).map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Tutar (₺)
+                  </label>
+                  <input type="number" step="0.01" min="0"
+                    value={row.amount ?? ""}
+                    onChange={(e) => updateRow(i, "amount", parseFloat(e.target.value) || 0)}
+                    style={{ width: "100%", border: `1px solid ${row.amount === null ? "var(--color-danger)" : "var(--color-border)"}`, borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", fontWeight: 700, textAlign: "right", background: "var(--color-bg)" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Notlar
+                  </label>
+                  <input type="text" value={row.notes}
+                    onChange={(e) => updateRow(i, "notes", e.target.value)}
+                    placeholder={row.invoiceNo ? `Fatura No: ${row.invoiceNo}` : "İsteğe bağlı..."}
+                    style={{ width: "100%", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", background: "var(--color-bg)" }} />
+                </div>
+              </div>
+            </div>
+          ))}
 
           {/* Onay kutusu */}
-          <div style={{ marginTop: "var(--spacing-5)", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)", background: "rgba(78,124,63,0.06)", border: "1px solid rgba(78,124,63,0.2)" }}>
+          <div style={{ padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)", background: "rgba(78,124,63,0.06)", border: "1px solid rgba(78,124,63,0.2)" }}>
             <p style={{ fontWeight: 600, marginBottom: "var(--spacing-2)", fontSize: "var(--font-size-sm)" }}>
               ✅ {rows.length} fatura okundu. Verileri kontrol ettiniz mi?
             </p>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-4)" }}>
-              Tabloda düzenleme yapabilirsiniz. Onayladıktan sonra tüm faturalar sisteme kaydedilecektir.
+              Yukarıdaki alanları düzenleyebilirsiniz. Onayladıktan sonra tüm faturalar sisteme kaydedilecektir.
             </p>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
               <button onClick={reset} className="btn" style={{ border: "1px solid var(--color-border)" }}>
@@ -185,7 +205,7 @@ function PdfUploadReview({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {step === "done" && (
@@ -242,6 +262,7 @@ const emptyForm = {
 };
 
 export default function SgkFaturaPage() {
+  const { lang } = useLangContext();
   const [invoices, setInvoices] = useState<SgkInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -376,7 +397,7 @@ export default function SgkFaturaPage() {
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>SGK Fatura Okuma</h1>
+        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.sgk.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
           SGK faturalarını sisteme girin. Ödeme tarihi fatura tarihinden 3 ay sonra otomatik hesaplanır.
         </p>
@@ -399,21 +420,21 @@ export default function SgkFaturaPage() {
         {/* FORM */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>
-            📋 Yeni Fatura Ekle
+            {lang === "en" ? "📋 Add New Invoice" : "📋 Yeni Fatura Ekle"}
           </h2>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
-              <label className="form-label">Fatura Tarihi</label>
+              <label className="form-label">{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</label>
               <input type="date" className="form-input" name="invoiceDate" value={formData.invoiceDate} onChange={handleChange} required />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Fatura Türü</label>
+              <label className="form-label">{lang === "en" ? "Invoice Type" : "Fatura Türü"}</label>
               <InvoiceTypeSelect value={formData.invoiceType} onChange={handleChange} name="invoiceType" />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Fatura Tutarı (₺)</label>
+              <label className="form-label">{lang === "en" ? "Invoice Amount (₺)" : "Fatura Tutarı (₺)"}</label>
               <input type="number" step="0.01" min="0.01" className="form-input" name="amount" value={formData.amount} onChange={handleChange} required placeholder="0,00" />
             </div>
 
@@ -425,7 +446,7 @@ export default function SgkFaturaPage() {
               border: "1px solid rgba(16,185,129,0.25)",
             }}>
               <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-success)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-                📅 Tahmini Ödeme Tarihi (+3 Ay)
+                📅 {lang === "en" ? "Est. Payment Date (+3 Mo)" : "Tahmini Ödeme Tarihi (+3 Ay)"}
               </p>
               <p style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-success)" }}>
                 {previewPaymentDate}
@@ -449,7 +470,7 @@ export default function SgkFaturaPage() {
         {/* TABLE */}
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
-            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>Kayıtlı SGK Faturaları</h2>
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>{lang === "en" ? "Saved SGK Invoices" : "Kayıtlı SGK Faturaları"}</h2>
             <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
               {invoices.length} kayıt
             </span>
@@ -460,14 +481,14 @@ export default function SgkFaturaPage() {
           ) : invoices.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏥</div>
-              Henüz SGK faturaı eklenmemiş.
+              {lang === "en" ? "No SGK invoices added yet." : "Henüz SGK faturası eklenmemiş."}
             </div>
           ) : (
             <div className="table-wrapper">
               <table className="table" style={{ width: "100%", fontSize: "14px" }}>
                 <thead>
                   <tr>
-                    <th>Fatura Tarihi</th>
+                    <th>{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</th>
                     <th>Tür</th>
                     <th style={{ textAlign: "right" }}>Tutar</th>
                     <th>Yatacak Tarih</th>
@@ -538,11 +559,11 @@ export default function SgkFaturaPage() {
             </h3>
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
-                <label className="form-label">Fatura Tarihi</label>
+                <label className="form-label">{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</label>
                 <input type="date" className="form-input" name="invoiceDate" value={editForm.invoiceDate} onChange={handleEditChange} required />
               </div>
               <div className="form-group">
-                <label className="form-label">Fatura Türü</label>
+                <label className="form-label">{lang === "en" ? "Invoice Type" : "Fatura Türü"}</label>
                 <InvoiceTypeSelect value={editForm.invoiceType} onChange={handleEditChange} name="invoiceType" />
               </div>
               <div className="form-group">

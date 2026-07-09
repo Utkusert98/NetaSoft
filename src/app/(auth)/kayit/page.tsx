@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 import { calculatePasswordStrength } from "@/lib/validators/auth";
+import { useLangContext } from "@/app/providers/LangProvider";
 
 interface FormData {
   pharmacyName: string;
@@ -22,16 +23,36 @@ const INITIAL_FORM: FormData = {
   confirmPassword: "",
 };
 
-const PASSWORD_RULES = [
-  { label: "En Az 12 Karakter", test: (p: string) => p.length >= 12 },
-  { label: "Büyük Harf (A-Z)", test: (p: string) => /[A-Z]/.test(p) },
-  { label: "Küçük Harf (a-z)", test: (p: string) => /[a-z]/.test(p) },
-  { label: "Rakam (0-9)", test: (p: string) => /[0-9]/.test(p) },
-  { label: "Özel Karakter (!@#$...)", test: (p: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(p) },
-];
+function LangToggle() {
+  const { lang, setLang } = useLangContext();
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center",
+      background: "var(--color-bg)", border: "1px solid var(--color-border)",
+      borderRadius: "999px", padding: "3px", marginBottom: "var(--spacing-5)",
+    }}>
+      {(["tr", "en"] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          style={{
+            padding: "6px 20px", borderRadius: "999px", border: "none",
+            background: lang === l ? "var(--color-primary)" : "transparent",
+            color: lang === l ? "white" : "var(--color-text-muted)",
+            fontWeight: 700, fontSize: "13px", cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          {l === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function KayitPage() {
   const router = useRouter();
+  const { lang } = useLangContext();
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<FormData> & { general?: string }>({});
   const [loading, setLoading] = useState(false);
@@ -40,6 +61,14 @@ export default function KayitPage() {
   const [success, setSuccess] = useState(false);
 
   const passwordStrength = calculatePasswordStrength(formData.password);
+
+  const PASSWORD_RULES = [
+    { label: lang === "en" ? "At Least 12 Characters" : "En Az 12 Karakter", test: (p: string) => p.length >= 12 },
+    { label: lang === "en" ? "Uppercase Letter (A-Z)" : "Büyük Harf (A-Z)", test: (p: string) => /[A-Z]/.test(p) },
+    { label: lang === "en" ? "Lowercase Letter (a-z)" : "Küçük Harf (a-z)", test: (p: string) => /[a-z]/.test(p) },
+    { label: lang === "en" ? "Number (0-9)" : "Rakam (0-9)", test: (p: string) => /[0-9]/.test(p) },
+    { label: lang === "en" ? "Special Character (!@#$...)" : "Özel Karakter (!@#$...)", test: (p: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(p) },
+  ];
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,12 +95,11 @@ export default function KayitPage() {
 
       if (!response.ok || !data.success) {
         if (response.status === 409) {
-          setErrors({ email: data.error ?? "Bu e-posta zaten kayıtlı" });
+          setErrors({ email: data.error ?? (lang === "en" ? "This email is already registered" : "Bu e-posta zaten kayıtlı") });
         } else if (response.status === 422) {
-          // Zod validasyon hatası
-          setErrors({ general: data.error ?? "Lütfen tüm alanları kontrol edin" });
+          setErrors({ general: data.error ?? (lang === "en" ? "Please check all fields" : "Lütfen tüm alanları kontrol edin") });
         } else {
-          setErrors({ general: data.error ?? "Bir hata oluştu" });
+          setErrors({ general: data.error ?? (lang === "en" ? "An error occurred" : "Bir hata oluştu") });
         }
         return;
       }
@@ -81,7 +109,7 @@ export default function KayitPage() {
         router.push("/giris?registered=true");
       }, 2000);
     } catch {
-      setErrors({ general: "Sunucu hatası, lütfen tekrar deneyin." });
+      setErrors({ general: lang === "en" ? "Server error, please try again." : "Sunucu hatası, lütfen tekrar deneyin." });
     } finally {
       setLoading(false);
     }
@@ -94,9 +122,11 @@ export default function KayitPage() {
           <div style={{ textAlign: "center", animation: "fadeIn 0.5s ease" }}>
             <div style={{ fontSize: "80px", marginBottom: "24px" }}>🎉</div>
             <h2 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "12px", color: "var(--color-success)" }}>
-              Hesabınız Oluşturuldu!
+              {lang === "en" ? "Account Created!" : "Hesabınız Oluşturuldu!"}
             </h2>
-            <p style={{ color: "var(--color-text-muted)" }}>Giriş sayfasına yönlendiriliyorsunuz...</p>
+            <p style={{ color: "var(--color-text-muted)" }}>
+              {lang === "en" ? "Redirecting to login page..." : "Giriş sayfasına yönlendiriliyorsunuz..."}
+            </p>
           </div>
         </div>
         <div className="auth-visual-side" />
@@ -113,12 +143,17 @@ export default function KayitPage() {
             <NetaSoftLogoFull size={44} />
           </div>
 
-          <h1 className="auth-title">Ücretsiz Başlayın</h1>
+          <LangToggle />
+
+          <h1 className="auth-title">
+            {lang === "en" ? "Get Started Free" : "Ücretsiz Başlayın"}
+          </h1>
           <p className="auth-subtitle">
-            Eczaneniz için hesap oluşturun, finansal yönetimi kolaylaştırın.
+            {lang === "en"
+              ? "Create an account for your pharmacy and simplify financial management."
+              : "Eczaneniz için hesap oluşturun, finansal yönetimi kolaylaştırın."}
           </p>
 
-          {/* Genel Hata */}
           {errors.general && (
             <div
               role="alert"
@@ -138,10 +173,9 @@ export default function KayitPage() {
           )}
 
           <form onSubmit={handleSubmit} noValidate>
-            {/* Eczane Adı */}
             <div className="form-group">
               <label htmlFor="pharmacyName" className="form-label required">
-                Eczane Adı
+                {lang === "en" ? "Pharmacy Name" : "Eczane Adı"}
               </label>
               <input
                 id="pharmacyName"
@@ -149,7 +183,7 @@ export default function KayitPage() {
                 type="text"
                 autoComplete="organization"
                 className={`form-input ${errors.pharmacyName ? "error" : ""}`}
-                placeholder="Örn: Güneş Eczanesi"
+                placeholder={lang === "en" ? "e.g. Sun Pharmacy" : "Örn: Güneş Eczanesi"}
                 value={formData.pharmacyName}
                 onChange={handleChange}
                 disabled={loading}
@@ -159,10 +193,9 @@ export default function KayitPage() {
               )}
             </div>
 
-            {/* Eczacı Adı */}
             <div className="form-group">
               <label htmlFor="pharmacistName" className="form-label required">
-                Eczacı Adı Soyadı
+                {lang === "en" ? "Pharmacist Full Name" : "Eczacı Adı Soyadı"}
               </label>
               <input
                 id="pharmacistName"
@@ -170,7 +203,7 @@ export default function KayitPage() {
                 type="text"
                 autoComplete="name"
                 className={`form-input ${errors.pharmacistName ? "error" : ""}`}
-                placeholder="Örn: Ahmet Yılmaz"
+                placeholder={lang === "en" ? "e.g. John Smith" : "Örn: Ahmet Yılmaz"}
                 value={formData.pharmacistName}
                 onChange={handleChange}
                 disabled={loading}
@@ -180,10 +213,9 @@ export default function KayitPage() {
               )}
             </div>
 
-            {/* E-Posta */}
             <div className="form-group">
               <label htmlFor="email" className="form-label required">
-                E-Posta Adresi
+                {lang === "en" ? "Email Address" : "E-Posta Adresi"}
               </label>
               <input
                 id="email"
@@ -191,7 +223,7 @@ export default function KayitPage() {
                 type="email"
                 autoComplete="email"
                 className={`form-input ${errors.email ? "error" : ""}`}
-                placeholder="ornek@eczane.com"
+                placeholder="example@pharmacy.com"
                 value={formData.email}
                 onChange={handleChange}
                 disabled={loading}
@@ -201,10 +233,9 @@ export default function KayitPage() {
               )}
             </div>
 
-            {/* Şifre */}
             <div className="form-group">
               <label htmlFor="password" className="form-label required">
-                Şifre
+                {lang === "en" ? "Password" : "Şifre"}
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -213,7 +244,7 @@ export default function KayitPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   className={`form-input ${errors.password ? "error" : ""}`}
-                  placeholder="En Az 12 Karakter"
+                  placeholder={lang === "en" ? "At Least 12 Characters" : "En Az 12 Karakter"}
                   value={formData.password}
                   onChange={handleChange}
                   disabled={loading}
@@ -222,7 +253,7 @@ export default function KayitPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((p) => !p)}
-                  aria-label={showPassword ? "Şifreyi Gizle" : "Şifreyi Göster"}
+                  aria-label={showPassword ? (lang === "en" ? "Hide Password" : "Şifreyi Gizle") : (lang === "en" ? "Show Password" : "Şifreyi Göster")}
                   style={{
                     position: "absolute", right: "12px", top: "50%",
                     transform: "translateY(-50%)", background: "none",
@@ -237,7 +268,6 @@ export default function KayitPage() {
                 <span className="form-error" role="alert">⚠ {errors.password}</span>
               )}
 
-              {/* Şifre güç göstergesi */}
               {formData.password && (
                 <div className="password-strength">
                   <div className="password-strength-bar">
@@ -247,14 +277,13 @@ export default function KayitPage() {
                       aria-valuenow={passwordStrength.score}
                       aria-valuemin={0}
                       aria-valuemax={5}
-                      aria-label="Şifre Gücü"
+                      aria-label={lang === "en" ? "Password Strength" : "Şifre Gücü"}
                     />
                   </div>
                   <div className="password-strength-label" style={{ color: passwordStrength.color }}>
-                    Şifre Gücü: {passwordStrength.label}
+                    {lang === "en" ? "Password Strength:" : "Şifre Gücü:"} {passwordStrength.label}
                   </div>
 
-                  {/* Şifre kuralları listesi */}
                   <div style={{
                     marginTop: "var(--spacing-3)",
                     padding: "var(--spacing-3)",
@@ -283,10 +312,9 @@ export default function KayitPage() {
               )}
             </div>
 
-            {/* Şifre Onayı */}
             <div className="form-group">
               <label htmlFor="confirmPassword" className="form-label required">
-                Şifre Tekrarı
+                {lang === "en" ? "Confirm Password" : "Şifre Tekrarı"}
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -295,7 +323,7 @@ export default function KayitPage() {
                   type={showConfirm ? "text" : "password"}
                   autoComplete="new-password"
                   className={`form-input ${errors.confirmPassword ? "error" : ""}`}
-                  placeholder="Şifrenizi Tekrar Girin"
+                  placeholder={lang === "en" ? "Re-enter Your Password" : "Şifrenizi Tekrar Girin"}
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   disabled={loading}
@@ -304,7 +332,7 @@ export default function KayitPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm((p) => !p)}
-                  aria-label={showConfirm ? "Şifreyi Gizle" : "Şifreyi Göster"}
+                  aria-label={showConfirm ? (lang === "en" ? "Hide Password" : "Şifreyi Gizle") : (lang === "en" ? "Show Password" : "Şifreyi Göster")}
                   style={{
                     position: "absolute", right: "12px", top: "50%",
                     transform: "translateY(-50%)", background: "none",
@@ -320,7 +348,7 @@ export default function KayitPage() {
               )}
               {formData.confirmPassword && formData.password === formData.confirmPassword && (
                 <span style={{ color: "var(--color-success)", fontSize: "var(--font-size-xs)", fontWeight: 500 }}>
-                  ✓ Şifreler Eşleşiyor
+                  ✓ {lang === "en" ? "Passwords Match" : "Şifreler Eşleşiyor"}
                 </span>
               )}
             </div>
@@ -335,17 +363,19 @@ export default function KayitPage() {
               {loading ? (
                 <>
                   <span className="spinner" style={{ width: 18, height: 18 }} />
-                  Hesap Oluşturuluyor...
+                  {lang === "en" ? "Creating Account..." : "Hesap Oluşturuluyor..."}
                 </>
               ) : (
-                "Hesap Oluştur"
+                lang === "en" ? "Create Account" : "Hesap Oluştur"
               )}
             </button>
           </form>
 
           <p className="auth-footer-text">
-            Zaten hesabınız var mı?{" "}
-            <Link href="/giris" className="auth-link">Giriş Yapın</Link>
+            {lang === "en" ? "Already have an account?" : "Zaten hesabınız var mı?"}{" "}
+            <Link href="/giris" className="auth-link">
+              {lang === "en" ? "Sign In" : "Giriş Yapın"}
+            </Link>
           </p>
 
           <p style={{
@@ -355,11 +385,15 @@ export default function KayitPage() {
             marginTop: "var(--spacing-4)",
             lineHeight: 1.6
           }}>
-            Kaydolarak{" "}
-            <Link href="/kullanim-kosullari" className="auth-link">Kullanım Koşullarını</Link>{" "}
-            ve{" "}
-            <Link href="/gizlilik-politikasi" className="auth-link">Gizlilik Politikasını</Link>{" "}
-            kabul etmiş olursunuz.
+            {lang === "en" ? "By signing up you agree to our" : "Kaydolarak"}{" "}
+            <Link href="/kullanim-kosullari" className="auth-link">
+              {lang === "en" ? "Terms of Service" : "Kullanım Koşullarını"}
+            </Link>{" "}
+            {lang === "en" ? "and" : "ve"}{" "}
+            <Link href="/gizlilik-politikasi" className="auth-link">
+              {lang === "en" ? "Privacy Policy" : "Gizlilik Politikasını"}
+            </Link>
+            {lang === "en" ? "." : " kabul etmiş olursunuz."}
           </p>
         </div>
       </div>
@@ -371,18 +405,29 @@ export default function KayitPage() {
             <NetaSoftIcon size={96} variant="white" />
           </div>
           <h2 style={{ fontSize: "var(--font-size-3xl)", fontWeight: 800, marginBottom: "16px", lineHeight: 1.2, color: "white" }}>
-            Eczanenizi Dijital<br />Dönüşüme Taşıyın
+            {lang === "en"
+              ? <>Take Your Pharmacy<br />Digital</>
+              : <>Eczanenizi Dijital<br />Dönüşüme Taşıyın</>}
           </h2>
           <p style={{ color: "rgba(255,255,255,0.9)", fontSize: "var(--font-size-base)", maxWidth: "380px", lineHeight: 1.8 }}>
-            Kurulum gerektirmez. Tarayıcınızdan anında başlayın.
+            {lang === "en"
+              ? "No setup required. Start instantly from your browser."
+              : "Kurulum gerektirmez. Tarayıcınızdan anında başlayın."}
           </p>
 
           <div style={{ marginTop: "48px", display: "flex", flexDirection: "column", gap: "16px", textAlign: "left" }}>
-            {[
-              { icon: "📊", title: "Gerçek Zamanlı Raporlar", desc: "Finansal durumunuzu anında görün" },
-              { icon: "📁", title: "Akıllı Dosya İçe Aktarma", desc: "Excel/PDF verilerinizi kolayca aktarın" },
-              { icon: "🔒", title: "Banka Düzeyinde Güvenlik", desc: "Verileriniz şifreli ve güvende" },
-            ].map((feature) => (
+            {(lang === "en"
+              ? [
+                  { icon: "📊", title: "Real-Time Reports", desc: "See your financial status instantly" },
+                  { icon: "📁", title: "Smart File Import", desc: "Easily import your Excel/PDF data" },
+                  { icon: "🔒", title: "Bank-Level Security", desc: "Your data is encrypted and secure" },
+                ]
+              : [
+                  { icon: "📊", title: "Gerçek Zamanlı Raporlar", desc: "Finansal durumunuzu anında görün" },
+                  { icon: "📁", title: "Akıllı Dosya İçe Aktarma", desc: "Excel/PDF verilerinizi kolayca aktarın" },
+                  { icon: "🔒", title: "Banka Düzeyinde Güvenlik", desc: "Verileriniz şifreli ve güvende" },
+                ]
+            ).map((feature) => (
               <div key={feature.title} style={{
                 display: "flex",
                 gap: "16px",

@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -55,6 +57,7 @@ function StatRow({ label, cur, prev }: { label: string; cur: number; prev: numbe
 }
 
 export default function AylikOzetPage() {
+  const { lang } = useLangContext();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -99,7 +102,7 @@ export default function AylikOzetPage() {
     void fetchPrev(year, month);
   }, [year, month, fetchData, fetchPrev]);
 
-  const months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+  const months = lang === "en" ? ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] : ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
   const cur = data?.summary;
   const prev = prevData?.summary;
@@ -122,7 +125,7 @@ export default function AylikOzetPage() {
       {/* Başlık */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
         <div>
-          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-1)" }}>Aylık Özet</h1>
+          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-1)" }}>{tx(t.aylik.title, lang)}</h1>
           <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>Seçilen ayın finansal özeti ve önceki ayla karşılaştırması.</p>
         </div>
         <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center" }}>
@@ -142,8 +145,8 @@ export default function AylikOzetPage() {
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
             {[
-              { label: "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: "📈", color: "#4e7c3f" },
-              { label: "Toplam Gider", value: cur?.totalExpense ?? 0, prev: prev?.totalExpense ?? 0, icon: "📉", color: "#e74c3c" },
+              { label: lang === "en" ? "Total Income" : "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: "📈", color: "#4e7c3f" },
+              { label: lang === "en" ? "Total Expense" : "Toplam Gider", value: cur?.totalExpense ?? 0, prev: prev?.totalExpense ?? 0, icon: "📉", color: "#e74c3c" },
               { label: "Net Kâr", value: cur?.netProfit ?? 0, prev: prev?.netProfit ?? 0, icon: "💰", color: "#3498db" },
             ].map(card => (
               <div key={card.label} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", borderTop: `3px solid ${card.color}` }}>
@@ -172,7 +175,7 @@ export default function AylikOzetPage() {
                   <StatRow label="🏥 SGK Faturaları" cur={data.monthly[0].sgk} prev={prevData?.monthly[0]?.sgk ?? 0} />
                   <StatRow label="📱 Platform Gelirleri" cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
-                    <span>Toplam Gelir</span>
+                    <span>{lang === "en" ? "Total Income" : "Toplam Gelir"}</span>
                     <span style={{ color: "#4e7c3f" }}>{fmt(data.monthly[0].gelir)}</span>
                   </div>
                 </>
@@ -193,7 +196,7 @@ export default function AylikOzetPage() {
                   <StatRow label="📄 Senetler (Vadeli)" cur={data.monthly[0].senetGider ?? 0} prev={prevData?.monthly[0]?.senetGider ?? 0} />
                   <StatRow label="🏦 Depo Havalesi / EFT" cur={data.monthly[0].depoHavalesi ?? 0} prev={prevData?.monthly[0]?.depoHavalesi ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
-                    <span>Toplam Gider</span>
+                    <span>{lang === "en" ? "Total Expense" : "Toplam Gider"}</span>
                     <span style={{ color: "#e74c3c" }}>{fmt(data.monthly[0].gider)}</span>
                   </div>
                   {data.monthly[0].gelir > 0 && (
@@ -277,7 +280,7 @@ export default function AylikOzetPage() {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: "2px solid var(--color-border)" }}>
-                      <td colSpan={2} style={{ fontWeight: 700, paddingTop: "10px" }}>Toplam</td>
+                      <td colSpan={2} style={{ fontWeight: 700, paddingTop: "10px" }}>{lang === "en" ? "Total" : "Toplam"}</td>
                       <td style={{ fontWeight: 800, color: "#e74c3c", paddingTop: "10px" }}>
                         {data.supplierTransfers.reduce((s, t) => s + t.amount, 0)
                           .toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}

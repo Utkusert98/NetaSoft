@@ -6,11 +6,13 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
+import { useLangContext } from "@/app/providers/LangProvider";
 
 function GirisForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/panel";
+  const { lang } = useLangContext();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,8 +34,8 @@ function GirisForm() {
     setErrors({});
 
     const newErrors: Record<string, string> = {};
-    if (!formData.email) newErrors.email = "E-Posta Adresi Gereklidir";
-    if (!formData.password) newErrors.password = "Şifre Gereklidir";
+    if (!formData.email) newErrors.email = lang === "en" ? "Email Address Required" : "E-Posta Adresi Gereklidir";
+    if (!formData.password) newErrors.password = lang === "en" ? "Password Required" : "Şifre Gereklidir";
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       setLoading(false);
@@ -49,14 +51,16 @@ function GirisForm() {
 
       if (result?.error) {
         setErrors({
-          general: "E-Posta Veya Şifre Hatalı. Lütfen Tekrar Deneyin.",
+          general: lang === "en"
+            ? "Invalid Email Or Password. Please Try Again."
+            : "E-Posta Veya Şifre Hatalı. Lütfen Tekrar Deneyin.",
         });
       } else {
         router.push(callbackUrl);
         router.refresh();
       }
     } catch {
-      setErrors({ general: "Sunucu Hatası, Lütfen Tekrar Deneyin." });
+      setErrors({ general: lang === "en" ? "Server Error, Please Try Again." : "Sunucu Hatası, Lütfen Tekrar Deneyin." });
     } finally {
       setLoading(false);
     }
@@ -87,7 +91,7 @@ function GirisForm() {
 
       <div className="form-group">
         <label htmlFor="email" className="form-label required">
-          E-Posta Adresi
+          {lang === "en" ? "Email Address" : "E-Posta Adresi"}
         </label>
         <input
           id="email"
@@ -95,7 +99,7 @@ function GirisForm() {
           type="email"
           autoComplete="email"
           className={`form-input ${errors.email ? "error" : ""}`}
-          placeholder="ornek@eczane.com"
+          placeholder="example@pharmacy.com"
           value={formData.email}
           onChange={handleChange}
           disabled={loading}
@@ -107,7 +111,7 @@ function GirisForm() {
 
       <div className="form-group">
         <label htmlFor="password" className="form-label required">
-          Şifre
+          {lang === "en" ? "Password" : "Şifre"}
         </label>
         <div style={{ position: "relative" }}>
           <input
@@ -125,7 +129,7 @@ function GirisForm() {
           <button
             type="button"
             onClick={() => setShowPassword((p) => !p)}
-            aria-label={showPassword ? "Şifreyi Gizle" : "Şifreyi Göster"}
+            aria-label={showPassword ? (lang === "en" ? "Hide Password" : "Şifreyi Gizle") : (lang === "en" ? "Show Password" : "Şifreyi Göster")}
             style={{
               position: "absolute", right: "12px", top: "50%",
               transform: "translateY(-50%)", background: "none",
@@ -143,7 +147,7 @@ function GirisForm() {
 
       <div style={{ textAlign: "right", marginBottom: "var(--spacing-6)", marginTop: "calc(-1 * var(--spacing-3))" }}>
         <Link href="/sifremi-unuttum" className="auth-link" style={{ fontSize: "var(--font-size-sm)" }}>
-          Şifremi Unuttum
+          {lang === "en" ? "Forgot Password" : "Şifremi Unuttum"}
         </Link>
       </div>
 
@@ -157,17 +161,45 @@ function GirisForm() {
         {loading ? (
           <>
             <span className="spinner" style={{ width: 18, height: 18 }} />
-            Giriş Yapılıyor...
+            {lang === "en" ? "Signing In..." : "Giriş Yapılıyor..."}
           </>
         ) : (
-          "Giriş Yap"
+          lang === "en" ? "Sign In" : "Giriş Yap"
         )}
       </button>
     </form>
   );
 }
 
+function LangToggle() {
+  const { lang, setLang } = useLangContext();
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center",
+      background: "var(--color-bg)", border: "1px solid var(--color-border)",
+      borderRadius: "999px", padding: "3px", marginBottom: "var(--spacing-5)",
+    }}>
+      {(["tr", "en"] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          style={{
+            padding: "6px 20px", borderRadius: "999px", border: "none",
+            background: lang === l ? "var(--color-primary)" : "transparent",
+            color: lang === l ? "white" : "var(--color-text-muted)",
+            fontWeight: 700, fontSize: "13px", cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          {l === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function GirisPage() {
+  const { lang } = useLangContext();
   return (
     <div className="auth-page">
       {/* Sol taraf — Form */}
@@ -177,9 +209,15 @@ export default function GirisPage() {
             <NetaSoftLogoFull size={44} />
           </div>
 
-          <h1 className="auth-title">Tekrar Hoş Geldiniz</h1>
+          <LangToggle />
+
+          <h1 className="auth-title">
+            {lang === "en" ? "Welcome Back" : "Tekrar Hoş Geldiniz"}
+          </h1>
           <p className="auth-subtitle">
-            Hesabınıza giriş yaparak finansal yönetiminize devam edin.
+            {lang === "en"
+              ? "Sign in to your account to continue managing your finances."
+              : "Hesabınıza giriş yaparak finansal yönetiminize devam edin."}
           </p>
 
           <Suspense fallback={
@@ -191,9 +229,9 @@ export default function GirisPage() {
           </Suspense>
 
           <p className="auth-footer-text">
-            Hesabınız Yok Mu?{" "}
+            {lang === "en" ? "Don't have an account?" : "Hesabınız Yok Mu?"}{" "}
             <Link href="/kayit" className="auth-link">
-              Ücretsiz Kayıt Olun
+              {lang === "en" ? "Sign Up Free" : "Ücretsiz Kayıt Olun"}
             </Link>
           </p>
         </div>
@@ -206,17 +244,28 @@ export default function GirisPage() {
             <NetaSoftIcon size={96} variant="white" />
           </div>
           <h2 style={{ color: "white", fontSize: "var(--font-size-3xl)", fontWeight: 800, marginBottom: "16px", lineHeight: 1.2 }} className="auth-visual-title">
-            Eczanenizin Finansal<br />Yönetimi Artık Çok Kolay
+            {lang === "en"
+              ? <>Financial Management<br />For Your Pharmacy</>
+              : <>Eczanenizin Finansal<br />Yönetimi Artık Çok Kolay</>}
           </h2>
           <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "var(--font-size-lg)", maxWidth: "400px", lineHeight: 1.6 }} className="auth-visual-subtitle">
-            Gelir-Gider Takibi, Fatura Yönetimi, Stok Kontrolü Ve Detaylı Raporlar Tek Platformda.
+            {lang === "en"
+              ? "Income & Expense Tracking, Invoice Management, Stock Control And Detailed Reports All In One Platform."
+              : "Gelir-Gider Takibi, Fatura Yönetimi, Stok Kontrolü Ve Detaylı Raporlar Tek Platformda."}
           </p>
           <div style={{ display: "flex", gap: "32px", justifyContent: "center", marginTop: "48px" }}>
-            {[
-              { label: "Aktif Eczane", value: "1.200+" },
-              { label: "Aylık İşlem", value: "50K+" },
-              { label: "Tasarruf", value: "%40" },
-            ].map((stat) => (
+            {(lang === "en"
+              ? [
+                  { label: "Active Pharmacies", value: "1,200+" },
+                  { label: "Monthly Transactions", value: "50K+" },
+                  { label: "Savings", value: "40%" },
+                ]
+              : [
+                  { label: "Aktif Eczane", value: "1.200+" },
+                  { label: "Aylık İşlem", value: "50K+" },
+                  { label: "Tasarruf", value: "%40" },
+                ]
+            ).map((stat) => (
               <div key={stat.label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "var(--font-size-3xl)", fontWeight: 800, color: "var(--color-primary-light)" }} className="auth-visual-stat-value">
                   {stat.value}

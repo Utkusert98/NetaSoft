@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback } from "react";
 import { format, addDays } from "date-fns";
@@ -30,6 +32,7 @@ const emptyForm = {
 };
 
 export default function PlatformGelirPage() {
+  const { lang } = useLangContext();
   const [incomes, setIncomes] = useState<PlatformIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -170,7 +173,7 @@ export default function PlatformGelirPage() {
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>Diğer Platform Gelirleri</h1>
+        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.platform.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
           Farmazon, Capsule vb. platformlardan gelen gelirleri takip edin. Giriş tarihinden 15 gün sonra hesaba yatar.
         </p>
@@ -209,7 +212,7 @@ export default function PlatformGelirPage() {
           </h2>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
-              <label className="form-label">Platform Adı</label>
+              <label className="form-label">{lang === "en" ? "Platform Name" : "Platform Adı"}</label>
               <input
                 list="platform-suggestions"
                 className="form-input"
@@ -282,7 +285,7 @@ export default function PlatformGelirPage() {
           ) : incomes.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>💸</div>
-              {statusFilter ? "Bu filtreye ait kayıt yok." : "Henüz platform geliri eklenmemiş."}
+              {statusFilter ? (lang === "en" ? "No records for this filter." : "Bu filtreye ait kayıt yok.") : (lang === "en" ? "No platform income added yet." : "Henüz platform geliri eklenmemiş.")}
             </div>
           ) : (
             <div className="table-wrapper">
@@ -369,7 +372,7 @@ export default function PlatformGelirPage() {
             </h3>
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
-                <label className="form-label">Platform Adı</label>
+                <label className="form-label">{lang === "en" ? "Platform Name" : "Platform Adı"}</label>
                 <input list="platform-suggestions-edit" className="form-input" name="platformName" value={editForm.platformName} onChange={handleEditChange} required />
                 <datalist id="platform-suggestions-edit">
                   {PLATFORM_SUGGESTIONS.map(p => <option key={p} value={p} />)}

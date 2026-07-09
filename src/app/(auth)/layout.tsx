@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LangProvider } from "@/app/providers/LangProvider";
 
 export const metadata: Metadata = {
   title: "Giriş Yap | NetaSoft",
@@ -10,5 +11,5 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <LangProvider>{children}</LangProvider>;
 }

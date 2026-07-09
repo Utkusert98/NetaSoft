@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -25,13 +27,6 @@ const TT = { background: "var(--color-surface)", border: "1px solid var(--color-
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
 
-const PRESETS = [
-  { label: "Bu Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date() }; } },
-  { label: "Son 3 Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth() - 2, 1), end: new Date() }; } },
-  { label: "Son 6 Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth() - 5, 1), end: new Date() }; } },
-  { label: "Bu Yıl", fn: () => ({ start: new Date(new Date().getFullYear(), 0, 1), end: new Date() }) },
-];
-
 function SummaryCard({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
   return (
     <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", borderTop: `3px solid ${color}` }}>
@@ -54,6 +49,13 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function GelirGiderPage() {
+  const { lang } = useLangContext();
+  const PRESETS = [
+    { label: lang === "en" ? "This Month" : "Bu Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date() }; } },
+    { label: lang === "en" ? "Last 3 Months" : "Son 3 Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth() - 2, 1), end: new Date() }; } },
+    { label: lang === "en" ? "Last 6 Months" : "Son 6 Ay", fn: () => { const n = new Date(); return { start: new Date(n.getFullYear(), n.getMonth() - 5, 1), end: new Date() }; } },
+    { label: lang === "en" ? "This Year" : "Bu Yıl", fn: () => ({ start: new Date(new Date().getFullYear(), 0, 1), end: new Date() }) },
+  ];
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePreset, setActivePreset] = useState(2); // Son 6 Ay default
@@ -103,7 +105,7 @@ export default function GelirGiderPage() {
     <main className="page-content">
       {/* Başlık + Filtreler */}
       <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>Gelir - Gider Raporu</h1>
+        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>{tx(t.gelirGider.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>Tüm gelir kaynaklarınızı ve giderlerinizi dönemsel olarak analiz edin.</p>
       </div>
 
@@ -139,8 +141,8 @@ export default function GelirGiderPage() {
         <>
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
-            <SummaryCard label="Toplam Gelir" value={fmt(data.summary.totalIncome)} icon="📈" color="#4e7c3f" />
-            <SummaryCard label="Toplam Gider" value={fmt(data.summary.totalExpense)} icon="📉" color="#e74c3c" />
+            <SummaryCard label={lang === "en" ? "Total Income" : "Toplam Gelir"} value={fmt(data.summary.totalIncome)} icon="📈" color="#4e7c3f" />
+            <SummaryCard label={lang === "en" ? "Total Expense" : "Toplam Gider"} value={fmt(data.summary.totalExpense)} icon="📉" color="#e74c3c" />
             <SummaryCard label="Net Kâr" value={fmt(data.summary.netProfit)} icon="💰"
               color={data.summary.netProfit >= 0 ? "#3498db" : "#e74c3c"} />
           </div>
@@ -166,7 +168,7 @@ export default function GelirGiderPage() {
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
-                      <Legend formatter={(v: string) => ({ gelir: "Gelir", gider: "Gider", kar: "Kâr" }[v] ?? v)} />
+                      <Legend formatter={(v: string) => ({ gelir: lang === "en" ? "Income" : "Gelir", gider: lang === "en" ? "Expense" : "Gider", kar: lang === "en" ? "Profit" : "Kâr" }[v] ?? v)} />
                       <Area type="monotone" dataKey="gelir" stroke="#4e7c3f" fill="url(#gGelir)" strokeWidth={2} />
                       <Area type="monotone" dataKey="gider" stroke="#e74c3c" fill="url(#gGider)" strokeWidth={2} />
                       <Area type="monotone" dataKey="kar" stroke="#3498db" fill="none" strokeWidth={2} strokeDasharray="4 2" />
@@ -179,7 +181,7 @@ export default function GelirGiderPage() {
 
           {/* Gelir Kaynaklari + Gider Kalemleri */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
-            <ChartCard title="Gelir Kaynakları">
+            <ChartCard title={lang === "en" ? "Income Sources" : "Gelir Kaynakları"}>
               {incomePieData.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Bu dönemde gelir yok.</p>
               ) : (
@@ -216,7 +218,7 @@ export default function GelirGiderPage() {
               )}
             </ChartCard>
 
-            <ChartCard title="Gider Kalemleri">
+            <ChartCard title={lang === "en" ? "Expense Items" : "Gider Kalemleri"}>
               {expensePieData.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Bu dönemde gider yok.</p>
               ) : (

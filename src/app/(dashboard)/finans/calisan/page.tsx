@@ -1,10 +1,13 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
 export default function CalisanPage() {
+  const { lang } = useLangContext();
   const [employees, setEmployees] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +152,7 @@ export default function CalisanPage() {
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>Personel Giderleri</h1>
+      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>{tx(t.calisan.title, lang)}</h1>
 
       {error && (
         <div style={{ padding: "12px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "24px", fontSize: "14px" }}>
@@ -178,13 +181,13 @@ export default function CalisanPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Gider Tarihi / Ay</label>
+                <label className="form-label">{lang === "en" ? "Expense Date / Month" : "Gider Tarihi / Ay"}</label>
                 <input type="date" className="form-input" name="expenseDate" value={expData.expenseDate} onChange={handleExpChange} required />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4)" }}>
                 <div className="form-group">
-                  <label className="form-label">Maaş (₺)</label>
+                  <label className="form-label">{lang === "en" ? "Salary (₺)" : "Maaş (₺)"}</label>
                   <input type="number" step="0.01" className="form-input" name="salaryAmount" value={expData.salaryAmount} onChange={handleExpChange} />
                 </div>
                 <div className="form-group">
@@ -202,7 +205,7 @@ export default function CalisanPage() {
               </div>
 
               <div style={{ padding: "12px", background: "var(--color-bg)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid var(--color-border)" }}>
-                <span style={{ fontSize: "14px", fontWeight: 500 }}>Toplam Maliyet:</span>
+                <span style={{ fontSize: "14px", fontWeight: 500 }}>{lang === "en" ? "Total Cost:" : "Toplam Maliyet:"}</span>
                 <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-primary)" }}>{calculateTotal().toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</span>
               </div>
 
@@ -212,7 +215,7 @@ export default function CalisanPage() {
               </div>
 
               <button type="submit" className="btn btn-primary btn-full" disabled={expSubmitting || employees.length === 0}>
-                {expSubmitting ? "Kaydediliyor..." : "Gider Kaydet"}
+                {expSubmitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "Save Expense" : "Gider Kaydet")}
               </button>
             </form>
           </div>
@@ -225,7 +228,7 @@ export default function CalisanPage() {
               <input type="text" className="form-input" name="lastName" placeholder="Soyad" value={empData.lastName} onChange={handleEmpChange} required />
               <div style={{ gridColumn: "span 2" }}>
                 <button type="submit" className="btn" style={{ width: "100%", background: "white", border: "1px solid var(--color-border)" }} disabled={empSubmitting}>
-                  {empSubmitting ? "Ekleniyor..." : "+ Personeli Kaydet"}
+                  {empSubmitting ? (lang === "en" ? "Adding..." : "Ekleniyor...") : (lang === "en" ? "+ Save Staff" : "+ Personeli Kaydet")}
                 </button>
               </div>
             </form>
@@ -240,7 +243,7 @@ export default function CalisanPage() {
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
           ) : expenses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>Henüz Gider Eklenmemiş.</div>
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>{lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}</div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="table" style={{ width: "100%", fontSize: "14px" }}>
@@ -248,7 +251,7 @@ export default function CalisanPage() {
                   <tr>
                     <th>Tarih</th>
                     <th>Personel</th>
-                    <th>Toplam</th>
+                    <th>{lang === "en" ? "Total" : "Toplam"}</th>
                     <th>Detaylar</th>
                   </tr>
                 </thead>

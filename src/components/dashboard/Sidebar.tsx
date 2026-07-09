@@ -5,60 +5,50 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { NetaSoftIcon, NetaSoftLogoFull } from "@/components/ui/NetaSoftLogo";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: keyof typeof t.sidebar;
   icon: string;
 }
 
 interface NavSection {
-  title: string;
+  titleKey: keyof typeof t.sidebar;
   items: NavItem[];
 }
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Genel",
+    titleKey: "general",
     items: [
-      { href: "/panel", label: "Gösterge Paneli", icon: "📊" },
-      { href: "/ai-destek", label: "AI Asistan", icon: "🤖" },
+      { href: "/panel", labelKey: "dashboard", icon: "📊" },
+      { href: "/ai-destek", labelKey: "aiAssistant", icon: "🤖" },
     ],
   },
   {
-    title: "Finans",
+    titleKey: "finance",
     items: [
-      { href: "/finans/kasa", label: "Günlük Kasa", icon: "🏦" },
-      { href: "/finans/sgk-fatura", label: "SGK Fatura", icon: "🏥" },
-      { href: "/finans/platform-gelir", label: "Platform Gelirleri", icon: "📈" },
-      { href: "/finans/senet", label: "Senet & Depo Havalesi", icon: "📄" },
-      { href: "/finans/sabit-gider", label: "Sabit Giderler", icon: "💸" },
-      { href: "/finans/calisan", label: "Personel Giderleri", icon: "👥" },
+      { href: "/finans/kasa", labelKey: "dailyCash", icon: "🏦" },
+      { href: "/finans/sgk-fatura", labelKey: "sgkInvoice", icon: "🏥" },
+      { href: "/finans/platform-gelir", labelKey: "platformIncome", icon: "📈" },
+      { href: "/finans/senet", labelKey: "promissoryNote", icon: "📄" },
+      { href: "/finans/sabit-gider", labelKey: "fixedExpense", icon: "💸" },
+      { href: "/finans/calisan", labelKey: "staffExpense", icon: "👥" },
     ],
   },
   {
-    title: "Satış",
+    titleKey: "reports",
     items: [
-      { href: "/satis/rapor", label: "Satış Raporları", icon: "🧾" },
+      { href: "/raporlar/gelir-gider", labelKey: "incomeExpense", icon: "📉" },
+      { href: "/raporlar/aylik", labelKey: "monthlySummary", icon: "📅" },
     ],
   },
   {
-    title: "Stok Yönetimi",
+    titleKey: "system",
     items: [
-      { href: "/stok/envanter", label: "Envanter Raporu", icon: "📊" },
-    ],
-  },
-  {
-    title: "Raporlar",
-    items: [
-      { href: "/raporlar/gelir-gider", label: "Gelir - Gider", icon: "📉" },
-      { href: "/raporlar/aylik", label: "Aylık Özet", icon: "📅" },
-    ],
-  },
-  {
-    title: "Sistem",
-    items: [
-      { href: "/ayarlar", label: "Ayarlar", icon: "⚙️" },
+      { href: "/ayarlar", labelKey: "settings", icon: "⚙️" },
     ],
   },
 ];
@@ -66,6 +56,7 @@ const NAV_SECTIONS: NavSection[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { lang } = useLangContext();
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -125,8 +116,8 @@ export default function Sidebar() {
         {/* Navigasyon */}
         <nav className="sidebar-nav">
           {NAV_SECTIONS.map((section) => (
-            <div key={section.title} className="sidebar-section">
-              <div className="sidebar-section-title">{section.title}</div>
+            <div key={section.titleKey} className="sidebar-section">
+              <div className="sidebar-section-title">{tx(t.sidebar[section.titleKey], lang)}</div>
               {section.items.map((item) => (
                 <Link
                   key={item.href}
@@ -138,7 +129,7 @@ export default function Sidebar() {
                   <span className="sidebar-item-icon" aria-hidden="true">
                     {item.icon}
                   </span>
-                  {item.label}
+                  {tx(t.sidebar[item.labelKey], lang)}
                 </Link>
               ))}
             </div>
@@ -173,7 +164,7 @@ export default function Sidebar() {
               }}
             >
               <span style={{ fontSize: "18px" }}>🚪</span>
-              Çıkış Yap
+              {tx(t.sidebar.logout, lang)}
             </button>
           </div>
         </nav>
@@ -201,9 +192,21 @@ export default function Sidebar() {
                 NetaSoft
               </div>
               <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>
-                Eczane Yönetim
+                {tx(t.sidebar.pharmacyMgmt, lang)}
               </div>
             </div>
+            <Link
+              href="/ayarlar"
+              title={lang === "en" ? "Language settings" : "Dil ayarları"}
+              style={{
+                color: "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: 700,
+                textDecoration: "none", flexShrink: 0,
+                padding: "2px 6px", borderRadius: "4px",
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}
+            >
+              {lang.toUpperCase()}
+            </Link>
           </div>
         </div>
       </aside>

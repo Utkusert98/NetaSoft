@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
@@ -29,6 +31,7 @@ const EMPTY_FORM = {
 };
 
 export default function SenetPage() {
+  const { lang } = useLangContext();
   const [notes, setNotes] = useState<PromissoryNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -180,7 +183,7 @@ export default function SenetPage() {
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "var(--spacing-6)" }}>
         <div>
-          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>Senet Yönetimi</h1>
+          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.senet.title, lang)}</h1>
           <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>Senet girişi, takibi, ödeme işaretleme</p>
         </div>
         <a href="/finans/depo-havalesi"
@@ -301,7 +304,7 @@ export default function SenetPage() {
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? "Kaydediliyor..." : formData.isInstallment ? `${formData.installmentCount} Taksit Senet Oluştur` : "Senet Kaydet"}
+              {submitting ? "Kaydediliyor..." : formData.isInstallment ? (lang === "en" ? `Create ${formData.installmentCount} Installments` : `${formData.installmentCount} Taksit Senet Oluştur`) : (lang === "en" ? "Save Note" : "Senet Kaydet")}
             </button>
           </form>
         </div>
@@ -365,7 +368,7 @@ export default function SenetPage() {
                                 disabled={markingId === note.id}
                                 style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-success)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", fontWeight: 600, opacity: markingId === note.id ? 0.7 : 1 }}
                               >
-                                {markingId === note.id ? "..." : "Ödendi"}
+                                {markingId === note.id ? "..." : lang === "en" ? "Paid" : "Ödendi"}
                               </button>
                               <button
                                 onClick={() => openEdit(note)}

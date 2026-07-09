@@ -1,4 +1,6 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
@@ -28,6 +30,7 @@ const emptyForm = {
 };
 
 export default function KasaPage() {
+  const { lang } = useLangContext();
   const [records, setRecords] = useState<Register[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -163,7 +166,7 @@ export default function KasaPage() {
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>Günlük Kasa Kapatma</h1>
+        <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.kasa.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
           Günlük POS, nakit, havale ve döviz tahsilatlarını kayıt altına alın.
         </p>
@@ -255,7 +258,7 @@ export default function KasaPage() {
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? "Kaydediliyor..." : "✓ Kasayı Kapat"}
+              {submitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "✓ Close Register" : "✓ Kasayı Kapat")}
             </button>
           </form>
         </div>
@@ -272,7 +275,7 @@ export default function KasaPage() {
           ) : records.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏦</div>
-              Henüz kasa kaydı eklenmemiş.
+              {lang === "en" ? "No cash records added yet." : "Henüz kasa kaydı eklenmemiş."}
             </div>
           ) : (
             <div className="table-wrapper">
@@ -280,7 +283,7 @@ export default function KasaPage() {
                 <thead>
                   <tr>
                     <th>Tarih</th>
-                    <th style={{ textAlign: "right" }}>POS</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "POS" : "POS"}</th>
                     <th style={{ textAlign: "right" }}>Nakit</th>
                     <th style={{ textAlign: "right" }}>Havale</th>
                     <th style={{ textAlign: "right" }}>Döviz</th>
@@ -346,9 +349,9 @@ export default function KasaPage() {
                 <input type="date" className="form-input" name="registerDate" value={editForm.registerDate} onChange={handleEditChange} required />
               </div>
               {[
-                { name: "posAmount", label: "POS (₺)" },
-                { name: "cashAmount", label: "Nakit (₺)" },
-                { name: "wireAmount", label: "Havale / EFT (₺)" },
+                { name: "posAmount", label: lang === "en" ? "POS (₺)" : "POS (₺)" },
+                { name: "cashAmount", label: lang === "en" ? "Cash (₺)" : "Nakit (₺)" },
+                { name: "wireAmount", label: lang === "en" ? "Wire / EFT (₺)" : "Havale / EFT (₺)" },
               ].map(field => (
                 <div key={field.name} className="form-group">
                   <label className="form-label">{field.label}</label>
@@ -373,7 +376,7 @@ export default function KasaPage() {
                   İptal
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
-                  {editSubmitting ? "Kaydediliyor..." : "Güncelle"}
+                  {editSubmitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "Update" : "Güncelle")}
                 </button>
               </div>
             </form>

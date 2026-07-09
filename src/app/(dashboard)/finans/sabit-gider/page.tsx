@@ -1,10 +1,13 @@
 "use client";
+import { useLangContext } from "@/app/providers/LangProvider";
+import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
 export default function SabitGiderPage() {
+  const { lang } = useLangContext();
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -94,18 +97,18 @@ export default function SabitGiderPage() {
 
   const getTypeLabel = (type: string, customType?: string) => {
     switch (type) {
-      case "INVOICE": return "Fatura";
-      case "ACCOUNTING": return "Muhasebe";
-      case "TAX": return "Vergi";
-      case "RENT": return "Kira";
-      case "OTHER": return customType || "Diğer";
+      case "INVOICE": return lang === "en" ? "Invoice" : "Fatura";
+      case "ACCOUNTING": return lang === "en" ? "Accounting" : "Muhasebe";
+      case "TAX": return lang === "en" ? "Tax" : "Vergi";
+      case "RENT": return lang === "en" ? "Rent" : "Kira";
+      case "OTHER": return customType || (lang === "en" ? "Other" : "Diğer");
       default: return type;
     }
   };
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>Sabit Giderler</h1>
+      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>{tx(t.sabitGider.title, lang)}</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* Form Card */}
@@ -153,7 +156,7 @@ export default function SabitGiderPage() {
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? "Kaydediliyor..." : "Gider Kaydet"}
+              {submitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "Save Expense" : "Gider Kaydet")}
             </button>
           </form>
         </div>
@@ -165,7 +168,7 @@ export default function SabitGiderPage() {
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
           ) : expenses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>Henüz Gider Eklenmemiş.</div>
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>{lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}</div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="table" style={{ width: "100%", fontSize: "14px" }}>
