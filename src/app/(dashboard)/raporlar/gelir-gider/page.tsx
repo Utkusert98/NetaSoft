@@ -88,7 +88,7 @@ export default function GelirGiderPage() {
   };
 
   const incomePieData = data ? [
-    { name: "Kasa (POS/Nakit)", value: data.incomeBySource.kasa },
+    { name: lang === "en" ? "Cash Register (POS/Cash)" : "Kasa (POS/Nakit)", value: data.incomeBySource.kasa },
     { name: "SGK", value: data.incomeBySource.sgk },
     { name: "Platform", value: data.incomeBySource.platform },
   ].filter(d => d.value > 0) : [];
@@ -106,7 +106,7 @@ export default function GelirGiderPage() {
       {/* Başlık + Filtreler */}
       <div style={{ marginBottom: "var(--spacing-6)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>{tx(t.gelirGider.title, lang)}</h1>
-        <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>Tüm gelir kaynaklarınızı ve giderlerinizi dönemsel olarak analiz edin.</p>
+        <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Analyze all your income sources and expenses by period." : "Tüm gelir kaynaklarınızı ve giderlerinizi dönemsel olarak analiz edin."}</p>
       </div>
 
       {/* Dönem Seçici */}
@@ -121,14 +121,14 @@ export default function GelirGiderPage() {
         <button onClick={() => setShowCustom(v => !v)}
           className={`btn ${showCustom ? "btn-primary" : "btn-ghost"}`}
           style={{ fontSize: "var(--font-size-sm)", padding: "8px 16px" }}>
-          📅 Özel Aralık
+          📅 {lang === "en" ? "Custom Range" : "Özel Aralık"}
         </button>
         {showCustom && (
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center" }}>
             <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="form-input" style={{ width: 140, fontSize: "var(--font-size-sm)", padding: "8px" }} />
             <span style={{ color: "var(--color-text-muted)" }}>—</span>
             <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="form-input" style={{ width: 140, fontSize: "var(--font-size-sm)", padding: "8px" }} />
-            <button onClick={handleCustom} className="btn btn-primary" style={{ padding: "8px 14px", fontSize: "var(--font-size-sm)" }}>Uygula</button>
+            <button onClick={handleCustom} className="btn btn-primary" style={{ padding: "8px 14px", fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Apply" : "Uygula"}</button>
           </div>
         )}
       </div>
@@ -136,22 +136,22 @@ export default function GelirGiderPage() {
       {loading ? (
         <div style={{ textAlign: "center", padding: "80px" }}><div className="spinner" style={{ margin: "0 auto" }} /></div>
       ) : !data ? (
-        <p style={{ color: "var(--color-text-muted)" }}>Veri yüklenemedi.</p>
+        <p style={{ color: "var(--color-text-muted)" }}>{lang === "en" ? "Data could not be loaded." : "Veri yüklenemedi."}</p>
       ) : (
         <>
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
             <SummaryCard label={lang === "en" ? "Total Income" : "Toplam Gelir"} value={fmt(data.summary.totalIncome)} icon="📈" color="#4e7c3f" />
             <SummaryCard label={lang === "en" ? "Total Expense" : "Toplam Gider"} value={fmt(data.summary.totalExpense)} icon="📉" color="#e74c3c" />
-            <SummaryCard label="Net Kâr" value={fmt(data.summary.netProfit)} icon="💰"
+            <SummaryCard label={lang === "en" ? "Net Profit" : "Net Kâr"} value={fmt(data.summary.netProfit)} icon="💰"
               color={data.summary.netProfit >= 0 ? "#3498db" : "#e74c3c"} />
           </div>
 
           {/* Aylık Trend */}
           <div style={{ marginBottom: "var(--spacing-5)" }}>
-            <ChartCard title="Aylık Gelir / Gider / Kâr Trendi">
+            <ChartCard title={lang === "en" ? "Monthly Income / Expense / Profit Trend" : "Aylık Gelir / Gider / Kâr Trendi"}>
               {data.monthly.length === 0 ? (
-                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Bu dönemde kayıt yok.</p>
+                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No records for this period." : "Bu dönemde kayıt yok."}</p>
               ) : (
                 <div style={{ height: 300 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -183,7 +183,7 @@ export default function GelirGiderPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             <ChartCard title={lang === "en" ? "Income Sources" : "Gelir Kaynakları"}>
               {incomePieData.length === 0 ? (
-                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Bu dönemde gelir yok.</p>
+                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No income for this period." : "Bu dönemde gelir yok."}</p>
               ) : (
                 <>
                   <div style={{ height: 220 }}>
@@ -220,7 +220,7 @@ export default function GelirGiderPage() {
 
             <ChartCard title={lang === "en" ? "Expense Items" : "Gider Kalemleri"}>
               {expensePieData.length === 0 ? (
-                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Bu dönemde gider yok.</p>
+                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No expenses for this period." : "Bu dönemde gider yok."}</p>
               ) : (
                 <>
                   <div style={{ height: 220 }}>
@@ -258,7 +258,7 @@ export default function GelirGiderPage() {
           {/* Platform Gelirleri + Senet Özeti */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             {topPlatforms.length > 0 && (
-              <ChartCard title="Platform Gelirleri Karşılaştırması">
+              <ChartCard title={lang === "en" ? "Platform Revenue Comparison" : "Platform Gelirleri Karşılaştırması"}>
                 <div style={{ height: 200 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={topPlatforms} layout="vertical" margin={{ left: 10, right: 40, top: 4, bottom: 4 }}>
@@ -273,9 +273,9 @@ export default function GelirGiderPage() {
               </ChartCard>
             )}
 
-            <ChartCard title="Aylık Gider Kırılımı">
+            <ChartCard title={lang === "en" ? "Monthly Expense Breakdown" : "Aylık Gider Kırılımı"}>
               {data.monthly.length === 0 ? (
-                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Veri yok.</p>
+                <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No data." : "Veri yok."}</p>
               ) : (
                 <div style={{ height: 200 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -284,7 +284,7 @@ export default function GelirGiderPage() {
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
-                      <Legend formatter={(v: string) => ({ sabitGider: "Sabit Gider", personelGider: "Personel" }[v] ?? v)} />
+                      <Legend formatter={(v: string) => ({ sabitGider: lang === "en" ? "Fixed Expense" : "Sabit Gider", personelGider: lang === "en" ? "Staff" : "Personel" }[v] ?? v)} />
                       <Bar dataKey="sabitGider" stackId="g" fill="#e74c3c" />
                       <Bar dataKey="personelGider" stackId="g" fill="#c0392b" radius={[3, 3, 0, 0]} />
                     </BarChart>
@@ -297,18 +297,18 @@ export default function GelirGiderPage() {
           {/* Aylık Tablo */}
           {data.monthly.length > 0 && (
             <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
-              <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>Aylık Detay Tablosu</h3>
+              <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Monthly Detail Table" : "Aylık Detay Tablosu"}</h3>
               <div style={{ overflowX: "auto" }}>
                 <table className="table" style={{ width: "100%", fontSize: "13px" }}>
                   <thead>
                     <tr>
-                      <th>Ay</th>
-                      <th style={{ textAlign: "right" }}>Kasa</th>
+                      <th>{lang === "en" ? "Month" : "Ay"}</th>
+                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Cash Register" : "Kasa"}</th>
                       <th style={{ textAlign: "right" }}>SGK</th>
                       <th style={{ textAlign: "right" }}>Platform</th>
-                      <th style={{ textAlign: "right" }}>Toplam Gelir</th>
-                      <th style={{ textAlign: "right" }}>Toplam Gider</th>
-                      <th style={{ textAlign: "right" }}>Net Kâr</th>
+                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Total Income" : "Toplam Gelir"}</th>
+                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Total Expense" : "Toplam Gider"}</th>
+                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Net Profit" : "Net Kâr"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -325,7 +325,7 @@ export default function GelirGiderPage() {
                     ))}
                     {/* Toplam satırı */}
                     <tr style={{ background: "var(--color-bg)", fontWeight: 800, borderTop: "2px solid var(--color-border)" }}>
-                      <td>TOPLAM</td>
+                      <td>{lang === "en" ? "TOTAL" : "TOPLAM"}</td>
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.kasa, 0))}</td>
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.sgk, 0))}</td>
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.platform, 0))}</td>

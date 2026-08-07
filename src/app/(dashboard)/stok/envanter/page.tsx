@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLangContext } from "@/app/providers/LangProvider";
 import {
   BarChart,
   Bar,
@@ -66,7 +67,8 @@ function SummaryCard({ label, value, sub, accent }: {
   );
 }
 
-function TopSellersChart({ data }: { data: InventoryRow[] }) {
+function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string }) {
+  const en = lang === "en";
   const chartData = data.map((r) => ({
     name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
     fullName: r.name,
@@ -84,7 +86,9 @@ function TopSellersChart({ data }: { data: InventoryRow[] }) {
           <Tooltip
             formatter={((value: string | number | undefined, name?: string | number) => {
               const v = Number(value ?? 0);
-              return String(name) === "adet" ? [v.toLocaleString("tr-TR") + " adet", "Satış"] : [formatCurrency(v), "Gelir"];
+              return String(name) === "adet"
+                ? [v.toLocaleString("tr-TR") + (en ? " units" : " adet"), en ? "Sales" : "Satış"]
+                : [formatCurrency(v), en ? "Revenue" : "Gelir"];
             }) as AnyFormatter}
             contentStyle={{
               background: "var(--color-surface)",
@@ -93,7 +97,7 @@ function TopSellersChart({ data }: { data: InventoryRow[] }) {
               fontSize: "12px",
             }}
           />
-          <Legend formatter={(v) => v === "adet" ? "Satış Adedi" : "Gelir (₺)"} />
+          <Legend formatter={(v) => v === "adet" ? (en ? "Units Sold" : "Satış Adedi") : (en ? "Revenue (₺)" : "Gelir (₺)")} />
           <Bar dataKey="adet" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
           <Bar dataKey="gelir" fill={CHART_COLORS[3]} radius={[0, 4, 4, 0]} />
         </BarChart>
@@ -102,10 +106,11 @@ function TopSellersChart({ data }: { data: InventoryRow[] }) {
   );
 }
 
-function SoldUnsoldPieChart({ sold, unsold }: { sold: number; unsold: number }) {
+function SoldUnsoldPieChart({ sold, unsold, lang }: { sold: number; unsold: number; lang: string }) {
+  const en = lang === "en";
   const data = [
-    { name: "Satılan Ürünler", value: sold },
-    { name: "Satılmayan Ürünler", value: unsold },
+    { name: en ? "Sold Products" : "Satılan Ürünler", value: sold },
+    { name: en ? "Unsold Products" : "Satılmayan Ürünler", value: unsold },
   ];
   return (
     <div style={{ height: 260 }}>
@@ -125,7 +130,7 @@ function SoldUnsoldPieChart({ sold, unsold }: { sold: number; unsold: number }) 
             ))}
           </Pie>
           <Tooltip
-            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + " ürün"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (en ? " products" : " ürün")]) as AnyFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Legend />
@@ -135,7 +140,8 @@ function SoldUnsoldPieChart({ sold, unsold }: { sold: number; unsold: number }) 
   );
 }
 
-function ProfitChart({ data }: { data: Array<{ name: string; profit: number; margin: number }> }) {
+function ProfitChart({ data, lang }: { data: Array<{ name: string; profit: number; margin: number }>; lang: string }) {
+  const en = lang === "en";
   const chartData = data.map((r) => ({
     name: r.name.length > 16 ? r.name.slice(0, 14) + "…" : r.name,
     kar: Math.round(r.profit * 100) / 100,
@@ -152,7 +158,9 @@ function ProfitChart({ data }: { data: Array<{ name: string; profit: number; mar
           <Tooltip
             formatter={((value: string | number | undefined, name?: string | number) => {
               const v = Number(value ?? 0);
-              return String(name) === "kar" ? [formatCurrency(v), "Kâr"] : [v + "%", "Kâr Marjı"];
+              return String(name) === "kar"
+                ? [formatCurrency(v), en ? "Profit" : "Kâr"]
+                : [v + "%", en ? "Profit Margin" : "Kâr Marjı"];
             }) as AnyFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
@@ -163,88 +171,84 @@ function ProfitChart({ data }: { data: Array<{ name: string; profit: number; mar
   );
 }
 
-function AnalysisDashboard({ analysis, inventoryRows }: {
+function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   analysis: InventoryAnalysis;
   inventoryRows: InventoryRow[];
+  lang: string;
 }) {
+  const en = lang === "en";
   const { summary } = analysis;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
-      {/* Özet Kartlar */}
       <section>
         <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-          Envanter Özeti
+          {en ? "Inventory Summary" : "Envanter Özeti"}
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--spacing-4)" }}>
-          <SummaryCard label="Toplam Ürün" value={summary.totalProducts.toLocaleString("tr-TR")} />
+          <SummaryCard label={en ? "Total Products" : "Toplam Ürün"} value={summary.totalProducts.toLocaleString("tr-TR")} />
           <SummaryCard
-            label="Satılan Ürün"
+            label={en ? "Sold Products" : "Satılan Ürün"}
             value={summary.soldProducts.toLocaleString("tr-TR")}
-            sub={`${Math.round((summary.soldProducts / summary.totalProducts) * 100)}% satış oranı`}
+            sub={`${Math.round((summary.soldProducts / summary.totalProducts) * 100)}% ${en ? "sell rate" : "satış oranı"}`}
             accent="success"
           />
           <SummaryCard
-            label="Satılmayan Ürün"
+            label={en ? "Unsold Products" : "Satılmayan Ürün"}
             value={summary.unsoldProducts.toLocaleString("tr-TR")}
             accent="danger"
           />
           <SummaryCard
-            label="Toplam Gelir"
+            label={en ? "Total Revenue" : "Toplam Gelir"}
             value={formatCurrency(summary.totalRevenue)}
             accent="primary"
           />
           <SummaryCard
-            label="Net Kâr"
+            label={en ? "Net Profit" : "Net Kâr"}
             value={formatCurrency(summary.totalProfit)}
-            sub={`${summary.profitMargin.toFixed(1)}% kâr marjı`}
+            sub={`${summary.profitMargin.toFixed(1)}% ${en ? "profit margin" : "kâr marjı"}`}
             accent={summary.totalProfit >= 0 ? "success" : "danger"}
           />
           <SummaryCard
-            label="Kârlı Ürün"
+            label={en ? "Profitable Products" : "Kârlı Ürün"}
             value={`${summary.profitableCount} / ${summary.totalProducts}`}
-            sub={`${summary.unprofitableCount} kârsız ürün`}
+            sub={`${summary.unprofitableCount} ${en ? "unprofitable products" : "kârsız ürün"}`}
           />
         </div>
       </section>
 
-      {/* Grafikler */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-6)" }}>
-        {/* En Çok Satılanlar */}
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            En Çok Satan 10 Ürün
+            {en ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün"}
           </h3>
           {analysis.topSellers.length > 0
-            ? <TopSellersChart data={analysis.topSellers} />
-            : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>Satış verisi bulunamadı</p>
+            ? <TopSellersChart data={analysis.topSellers} lang={lang} />
+            : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No sales data found" : "Satış verisi bulunamadı"}</p>
           }
         </section>
 
-        {/* Pasta Grafik */}
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            Satış Dağılımı
+            {en ? "Sales Distribution" : "Satış Dağılımı"}
           </h3>
-          <SoldUnsoldPieChart sold={summary.soldProducts} unsold={summary.unsoldProducts} />
+          <SoldUnsoldPieChart sold={summary.soldProducts} unsold={summary.unsoldProducts} lang={lang} />
         </section>
       </div>
 
-      {/* Kâr Analizi */}
       {analysis.profitByProduct.length > 0 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            En Kârlı 10 Ürün
+            {en ? "Top 10 Most Profitable Products" : "En Kârlı 10 Ürün"}
           </h3>
-          <ProfitChart data={analysis.profitByProduct} />
+          <ProfitChart data={analysis.profitByProduct} lang={lang} />
         </section>
       )}
 
-      {/* Kategori Dağılımı */}
       {analysis.categoryBreakdown.length > 1 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            Kategori Bazında Gelir
+            {en ? "Revenue by Category" : "Kategori Bazında Gelir"}
           </h3>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -255,11 +259,11 @@ function AnalysisDashboard({ analysis, inventoryRows }: {
                 <Tooltip
                   formatter={((value: string | number | undefined, name?: string | number) => {
                     const v = Number(value ?? 0);
-                    return String(name) === "revenue" ? [formatCurrency(v), "Gelir"] : [formatCurrency(v), "Kâr"];
+                    return String(name) === "revenue" ? [formatCurrency(v), en ? "Revenue" : "Gelir"] : [formatCurrency(v), en ? "Profit" : "Kâr"];
                   }) as AnyFormatter}
                   contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
                 />
-                <Legend formatter={(v) => v === "revenue" ? "Gelir" : "Kâr"} />
+                <Legend formatter={(v) => v === "revenue" ? (en ? "Revenue" : "Gelir") : (en ? "Profit" : "Kâr")} />
                 <Bar dataKey="revenue" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="profit" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -268,26 +272,25 @@ function AnalysisDashboard({ analysis, inventoryRows }: {
         </section>
       )}
 
-      {/* Satılmayan Ürünler Tablosu */}
       {analysis.unsoldProducts.length > 0 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
             <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700 }}>
-              Satılmayan Ürünler
+              {en ? "Unsold Products" : "Satılmayan Ürünler"}
             </h3>
-            <span className="badge badge-danger">{analysis.unsoldProducts.length} Ürün</span>
+            <span className="badge badge-danger">{analysis.unsoldProducts.length} {en ? "Products" : "Ürün"}</span>
           </div>
           <div style={{ overflowX: "auto" }}>
-            <table className="table" aria-label="Satılmayan Ürünler Tablosu">
+            <table className="table" aria-label={en ? "Unsold Products Table" : "Satılmayan Ürünler Tablosu"}>
               <thead>
                 <tr>
-                  <th scope="col">Ürün Adı</th>
-                  <th scope="col">Barkod</th>
-                  <th scope="col">Kategori</th>
-                  <th scope="col">Mevcut Stok</th>
-                  <th scope="col">Alış Fiyatı</th>
-                  <th scope="col">Satış Fiyatı</th>
-                  <th scope="col">Stok Değeri</th>
+                  <th scope="col">{en ? "Product Name" : "Ürün Adı"}</th>
+                  <th scope="col">{en ? "Barcode" : "Barkod"}</th>
+                  <th scope="col">{en ? "Category" : "Kategori"}</th>
+                  <th scope="col">{en ? "Current Stock" : "Mevcut Stok"}</th>
+                  <th scope="col">{en ? "Purchase Price" : "Alış Fiyatı"}</th>
+                  <th scope="col">{en ? "Sale Price" : "Satış Fiyatı"}</th>
+                  <th scope="col">{en ? "Stock Value" : "Stok Değeri"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -312,23 +315,22 @@ function AnalysisDashboard({ analysis, inventoryRows }: {
         </section>
       )}
 
-      {/* Ham Veri Tablosu */}
       <details style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
         <summary style={{ padding: "var(--spacing-4) var(--spacing-6)", cursor: "pointer", fontWeight: 600, userSelect: "none" }}>
-          Tüm Ürün Verileri ({inventoryRows.length} satır)
+          {en ? `All Product Data (${inventoryRows.length} rows)` : `Tüm Ürün Verileri (${inventoryRows.length} satır)`}
         </summary>
         <div style={{ padding: "0 var(--spacing-6) var(--spacing-6)", overflowX: "auto" }}>
-          <table className="table" aria-label="Tüm Ürün Verileri">
+          <table className="table" aria-label={en ? "All Product Data" : "Tüm Ürün Verileri"}>
             <thead>
               <tr>
-                <th scope="col">Ürün Adı</th>
-                <th scope="col">Barkod</th>
-                <th scope="col">Satış Adedi</th>
-                <th scope="col">Kalan Stok</th>
-                <th scope="col">Alış Fiyatı</th>
-                <th scope="col">Satış Fiyatı</th>
-                <th scope="col">Kâr/Ürün</th>
-                <th scope="col">Toplam Kâr</th>
+                <th scope="col">{en ? "Product Name" : "Ürün Adı"}</th>
+                <th scope="col">{en ? "Barcode" : "Barkod"}</th>
+                <th scope="col">{en ? "Units Sold" : "Satış Adedi"}</th>
+                <th scope="col">{en ? "Remaining Stock" : "Kalan Stok"}</th>
+                <th scope="col">{en ? "Purchase Price" : "Alış Fiyatı"}</th>
+                <th scope="col">{en ? "Sale Price" : "Satış Fiyatı"}</th>
+                <th scope="col">{en ? "Profit/Unit" : "Kâr/Ürün"}</th>
+                <th scope="col">{en ? "Total Profit" : "Toplam Kâr"}</th>
               </tr>
             </thead>
             <tbody>
@@ -367,6 +369,8 @@ function AnalysisDashboard({ analysis, inventoryRows }: {
 }
 
 export default function EnvanterPage() {
+  const { lang } = useLangContext();
+  const en = lang === "en";
   const [analysis, setAnalysis] = useState<InventoryAnalysis | null>(null);
   const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
 
@@ -389,20 +393,20 @@ export default function EnvanterPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-8)" }}>
           <div>
             <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-1)" }}>
-              Envanter Analizi
+              {en ? "Inventory Analysis" : "Envanter Analizi"}
             </h1>
             <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-              {inventoryRows.length} ürün analiz edildi
+              {inventoryRows.length} {en ? "products analyzed" : "ürün analiz edildi"}
             </p>
           </div>
           <button
             className="btn btn-secondary"
             onClick={handleReset}
           >
-            Yeni Rapor Yükle
+            {en ? "Upload New Report" : "Yeni Rapor Yükle"}
           </button>
         </div>
-        <AnalysisDashboard analysis={analysis} inventoryRows={inventoryRows} />
+        <AnalysisDashboard analysis={analysis} inventoryRows={inventoryRows} lang={lang} />
       </main>
     );
   }
@@ -411,10 +415,12 @@ export default function EnvanterPage() {
     <main>
       <div style={{ marginBottom: "var(--spacing-8)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
-          Envanter Raporu Yükle
+          {en ? "Upload Inventory Report" : "Envanter Raporu Yükle"}
         </h1>
         <p style={{ color: "var(--color-text-muted)" }}>
-          Eczane envanter raporunuzu yükleyin. Sistem satılan ve satılmayan ürünleri otomatik analiz eder.
+          {en
+            ? "Upload your pharmacy inventory report. The system automatically analyzes sold and unsold products."
+            : "Eczane envanter raporunuzu yükleyin. Sistem satılan ve satılmayan ürünleri otomatik analiz eder."}
         </p>
       </div>
 
@@ -426,25 +432,42 @@ export default function EnvanterPage() {
         marginBottom: "var(--spacing-6)",
       }}>
         <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>
-          Desteklenen Sütun Adları
+          {en ? "Supported Column Names" : "Desteklenen Sütun Adları"}
         </h2>
         <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
-          Sistem aşağıdaki sütunları otomatik tanır. Başlıklar tam eşleşmese de benzer isimler algılanır:
+          {en
+            ? "The system auto-detects the following columns. Similar names are recognized even if not an exact match:"
+            : "Sistem aşağıdaki sütunları otomatik tanır. Başlıklar tam eşleşmese de benzer isimler algılanır:"}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-2)" }}>
-          {[
-            "Ürün Adı / İlaç Adı",
-            "Barkod / İlaç Kodu",
-            "Kategori / Grup",
-            "Satış Adedi / Çıkış",
-            "Kalan Stok / Dönem Sonu",
-            "Alış Fiyatı / Maliyet",
-            "Satış Fiyatı / S.F.",
-          ].map((label) => (
-            <span key={label} className="badge badge-info" style={{ fontSize: "var(--font-size-xs)" }}>
-              {label}
-            </span>
-          ))}
+          {en
+            ? [
+                "Product Name / Drug Name",
+                "Barcode / Drug Code",
+                "Category / Group",
+                "Units Sold / Outflow",
+                "Remaining Stock / Period End",
+                "Purchase Price / Cost",
+                "Sale Price / S.P.",
+              ].map((label) => (
+                <span key={label} className="badge badge-info" style={{ fontSize: "var(--font-size-xs)" }}>
+                  {label}
+                </span>
+              ))
+            : [
+                "Ürün Adı / İlaç Adı",
+                "Barkod / İlaç Kodu",
+                "Kategori / Grup",
+                "Satış Adedi / Çıkış",
+                "Kalan Stok / Dönem Sonu",
+                "Alış Fiyatı / Maliyet",
+                "Satış Fiyatı / S.F.",
+              ].map((label) => (
+                <span key={label} className="badge badge-info" style={{ fontSize: "var(--font-size-xs)" }}>
+                  {label}
+                </span>
+              ))
+          }
         </div>
       </div>
 
@@ -453,6 +476,7 @@ export default function EnvanterPage() {
         onConfirm={handleConfirm}
         acceptedTypes=".xlsx,.xls,.csv,.pdf"
         maxFileSizeMB={100}
+        lang={lang}
       />
     </main>
   );

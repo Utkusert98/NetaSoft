@@ -89,7 +89,7 @@ export default function Sidebar() {
         <button
           className="sidebar-toggle"
           onClick={() => setOpen((o) => !o)}
-          aria-label={open ? "Menüyü Kapat" : "Menüyü Aç"}
+          aria-label={open ? (lang === "en" ? "Close Menu" : "Menüyü Kapat") : (lang === "en" ? "Open Menu" : "Menüyü Aç")}
           aria-expanded={open}
         >
           {open ? "✕" : "☰"}
@@ -104,7 +104,7 @@ export default function Sidebar() {
       />
 
       {/* Sidebar */}
-      <aside className={`sidebar ${open ? "open" : ""}`} role="navigation" aria-label="Ana Menü">
+      <aside className={`sidebar ${open ? "open" : ""}`} role="navigation" aria-label={lang === "en" ? "Main Menu" : "Ana Menü"}>
         {/* Logo */}
         <div className="sidebar-logo">
           <NetaSoftIcon size={32} />

@@ -7,6 +7,7 @@ import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 
 const senetSchema = z.object({
   noteNumber: z.string().min(1, "Senet no gereklidir"),
+  supplierName: z.string().optional(),
   issueDate: z.string().datetime(),
   dueDate: z.string().datetime(),
   amount: z.number().min(0.01, "Tutar 0'dan büyük olmalıdır"),
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       const notesToCreate = Array.from({ length: count }).map((_, i) => ({
         pharmacyId: userRole.pharmacyId,
         noteNumber: `${validated.noteNumber}-${i + 1}/${count}`,
+        supplierName: validated.supplierName,
         issueDate,
         dueDate: addMonths(baseDueDate, i),
         amount: amountPerInstallment,
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
         data: {
           pharmacyId: userRole.pharmacyId,
           noteNumber: validated.noteNumber,
+          supplierName: validated.supplierName,
           issueDate,
           dueDate: baseDueDate,
           amount: validated.amount,

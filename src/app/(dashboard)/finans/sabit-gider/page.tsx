@@ -1,20 +1,32 @@
 "use client";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
-
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr as trLocale, enUS } from "date-fns/locale";
+
+type Expense = {
+  id: string;
+  type: string;
+  customType?: string;
+  amount: number;
+  expenseDate: string;
+  notes?: string;
+};
 
 export default function SabitGiderPage() {
   const { lang } = useLangContext();
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const locale = lang === "en" ? enUS : trLocale;
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  
+  const [editExpense, setEditExpense] = useState<Expense | null>(null);
+  const [editForm, setEditForm] = useState({ type: "INVOICE", customType: "", amount: "", expenseDate: "", notes: "" });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     type: "INVOICE",
     customType: "",
@@ -23,20 +35,15 @@ export default function SabitGiderPage() {
     notes: "",
   });
 
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
+  useEffect(() => { fetchExpenses(); }, []);
 
   const fetchExpenses = async () => {
     try {
       const res = await fetch("/api/v1/finans/sabit-gider", { headers: { "Accept-Language": lang } });
       const json = await res.json();
       if (json.success) setExpenses(json.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -48,34 +55,19 @@ export default function SabitGiderPage() {
     e.preventDefault();
     setSubmitting(true);
     setError("");
-
     try {
-      const payload = {
-        ...formData,
-        amount: parseFloat(formData.amount),
-        expenseDate: formData.expenseDate + "T00:00:00.000Z"
-      };
-
+      const payload = { ...formData, amount: parseFloat(formData.amount), expenseDate: formData.expenseDate + "T00:00:00.000Z" };
       const res = await fetch("/api/v1/finans/sabit-gider", {
         method: "POST",
-        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify(payload),
       });
-
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bir hata oluştu");
-
-      setFormData({
-        type: "INVOICE",
-        customType: "",
-        amount: "",
-        expenseDate: new Date().toISOString().split("T")[0],
-        notes: "",
-      });
-      
+      if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+      setFormData({ type: "INVOICE", customType: "", amount: "", expenseDate: new Date().toISOString().split("T")[0], notes: "" });
       fetchExpenses();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Bir hata oluştu");
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally {
       setSubmitting(false);
     }
@@ -88,33 +80,67 @@ export default function SabitGiderPage() {
       await fetch(`/api/v1/finans/sabit-gider/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
       setDeleteId(null);
       await fetchExpenses();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setDeleting(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setDeleting(false); }
+  };
+
+  const openEdit = (exp: Expense) => {
+    setEditExpense(exp);
+    setEditForm({
+      type: exp.type,
+      customType: exp.customType ?? "",
+      amount: String(exp.amount),
+      expenseDate: new Date(exp.expenseDate).toISOString().split("T")[0],
+      notes: exp.notes ?? "",
+    });
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editExpense) return;
+    setEditSubmitting(true);
+    try {
+      await fetch(`/api/v1/finans/sabit-gider/${editExpense.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({
+          type: editForm.type,
+          customType: editForm.type === "OTHER" ? editForm.customType : undefined,
+          amount: parseFloat(editForm.amount),
+          expenseDate: editForm.expenseDate + "T00:00:00.000Z",
+          notes: editForm.notes,
+        }),
+      });
+      setEditExpense(null);
+      await fetchExpenses();
+    } catch (e) { console.error(e); }
+    finally { setEditSubmitting(false); }
   };
 
   const getTypeLabel = (type: string, customType?: string) => {
-    switch (type) {
-      case "INVOICE": return lang === "en" ? "Invoice" : "Fatura";
-      case "ACCOUNTING": return lang === "en" ? "Accounting" : "Muhasebe";
-      case "TAX": return lang === "en" ? "Tax" : "Vergi";
-      case "RENT": return lang === "en" ? "Rent" : "Kira";
-      case "OTHER": return customType || (lang === "en" ? "Other" : "Diğer");
-      default: return type;
-    }
+    const labels: Record<string, { tr: string; en: string }> = {
+      INVOICE: { tr: "Fatura", en: "Invoice" },
+      ACCOUNTING: { tr: "Muhasebe", en: "Accounting" },
+      TAX: { tr: "Vergi", en: "Tax" },
+      RENT: { tr: "Kira", en: "Rent" },
+      OTHER: { tr: customType || "Diğer", en: customType || "Other" },
+    };
+    return labels[type]?.[lang] ?? type;
   };
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>{tx(t.sabitGider.title, lang)}</h1>
+      <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>
+        {tx(t.sabitGider.title, lang)}
+      </h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--spacing-8)", alignItems: "start" }}>
-        {/* Form Card */}
+        {/* Form */}
         <div className="card">
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>Yeni Gider Ekle</h2>
-          
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
+            {lang === "en" ? "Add New Expense" : "Yeni Gider Ekle"}
+          </h2>
+
           {error && (
             <div style={{ padding: "12px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "16px", fontSize: "14px" }}>
               {error}
@@ -123,35 +149,35 @@ export default function SabitGiderPage() {
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
-              <label className="form-label">Gider Türü</label>
+              <label className="form-label">{lang === "en" ? "Expense Type" : "Gider Türü"}</label>
               <select className="form-input" name="type" value={formData.type} onChange={handleChange} required>
-                <option value="INVOICE">Fatura</option>
-                <option value="ACCOUNTING">Muhasebe</option>
-                <option value="TAX">Vergi</option>
-                <option value="RENT">Kira</option>
-                <option value="OTHER">Diğer</option>
+                <option value="INVOICE">{lang === "en" ? "Invoice" : "Fatura"}</option>
+                <option value="ACCOUNTING">{lang === "en" ? "Accounting" : "Muhasebe"}</option>
+                <option value="TAX">{lang === "en" ? "Tax" : "Vergi"}</option>
+                <option value="RENT">{lang === "en" ? "Rent" : "Kira"}</option>
+                <option value="OTHER">{lang === "en" ? "Other" : "Diğer"}</option>
               </select>
             </div>
 
             {formData.type === "OTHER" && (
               <div className="form-group">
-                <label className="form-label">Özel Gider Türü</label>
+                <label className="form-label">{lang === "en" ? "Custom Expense Type" : "Özel Gider Türü"}</label>
                 <input type="text" className="form-input" name="customType" value={formData.customType} onChange={handleChange} required />
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label">Tutar (₺)</label>
+              <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
               <input type="number" step="0.01" className="form-input" name="amount" value={formData.amount} onChange={handleChange} required />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Gider Tarihi</label>
+              <label className="form-label">{lang === "en" ? "Expense Date" : "Gider Tarihi"}</label>
               <input type="date" className="form-input" name="expenseDate" value={formData.expenseDate} onChange={handleChange} required />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Notlar</label>
+              <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
               <textarea className="form-input" name="notes" value={formData.notes} onChange={handleChange} rows={2} />
             </div>
 
@@ -161,30 +187,34 @@ export default function SabitGiderPage() {
           </form>
         </div>
 
-        {/* Table Card */}
+        {/* Table */}
         <div className="card">
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>Geçmiş Giderler</h2>
-          
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
+            {lang === "en" ? "Past Expenses" : "Geçmiş Giderler"}
+          </h2>
+
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
           ) : expenses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>{lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}</div>
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>
+              {lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}
+            </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="table" style={{ width: "100%", fontSize: "14px" }}>
                 <thead>
                   <tr>
-                    <th>Tarih</th>
-                    <th>Tür</th>
-                    <th>Tutar</th>
-                    <th>Notlar</th>
-                    <th style={{ textAlign: "right" }}>İşlem</th>
+                    <th>{lang === "en" ? "Date" : "Tarih"}</th>
+                    <th>{lang === "en" ? "Type" : "Tür"}</th>
+                    <th>{lang === "en" ? "Amount" : "Tutar"}</th>
+                    <th>{lang === "en" ? "Notes" : "Notlar"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {expenses.map((exp) => (
                     <tr key={exp.id}>
-                      <td>{format(new Date(exp.expenseDate), "dd MMM yyyy", { locale: tr })}</td>
+                      <td>{format(new Date(exp.expenseDate), "dd MMM yyyy", { locale })}</td>
                       <td>
                         <span style={{ padding: "4px 8px", background: "var(--color-bg)", borderRadius: "4px", fontSize: "12px", fontWeight: 500 }}>
                           {getTypeLabel(exp.type, exp.customType)}
@@ -193,12 +223,16 @@ export default function SabitGiderPage() {
                       <td style={{ fontWeight: 600 }}>{Number(exp.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</td>
                       <td style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{exp.notes || "-"}</td>
                       <td style={{ textAlign: "right" }}>
-                        <button
-                          onClick={() => setDeleteId(exp.id)}
-                          style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}
-                        >
-                          Sil
-                        </button>
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                          <button onClick={() => openEdit(exp)}
+                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                            {lang === "en" ? "Edit" : "Düzenle"}
+                          </button>
+                          <button onClick={() => setDeleteId(exp.id)}
+                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                            {lang === "en" ? "Delete" : "Sil"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -209,18 +243,73 @@ export default function SabitGiderPage() {
         </div>
       </div>
 
+      {/* Edit Modal */}
+      {editExpense && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card" style={{ width: "440px", padding: "var(--spacing-6)" }}>
+            <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
+              {lang === "en" ? "Edit Expense" : "Gideri Düzenle"}
+            </h3>
+            <form onSubmit={(e) => void handleEditSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Expense Type" : "Gider Türü"}</label>
+                <select className="form-input" value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value }))}>
+                  <option value="INVOICE">{lang === "en" ? "Invoice" : "Fatura"}</option>
+                  <option value="ACCOUNTING">{lang === "en" ? "Accounting" : "Muhasebe"}</option>
+                  <option value="TAX">{lang === "en" ? "Tax" : "Vergi"}</option>
+                  <option value="RENT">{lang === "en" ? "Rent" : "Kira"}</option>
+                  <option value="OTHER">{lang === "en" ? "Other" : "Diğer"}</option>
+                </select>
+              </div>
+              {editForm.type === "OTHER" && (
+                <div className="form-group">
+                  <label className="form-label">{lang === "en" ? "Custom Type" : "Özel Tür"}</label>
+                  <input type="text" className="form-input" value={editForm.customType} onChange={e => setEditForm(p => ({ ...p, customType: e.target.value }))} />
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
+                <input type="number" step="0.01" className="form-input" value={editForm.amount} onChange={e => setEditForm(p => ({ ...p, amount: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Expense Date" : "Gider Tarihi"}</label>
+                <input type="date" className="form-input" value={editForm.expenseDate} onChange={e => setEditForm(p => ({ ...p, expenseDate: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
+                <textarea className="form-input" rows={2} value={editForm.notes} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+              <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "4px" }}>
+                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setEditExpense(null)}>
+                  {lang === "en" ? "Cancel" : "İptal"}
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={editSubmitting}>
+                  {editSubmitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "Save" : "Kaydet")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ width: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
-            <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>Gideri Sil</h3>
+            <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
+              {lang === "en" ? "Delete Expense" : "Gideri Sil"}
+            </h3>
             <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
-              Bu gider kaydını silmek istediğinizden emin misiniz?
+              {lang === "en" ? "Are you sure you want to delete this expense record?" : "Bu gider kaydını silmek istediğinizden emin misiniz?"}
             </p>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
-              <button className="btn" style={{ flex: 1 }} onClick={() => setDeleteId(null)}>İptal</button>
-              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }} onClick={() => void handleDelete()} disabled={deleting}>
-                {deleting ? "Siliniyor..." : "Evet, Sil"}
+              <button className="btn" style={{ flex: 1 }} onClick={() => setDeleteId(null)}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
+              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }}
+                onClick={() => void handleDelete()} disabled={deleting}>
+                {deleting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
               </button>
             </div>
           </div>

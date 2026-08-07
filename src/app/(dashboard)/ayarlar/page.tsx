@@ -59,7 +59,7 @@ function ThemePicker() {
     <div className="card">
       <h2 style={{ fontWeight: 700, marginBottom: "var(--spacing-2)" }}>{lang === "en" ? "Appearance Theme" : "Görünüm Teması"}</h2>
       <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-6)" }}>
-        Tercih ettiğiniz temayı seçin. Ayar tarayıcıda kalıcı olarak saklanır.
+        {lang === "en" ? "Choose your preferred theme. The setting is stored permanently in the browser." : "Tercih ettiğiniz temayı seçin. Ayar tarayıcıda kalıcı olarak saklanır."}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
         {THEME_OPTIONS.map(opt => {
@@ -102,11 +102,11 @@ function ThemePicker() {
         <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{lang === "en" ? "Preview" : "Önizleme"}</p>
         <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
           <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "12px 16px", flex: 1 }}>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>Toplam Gelir</div>
+            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Total Revenue" : "Toplam Gelir"}</div>
             <div style={{ fontWeight: 700, color: "var(--color-primary)", fontSize: "var(--font-size-lg)" }}>₺12.500</div>
           </div>
           <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "12px 16px", flex: 1 }}>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>Net Kâr</div>
+            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Net Profit" : "Net Kâr"}</div>
             <div style={{ fontWeight: 700, color: "#3498db", fontSize: "var(--font-size-lg)" }}>₺4.200</div>
           </div>
         </div>
@@ -233,10 +233,10 @@ export default function AyarlarPage() {
     try {
       const res = await fetch("/api/v1/ayarlar/eczane", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(pharForm) });
       const json = await res.json() as { success: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? "Kayıt hatası");
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "Save error" : "Kayıt hatası"));
       setSuccess(tx(t.settings.updatePharmacy, lang));
       await loadPharmacy();
-    } catch (err) { setError(err instanceof Error ? err.message : "Hata oluştu"); }
+    } catch (err) { setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
     finally { setSaving(false); }
   };
 
@@ -245,10 +245,10 @@ export default function AyarlarPage() {
     try {
       const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(profileForm) });
       const json = await res.json() as { success: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? "Kayıt hatası");
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "Save error" : "Kayıt hatası"));
       setSuccess(tx(t.settings.updateProfile, lang));
       await loadUser();
-    } catch (err) { setError(err instanceof Error ? err.message : "Hata oluştu"); }
+    } catch (err) { setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
     finally { setSaving(false); }
   };
 
@@ -257,10 +257,10 @@ export default function AyarlarPage() {
     try {
       const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify({ action: "change-password", ...pwForm }) });
       const json = await res.json() as { success: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? "Hata oluştu");
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
       setSuccess(tx(t.settings.updatePassword, lang));
       setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    } catch (err) { setError(err instanceof Error ? err.message : "Hata oluştu"); }
+    } catch (err) { setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
     finally { setSaving(false); }
   };
 
@@ -269,7 +269,7 @@ export default function AyarlarPage() {
     { key: "profil", label: tx(t.settings.profileTab, lang), icon: "👤" },
     { key: "sifre", label: tx(t.settings.passwordTab, lang), icon: "🔑" },
     { key: "tema", label: tx(t.settings.themeTab, lang), icon: "🎨" },
-    { key: "dil", label: "Dil / Language", icon: "🌐" },
+    { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: "🌐" },
   ];
 
   return (
@@ -316,8 +316,8 @@ export default function AyarlarPage() {
               <Field label={tx(t.settings.district, lang)} name="district" value={pharForm.district} onChange={handlePharChange} placeholder="Kadıköy" />
             </div>
             <div className="form-group">
-              <label className="form-label">Adres</label>
-              <textarea name="address" value={pharForm.address} onChange={handlePharChange} className="form-input" rows={2} placeholder="Tam adres..." />
+              <label className="form-label">{lang === "en" ? "Address" : "Adres"}</label>
+              <textarea name="address" value={pharForm.address} onChange={handlePharChange} className="form-input" rows={2} placeholder={lang === "en" ? "Full address..." : "Tam adres..."} />
             </div>
             <div className="grid-2">
               <Field label={tx(t.settings.phone, lang)} name="phone" value={pharForm.phone} onChange={handlePharChange} placeholder="0212 555 00 00" />
@@ -335,7 +335,7 @@ export default function AyarlarPage() {
         <div className="card">
           <div style={{ marginBottom: "var(--spacing-5)" }}>
             <h2 style={{ fontWeight: 700 }}>{lang === "en" ? "Profile Information" : "Profil Bilgileri"}</h2>
-            {user && <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>E-posta: {user.email}</p>}
+            {user && <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>{lang === "en" ? "Email:" : "E-posta:"} {user.email}</p>}
           </div>
 
           {/* Avatar */}
@@ -348,7 +348,7 @@ export default function AyarlarPage() {
                 <p style={{ fontWeight: 700 }}>{user.name ?? "—"}</p>
                 <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{user.email}</p>
                 <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
-                  {lang === "en" ? "Registered" : "Kayıt"}: {new Date(user.createdAt).toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")}
+                  {lang === "en" ? "Registered:" : "Kayıt:"} {new Date(user.createdAt).toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")}
                 </p>
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function AyarlarPage() {
           </div>
           <form onSubmit={(e) => void savePassword(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <Field label={tx(t.settings.currentPassword, lang)} name="currentPassword" value={pwForm.currentPassword} onChange={handlePwChange} type="password" />
-            <Field label={tx(t.settings.newPassword, lang)} name="newPassword" value={pwForm.newPassword} onChange={handlePwChange} type="password" placeholder="En az 12 karakter..." />
+            <Field label={tx(t.settings.newPassword, lang)} name="newPassword" value={pwForm.newPassword} onChange={handlePwChange} type="password" placeholder={lang === "en" ? "At least 12 characters..." : "En az 12 karakter..."} />
             <Field label={tx(t.settings.confirmPassword, lang)} name="confirmPassword" value={pwForm.confirmPassword} onChange={handlePwChange} type="password" />
 
             {/* Şifre gücü göstergesi */}

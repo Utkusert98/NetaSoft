@@ -5,9 +5,11 @@ import { z } from "zod";
 import { getLang, m } from "@/lib/i18n/api-messages";
 
 const updateSchema = z.object({
-  supplierName: z.string().min(1).optional(),
-  amount: z.number().min(0.01).optional(),
-  transferDate: z.string().datetime().optional(),
+  salaryAmount: z.number().min(0).optional(),
+  sgkAmount: z.number().min(0).optional(),
+  foodAmount: z.number().min(0).optional(),
+  transportAmount: z.number().min(0).optional(),
+  expenseDate: z.string().datetime().optional(),
   notes: z.string().optional(),
 });
 
@@ -27,14 +29,15 @@ export async function DELETE(
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+
     const pharmacyId = await getPharmacyId(session.user.id);
     if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { id } = await context.params;
-    const record = await prisma.supplierTransfer.findFirst({ where: { id, pharmacyId, deletedAt: null } });
+    const record = await prisma.employeeExpense.findFirst({ where: { id, pharmacyId, deletedAt: null } });
     if (!record) return NextResponse.json({ success: false, error: m("notFound", lang), code: "NOT_FOUND" }, { status: 404 });
 
-    await prisma.supplierTransfer.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.employeeExpense.update({ where: { id }, data: { deletedAt: new Date() } });
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
@@ -49,22 +52,32 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+
     const pharmacyId = await getPharmacyId(session.user.id);
     if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const { id } = await context.params;
-    const record = await prisma.supplierTransfer.findFirst({ where: { id, pharmacyId, deletedAt: null } });
+    const record = await prisma.employeeExpense.findFirst({ where: { id, pharmacyId, deletedAt: null } });
     if (!record) return NextResponse.json({ success: false, error: m("notFound", lang), code: "NOT_FOUND" }, { status: 404 });
 
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
-    const updated = await prisma.supplierTransfer.update({
+    const salary = validated.salaryAmount ?? Number(record.salaryAmount);
+    const sgk = validated.sgkAmount ?? Number(record.sgkAmount);
+    const food = validated.foodAmount ?? Number(record.foodAmount);
+    const transport = validated.transportAmount ?? Number(record.transportAmount);
+    const total = salary + sgk + food + transport;
+
+    const updated = await prisma.employeeExpense.update({
       where: { id },
       data: {
-        ...(validated.supplierName !== undefined && { supplierName: validated.supplierName }),
-        ...(validated.amount !== undefined && { amount: validated.amount }),
-        ...(validated.transferDate !== undefined && { transferDate: new Date(validated.transferDate) }),
+        salaryAmount: salary,
+        sgkAmount: sgk,
+        foodAmount: food,
+        transportAmount: transport,
+        totalAmount: total,
+        ...(validated.expenseDate !== undefined && { expenseDate: new Date(validated.expenseDate) }),
         ...(validated.notes !== undefined && { notes: validated.notes }),
       },
     });

@@ -532,6 +532,7 @@ model PromissoryNote {
   amount     Decimal  @db.Decimal(15, 2)
   currency   String   @default("TRY")
 
+  supplierName       String?   @map("supplier_name") // Ecza deposu / alacaklı adı
   notes              String? @db.Text
   isPaid             Boolean   @default(false) @map("is_paid")
   paidDate           DateTime? @map("paid_date")

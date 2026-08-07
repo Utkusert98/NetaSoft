@@ -4,7 +4,7 @@ import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback } from "react";
 import { format, addDays } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr as trLocale, enUS } from "date-fns/locale";
 
 const PLATFORM_SUGGESTIONS = ["Farmazon", "Capsule", "Nora", "Pharmy", "ePlatform", "Diğer"];
 
@@ -18,10 +18,15 @@ type PlatformIncome = {
   notes?: string;
 };
 
-const STATUS_MAP = {
+const STATUS_MAP_TR = {
   PENDING:   { label: "Bekliyor",     color: "#d97706", bg: "rgba(217,119,6,0.1)" },
   RECEIVED:  { label: "Hesaba Yattı", color: "#059669", bg: "rgba(5,150,105,0.1)" },
   CANCELLED: { label: "İptal",        color: "#dc2626", bg: "rgba(220,38,38,0.1)" },
+};
+const STATUS_MAP_EN = {
+  PENDING:   { label: "Pending",    color: "#d97706", bg: "rgba(217,119,6,0.1)" },
+  RECEIVED:  { label: "Received",   color: "#059669", bg: "rgba(5,150,105,0.1)" },
+  CANCELLED: { label: "Cancelled",  color: "#dc2626", bg: "rgba(220,38,38,0.1)" },
 };
 
 const emptyForm = {
@@ -33,6 +38,8 @@ const emptyForm = {
 
 export default function PlatformGelirPage() {
   const { lang } = useLangContext();
+  const locale = lang === "en" ? enUS : trLocale;
+  const STATUS_MAP = lang === "en" ? STATUS_MAP_EN : STATUS_MAP_TR;
   const [incomes, setIncomes] = useState<PlatformIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -64,11 +71,11 @@ export default function PlatformGelirPage() {
 
   // +15 gün önizlemesi
   const previewPaymentDate = formData.incomeDate
-    ? format(addDays(new Date(formData.incomeDate + "T00:00:00"), 15), "dd MMMM yyyy", { locale: tr })
+    ? format(addDays(new Date(formData.incomeDate + "T00:00:00"), 15), "dd MMMM yyyy", { locale })
     : "—";
 
   const editPreviewDate = editForm.incomeDate
-    ? format(addDays(new Date(editForm.incomeDate + "T00:00:00"), 15), "dd MMMM yyyy", { locale: tr })
+    ? format(addDays(new Date(editForm.incomeDate + "T00:00:00"), 15), "dd MMMM yyyy", { locale })
     : "—";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -88,11 +95,11 @@ export default function PlatformGelirPage() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bir hata oluştu");
+      if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setFormData(emptyForm);
       await fetchIncomes();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally {
       setSubmitting(false);
     }
@@ -125,11 +132,11 @@ export default function PlatformGelirPage() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bir hata oluştu");
+      if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setEditRecord(null);
       await fetchIncomes();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally {
       setEditSubmitting(false);
     }
@@ -142,10 +149,10 @@ export default function PlatformGelirPage() {
         headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Durum güncellenemedi");
+      if (!res.ok) throw new Error(lang === "en" ? "Status could not be updated" : "Durum güncellenemedi");
       await fetchIncomes();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     }
   };
 
@@ -154,11 +161,11 @@ export default function PlatformGelirPage() {
     setDeleteSubmitting(true);
     try {
       const res = await fetch(`/api/v1/finans/platform-gelir/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
-      if (!res.ok) throw new Error("Silme işlemi başarısız");
+      if (!res.ok) throw new Error(lang === "en" ? "Delete operation failed" : "Silme işlemi başarısız");
       setDeleteId(null);
       await fetchIncomes();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally {
       setDeleteSubmitting(false);
     }
@@ -175,7 +182,9 @@ export default function PlatformGelirPage() {
       <div style={{ marginBottom: "var(--spacing-6)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.platform.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
-          Farmazon, Capsule vb. platformlardan gelen gelirleri takip edin. Giriş tarihinden 15 gün sonra hesaba yatar.
+          {lang === "en"
+            ? "Track income from platforms like Farmazon, Capsule, etc. Funds arrive 15 days after the entry date."
+            : "Farmazon, Capsule vb. platformlardan gelen gelirleri takip edin. Giriş tarihinden 15 gün sonra hesaba yatar."}
         </p>
       </div>
 
@@ -190,9 +199,9 @@ export default function PlatformGelirPage() {
       {incomes.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
           {[
-            { label: "Bekleyen Toplam", value: totalPending, color: "#d97706" },
-            { label: "Toplam Kayıt", value: incomes.length, isCnt: true, color: "var(--color-primary)" },
-            { label: "Yatacak Kayıt", value: incomes.filter(i => i.status === "PENDING").length, isCnt: true, color: "#7c3aed" },
+            { label: lang === "en" ? "Pending Total" : "Bekleyen Toplam", value: totalPending, color: "#d97706" },
+            { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: incomes.length, isCnt: true, color: "var(--color-primary)" },
+            { label: lang === "en" ? "Pending Records" : "Yatacak Kayıt", value: incomes.filter(i => i.status === "PENDING").length, isCnt: true, color: "#7c3aed" },
           ].map((s, i) => (
             <div key={i} className="card" style={{ padding: "16px 20px" }}>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.label}</div>
@@ -208,7 +217,7 @@ export default function PlatformGelirPage() {
         {/* FORM */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>
-            💸 Yeni Platform Geliri
+            💸 {lang === "en" ? "New Platform Income" : "Yeni Platform Geliri"}
           </h2>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
@@ -228,16 +237,15 @@ export default function PlatformGelirPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Tutar (₺)</label>
+              <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
               <input type="number" step="0.01" min="0.01" className="form-input" name="amount" value={formData.amount} onChange={handleChange} required placeholder="0,00" />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Giriş Tarihi</label>
+              <label className="form-label">{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</label>
               <input type="date" className="form-input" name="incomeDate" value={formData.incomeDate} onChange={handleChange} required />
             </div>
 
-            {/* Otomatik ödeme tarihi önizlemesi */}
             <div style={{
               padding: "14px 16px",
               borderRadius: "var(--radius-md)",
@@ -245,7 +253,7 @@ export default function PlatformGelirPage() {
               border: "1px solid rgba(124,58,237,0.25)",
             }}>
               <p style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-                ⏳ Tahmini Ödeme Tarihi (+15 Gün)
+                ⏳ {lang === "en" ? "Estimated Payment Date (+15 Days)" : "Tahmini Ödeme Tarihi (+15 Gün)"}
               </p>
               <p style={{ fontSize: "20px", fontWeight: 700, color: "#7c3aed" }}>
                 {previewPaymentDate}
@@ -253,12 +261,12 @@ export default function PlatformGelirPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Notlar</label>
-              <textarea className="form-input" name="notes" value={formData.notes} onChange={handleChange} rows={2} placeholder="İsteğe bağlı..." />
+              <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
+              <textarea className="form-input" name="notes" value={formData.notes} onChange={handleChange} rows={2} placeholder={lang === "en" ? "Optional..." : "İsteğe bağlı..."} />
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? "Kaydediliyor..." : "+ Platform Geliri Ekle"}
+              {submitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "+ Add Platform Income" : "+ Platform Geliri Ekle")}
             </button>
           </form>
         </div>
@@ -266,17 +274,19 @@ export default function PlatformGelirPage() {
         {/* TABLE */}
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
-            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>Bekleyen Gelirler</h2>
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>
+              {lang === "en" ? "Income Records" : "Bekleyen Gelirler"}
+            </h2>
             <select
               className="form-input"
               style={{ width: "140px", fontSize: "13px" }}
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
-              <option value="">Tümü</option>
-              <option value="PENDING">Bekliyor</option>
-              <option value="RECEIVED">Hesaba Yattı</option>
-              <option value="CANCELLED">İptal</option>
+              <option value="">{lang === "en" ? "All" : "Tümü"}</option>
+              <option value="PENDING">{lang === "en" ? "Pending" : "Bekliyor"}</option>
+              <option value="RECEIVED">{lang === "en" ? "Received" : "Hesaba Yattı"}</option>
+              <option value="CANCELLED">{lang === "en" ? "Cancelled" : "İptal"}</option>
             </select>
           </div>
 
@@ -293,11 +303,11 @@ export default function PlatformGelirPage() {
                 <thead>
                   <tr>
                     <th>Platform</th>
-                    <th>Giriş Tarihi</th>
-                    <th style={{ textAlign: "right" }}>Tutar</th>
-                    <th>Yatacak Tarih</th>
-                    <th>Durum</th>
-                    <th style={{ textAlign: "center" }}>İşlem</th>
+                    <th>{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Amount" : "Tutar"}</th>
+                    <th>{lang === "en" ? "Payment Date" : "Yatacak Tarih"}</th>
+                    <th>{lang === "en" ? "Status" : "Durum"}</th>
+                    <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -308,12 +318,12 @@ export default function PlatformGelirPage() {
                       <tr key={inc.id}>
                         <td style={{ fontWeight: 600 }}>{inc.platformName}</td>
                         <td style={{ color: "var(--color-text-muted)" }}>
-                          {format(new Date(inc.incomeDate), "dd MMM yyyy", { locale: tr })}
+                          {format(new Date(inc.incomeDate), "dd MMM yyyy", { locale })}
                         </td>
                         <td style={{ textAlign: "right", fontWeight: 700 }}>{fmt(Number(inc.amount))}</td>
                         <td>
                           <span style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text)", fontWeight: isOverdue ? 700 : 400 }}>
-                            {format(new Date(inc.expectedPaymentDate), "dd MMM yyyy", { locale: tr })}
+                            {format(new Date(inc.expectedPaymentDate), "dd MMM yyyy", { locale })}
                           </span>
                           {isOverdue && <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-danger)" }}>❗</span>}
                         </td>
@@ -332,9 +342,9 @@ export default function PlatformGelirPage() {
                               cursor: "pointer",
                             }}
                           >
-                            <option value="PENDING">Bekliyor</option>
-                            <option value="RECEIVED">Hesaba Yattı</option>
-                            <option value="CANCELLED">İptal</option>
+                            <option value="PENDING">{lang === "en" ? "Pending" : "Bekliyor"}</option>
+                            <option value="RECEIVED">{lang === "en" ? "Received" : "Hesaba Yattı"}</option>
+                            <option value="CANCELLED">{lang === "en" ? "Cancelled" : "İptal"}</option>
                           </select>
                         </td>
                         <td style={{ textAlign: "center" }}>
@@ -368,7 +378,7 @@ export default function PlatformGelirPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ width: "460px", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-              Platform Gelirini Düzenle
+              {lang === "en" ? "Edit Platform Income" : "Platform Gelirini Düzenle"}
             </h3>
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
@@ -379,24 +389,26 @@ export default function PlatformGelirPage() {
                 </datalist>
               </div>
               <div className="form-group">
-                <label className="form-label">Tutar (₺)</label>
+                <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
                 <input type="number" step="0.01" min="0.01" className="form-input" name="amount" value={editForm.amount} onChange={handleEditChange} required />
               </div>
               <div className="form-group">
-                <label className="form-label">Giriş Tarihi</label>
+                <label className="form-label">{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</label>
                 <input type="date" className="form-input" name="incomeDate" value={editForm.incomeDate} onChange={handleEditChange} required />
               </div>
               <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", fontSize: "13px" }}>
-                ⏳ Yeni Ödeme Tarihi: <strong style={{ color: "#7c3aed" }}>{editPreviewDate}</strong>
+                ⏳ {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "#7c3aed" }}>{editPreviewDate}</strong>
               </div>
               <div className="form-group">
-                <label className="form-label">Notlar</label>
+                <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
                 <textarea className="form-input" name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <button type="button" className="btn" onClick={() => setEditRecord(null)} style={{ border: "1px solid var(--color-border)" }}>İptal</button>
+                <button type="button" className="btn" onClick={() => setEditRecord(null)} style={{ border: "1px solid var(--color-border)" }}>
+                  {lang === "en" ? "Cancel" : "İptal"}
+                </button>
                 <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
-                  {editSubmitting ? "Güncelleniyor..." : "Güncelle"}
+                  {editSubmitting ? (lang === "en" ? "Updating..." : "Güncelleniyor...") : (lang === "en" ? "Update" : "Güncelle")}
                 </button>
               </div>
             </form>
@@ -408,15 +420,21 @@ export default function PlatformGelirPage() {
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ width: "380px" }}>
-            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>Silmeyi Onayla</h3>
+            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>
+              {lang === "en" ? "Confirm Delete" : "Silmeyi Onayla"}
+            </h3>
             <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginBottom: "24px" }}>
-              Bu platform geliri silinecek. Bu işlem geri alınamaz.
+              {lang === "en"
+                ? "This platform income will be deleted. This action cannot be undone."
+                : "Bu platform geliri silinecek. Bu işlem geri alınamaz."}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <button className="btn" onClick={() => setDeleteId(null)} style={{ border: "1px solid var(--color-border)" }}>İptal</button>
+              <button className="btn" onClick={() => setDeleteId(null)} style={{ border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
               <button className="btn" onClick={handleDelete} disabled={deleteSubmitting}
                 style={{ background: "var(--color-danger)", color: "white", border: "none" }}>
-                {deleteSubmitting ? "Siliniyor..." : "Evet, Sil"}
+                {deleteSubmitting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
               </button>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format, addMonths } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr, enUS } from "date-fns/locale";
 import type { ParsedSgkInvoice } from "@/app/api/v1/finans/sgk-fatura/parse-pdf/route";
 
 // ── Çoklu PDF yükleme ve onay bileşeni ─────────────────────────────────────
@@ -31,11 +31,11 @@ function PdfUploadReview({
       Array.from(files).forEach((f) => fd.append("files", f));
       const res = await fetch("/api/v1/finans/sgk-fatura/parse-pdf", { method: "POST", headers: { "Accept-Language": lang }, body: fd });
       const json = await res.json() as { success: boolean; data?: ParsedSgkInvoice[]; error?: string };
-      if (!json.success) throw new Error(json.error ?? "PDF işlenemedi");
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "PDF could not be processed" : "PDF işlenemedi"));
       setRows(json.data ?? []);
       setStep("review");
     } catch (e) {
-      onError(e instanceof Error ? e.message : "PDF okunamadı");
+      onError(e instanceof Error ? e.message : (lang === "en" ? "Could not read PDF" : "PDF okunamadı"));
     } finally {
       setParsing(false);
     }
@@ -64,7 +64,7 @@ function PdfUploadReview({
       setRows([]);
       onSaved();
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Kayıt hatası");
+      onError(e instanceof Error ? e.message : (lang === "en" ? "Save error" : "Kayıt hatası"));
     } finally {
       setSaving(false);
     }
@@ -78,12 +78,12 @@ function PdfUploadReview({
         <div>
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>{lang === "en" ? "📂 Upload Invoice from PDF" : "📂 PDF'den Fatura Yükle"}</h2>
           <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
-            Birden fazla SGK faturası PDF dosyası seçin — sistem otomatik okur, siz düzenler ve onaylarsınız.
+            {lang === "en" ? "Select multiple SGK invoice PDF files — the system reads them automatically; you review and confirm." : "Birden fazla SGK faturası PDF dosyası seçin — sistem otomatik okur, siz düzenler ve onaylarsınız."}
           </p>
         </div>
         {step === "review" && (
           <button onClick={reset} className="btn" style={{ fontSize: "var(--font-size-xs)", padding: "6px 12px" }}>
-            Yeniden Yükle
+            {lang === "en" ? "Upload Again" : "Yeniden Yükle"}
           </button>
         )}
       </div>
@@ -102,12 +102,12 @@ function PdfUploadReview({
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--color-border)")}
         >
           {parsing ? (
-            <><div className="spinner" style={{ margin: "0 auto 12px" }} /><p>PDF'ler okunuyor...</p></>
+            <><div className="spinner" style={{ margin: "0 auto 12px" }} /><p>{lang === "en" ? "Reading PDFs..." : "PDF'ler okunuyor..."}</p></>
           ) : (
             <>
               <div style={{ fontSize: "36px", marginBottom: "8px" }}>📄</div>
-              <p style={{ fontWeight: 600, marginBottom: "4px" }}>PDF dosyalarını sürükleyin veya tıklayın</p>
-              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>Birden fazla dosya seçebilirsiniz</p>
+              <p style={{ fontWeight: 600, marginBottom: "4px" }}>{lang === "en" ? "Drag PDF files here or click" : "PDF dosyalarını sürükleyin veya tıklayın"}</p>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{lang === "en" ? "You can select multiple files" : "Birden fazla dosya seçebilirsiniz"}</p>
             </>
           )}
           <input ref={inputRef} type="file" accept=".pdf" multiple hidden
@@ -132,11 +132,11 @@ function PdfUploadReview({
                 )}
                 {row.periodStart && row.periodEnd && (
                   <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
-                    📅 Dönem: {row.periodStart} — {row.periodEnd}
+                    📅 {lang === "en" ? "Period:" : "Dönem:"} {row.periodStart} — {row.periodEnd}
                   </span>
                 )}
                 {row.amount === null && (
-                  <span style={{ fontSize: "11px", color: "var(--color-danger)", fontWeight: 600 }}>⚠️ Tutar okunamadı</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-danger)", fontWeight: 600 }}>⚠️ {lang === "en" ? "Amount not read" : "Tutar okunamadı"}</span>
                 )}
               </div>
 
@@ -144,7 +144,7 @@ function PdfUploadReview({
               <div style={{ padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", alignItems: "end" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Fatura Tarihi
+                    {lang === "en" ? "Invoice Date" : "Fatura Tarihi"}
                   </label>
                   <input type="date" value={row.invoiceDate}
                     onChange={(e) => updateRow(i, "invoiceDate", e.target.value)}
@@ -153,7 +153,7 @@ function PdfUploadReview({
 
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Fatura Türü
+                    {lang === "en" ? "Invoice Type" : "Fatura Türü"}
                   </label>
                   <select value={row.invoiceType}
                     onChange={(e) => updateRow(i, "invoiceType", e.target.value)}
@@ -166,7 +166,7 @@ function PdfUploadReview({
 
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Tutar (₺)
+                    {lang === "en" ? "Amount (₺)" : "Tutar (₺)"}
                   </label>
                   <input type="number" step="0.01" min="0"
                     value={row.amount ?? ""}
@@ -176,11 +176,11 @@ function PdfUploadReview({
 
                 <div>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    Notlar
+                    {lang === "en" ? "Notes" : "Notlar"}
                   </label>
                   <input type="text" value={row.notes}
                     onChange={(e) => updateRow(i, "notes", e.target.value)}
-                    placeholder={row.invoiceNo ? `Fatura No: ${row.invoiceNo}` : "İsteğe bağlı..."}
+                    placeholder={row.invoiceNo ? `${lang === "en" ? "Invoice No:" : "Fatura No:"} ${row.invoiceNo}` : (lang === "en" ? "Optional..." : "İsteğe bağlı...")}
                     style={{ width: "100%", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", background: "var(--color-bg)" }} />
                 </div>
               </div>
@@ -190,18 +190,18 @@ function PdfUploadReview({
           {/* Onay kutusu */}
           <div style={{ padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)", background: "rgba(78,124,63,0.06)", border: "1px solid rgba(78,124,63,0.2)" }}>
             <p style={{ fontWeight: 600, marginBottom: "var(--spacing-2)", fontSize: "var(--font-size-sm)" }}>
-              ✅ {rows.length} fatura okundu. Verileri kontrol ettiniz mi?
+              ✅ {rows.length} {lang === "en" ? "invoices read. Have you reviewed the data?" : "fatura okundu. Verileri kontrol ettiniz mi?"}
             </p>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-4)" }}>
-              Yukarıdaki alanları düzenleyebilirsiniz. Onayladıktan sonra tüm faturalar sisteme kaydedilecektir.
+              {lang === "en" ? "You can edit the fields above. After confirming, all invoices will be saved to the system." : "Yukarıdaki alanları düzenleyebilirsiniz. Onayladıktan sonra tüm faturalar sisteme kaydedilecektir."}
             </p>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
               <button onClick={reset} className="btn" style={{ border: "1px solid var(--color-border)" }}>
-                ✕ İptal Et
+                ✕ {lang === "en" ? "Cancel" : "İptal Et"}
               </button>
               <button onClick={() => void handleConfirm()} disabled={saving || rows.some(r => !r.amount)}
                 className="btn btn-primary" style={{ flex: 1 }}>
-                {saving ? "Kaydediliyor..." : `✔ Onayla ve ${rows.length} Faturayı Kaydet`}
+                {saving ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : `✔ ${lang === "en" ? `Confirm and Save ${rows.length} Invoices` : `Onayla ve ${rows.length} Faturayı Kaydet`}`}
               </button>
             </div>
           </div>
@@ -211,8 +211,8 @@ function PdfUploadReview({
       {step === "done" && (
         <div style={{ textAlign: "center", padding: "32px", color: "var(--color-success)" }}>
           <div style={{ fontSize: "40px", marginBottom: "8px" }}>✅</div>
-          <p style={{ fontWeight: 700 }}>Faturalar başarıyla kaydedildi!</p>
-          <button onClick={reset} className="btn" style={{ marginTop: "12px" }}>Yeni Yükle</button>
+          <p style={{ fontWeight: 700 }}>{lang === "en" ? "Invoices saved successfully!" : "Faturalar başarıyla kaydedildi!"}</p>
+          <button onClick={reset} className="btn" style={{ marginTop: "12px" }}>{lang === "en" ? "Upload New" : "Yeni Yükle"}</button>
         </div>
       )}
     </div>
@@ -291,12 +291,14 @@ export default function SgkFaturaPage() {
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
   // Tarih + 3 ay önizlemesi
+  const dateLocale = lang === "en" ? enUS : tr;
+
   const previewPaymentDate = formData.invoiceDate
-    ? format(addMonths(new Date(formData.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: tr })
+    ? format(addMonths(new Date(formData.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: dateLocale })
     : "—";
 
   const editPreviewDate = editForm.invoiceDate
-    ? format(addMonths(new Date(editForm.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: tr })
+    ? format(addMonths(new Date(editForm.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: dateLocale })
     : "—";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -316,7 +318,7 @@ export default function SgkFaturaPage() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bir hata oluştu");
+      if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setFormData(emptyForm);
       await fetchInvoices();
     } catch (err: any) {
@@ -353,7 +355,7 @@ export default function SgkFaturaPage() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bir hata oluştu");
+      if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setEditRecord(null);
       await fetchInvoices();
     } catch (err: any) {
@@ -368,7 +370,7 @@ export default function SgkFaturaPage() {
     setDeleteSubmitting(true);
     try {
       const res = await fetch(`/api/v1/finans/sgk-fatura/${deleteId}`, { method: "DELETE", headers: { "Accept-Language": lang } });
-      if (!res.ok) throw new Error("Silme işlemi başarısız");
+      if (!res.ok) throw new Error(lang === "en" ? "Delete operation failed" : "Silme işlemi başarısız");
       setDeleteId(null);
       await fetchInvoices();
     } catch (err: any) {
@@ -399,7 +401,7 @@ export default function SgkFaturaPage() {
       <div style={{ marginBottom: "var(--spacing-6)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.sgk.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
-          SGK faturalarını sisteme girin. Ödeme tarihi fatura tarihinden 3 ay sonra otomatik hesaplanır.
+          {lang === "en" ? "Enter SGK invoices. Payment date is automatically calculated 3 months after the invoice date." : "SGK faturalarını sisteme girin. Ödeme tarihi fatura tarihinden 3 ay sonra otomatik hesaplanır."}
         </p>
       </div>
 
@@ -452,17 +454,17 @@ export default function SgkFaturaPage() {
                 {previewPaymentDate}
               </p>
               <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-                Bu tutar, fatura tarihinden 3 ay sonra "Yatacak Gelirler" hanesine eklenir.
+                {lang === "en" ? 'This amount is added to "Expected Income" 3 months after the invoice date.' : 'Bu tutar, fatura tarihinden 3 ay sonra "Yatacak Gelirler" hanesine eklenir.'}
               </p>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Notlar</label>
-              <textarea className="form-input" name="notes" value={formData.notes} onChange={handleChange} rows={2} placeholder="İsteğe bağlı..." />
+              <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
+              <textarea className="form-input" name="notes" value={formData.notes} onChange={handleChange} rows={2} placeholder={lang === "en" ? "Optional..." : "İsteğe bağlı..."} />
             </div>
 
             <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
-              {submitting ? "Kaydediliyor..." : "+ Fatura Ekle"}
+              {submitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "+ Add Invoice" : "+ Fatura Ekle")}
             </button>
           </form>
         </div>
@@ -472,7 +474,7 @@ export default function SgkFaturaPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
             <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>{lang === "en" ? "Saved SGK Invoices" : "Kayıtlı SGK Faturaları"}</h2>
             <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-              {invoices.length} kayıt
+              {invoices.length} {lang === "en" ? "records" : "kayıt"}
             </span>
           </div>
 
@@ -489,10 +491,10 @@ export default function SgkFaturaPage() {
                 <thead>
                   <tr>
                     <th>{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</th>
-                    <th>Tür</th>
-                    <th style={{ textAlign: "right" }}>Tutar</th>
-                    <th>Yatacak Tarih</th>
-                    <th style={{ textAlign: "center" }}>İşlem</th>
+                    <th>{lang === "en" ? "Type" : "Tür"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Amount" : "Tutar"}</th>
+                    <th>{lang === "en" ? "Payment Date" : "Yatacak Tarih"}</th>
+                    <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -500,7 +502,7 @@ export default function SgkFaturaPage() {
                     const isUpcoming = new Date(inv.expectedPaymentDate) > new Date();
                     return (
                       <tr key={inv.id}>
-                        <td>{format(new Date(inv.invoiceDate), "dd MMM yyyy", { locale: tr })}</td>
+                        <td>{format(new Date(inv.invoiceDate), "dd MMM yyyy", { locale: dateLocale })}</td>
                         <td>
                           <span style={{
                             padding: "3px 8px",
@@ -516,11 +518,11 @@ export default function SgkFaturaPage() {
                         <td style={{ textAlign: "right", fontWeight: 700 }}>{fmt(Number(inv.amount))}</td>
                         <td>
                           <span style={{ color: isUpcoming ? "var(--color-success)" : "var(--color-text-muted)", fontWeight: isUpcoming ? 600 : 400 }}>
-                            {format(new Date(inv.expectedPaymentDate), "dd MMM yyyy", { locale: tr })}
+                            {format(new Date(inv.expectedPaymentDate), "dd MMM yyyy", { locale: dateLocale })}
                           </span>
                           {isUpcoming && (
                             <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-success)" }}>
-                              (bekliyor)
+                              ({lang === "en" ? "pending" : "bekliyor"})
                             </span>
                           )}
                         </td>
@@ -530,13 +532,13 @@ export default function SgkFaturaPage() {
                               onClick={() => openEdit(inv)}
                               style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-text)" }}
                             >
-                              ✏️ Düzenle
+                              ✏️ {lang === "en" ? "Edit" : "Düzenle"}
                             </button>
                             <button
                               onClick={() => setDeleteId(inv.id)}
                               style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
                             >
-                              🗑️ Sil
+                              🗑️ {lang === "en" ? "Delete" : "Sil"}
                             </button>
                           </div>
                         </td>
@@ -555,7 +557,7 @@ export default function SgkFaturaPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ width: "480px", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-              SGK Faturasını Düzenle
+              {lang === "en" ? "Edit SGK Invoice" : "SGK Faturasını Düzenle"}
             </h3>
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
@@ -567,20 +569,20 @@ export default function SgkFaturaPage() {
                 <InvoiceTypeSelect value={editForm.invoiceType} onChange={handleEditChange} name="invoiceType" />
               </div>
               <div className="form-group">
-                <label className="form-label">Tutar (₺)</label>
+                <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
                 <input type="number" step="0.01" min="0.01" className="form-input" name="amount" value={editForm.amount} onChange={handleEditChange} required />
               </div>
               <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", fontSize: "13px" }}>
-                📅 Yeni Ödeme Tarihi: <strong style={{ color: "var(--color-success)" }}>{editPreviewDate}</strong>
+                📅 {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "var(--color-success)" }}>{editPreviewDate}</strong>
               </div>
               <div className="form-group">
-                <label className="form-label">Notlar</label>
+                <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
                 <textarea className="form-input" name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <button type="button" className="btn" onClick={() => setEditRecord(null)} style={{ border: "1px solid var(--color-border)" }}>İptal</button>
+                <button type="button" className="btn" onClick={() => setEditRecord(null)} style={{ border: "1px solid var(--color-border)" }}>{lang === "en" ? "Cancel" : "İptal"}</button>
                 <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
-                  {editSubmitting ? "Güncelleniyor..." : "Güncelle"}
+                  {editSubmitting ? (lang === "en" ? "Updating..." : "Güncelleniyor...") : (lang === "en" ? "Update" : "Güncelle")}
                 </button>
               </div>
             </form>
@@ -592,15 +594,15 @@ export default function SgkFaturaPage() {
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div className="card" style={{ width: "380px" }}>
-            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>Silmeyi Onayla</h3>
+            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>{lang === "en" ? "Confirm Delete" : "Silmeyi Onayla"}</h3>
             <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginBottom: "24px" }}>
-              Bu SGK faturası silinecek. Bu işlem geri alınamaz.
+              {lang === "en" ? "This SGK invoice will be deleted. This action cannot be undone." : "Bu SGK faturası silinecek. Bu işlem geri alınamaz."}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <button className="btn" onClick={() => setDeleteId(null)} style={{ border: "1px solid var(--color-border)" }}>İptal</button>
+              <button className="btn" onClick={() => setDeleteId(null)} style={{ border: "1px solid var(--color-border)" }}>{lang === "en" ? "Cancel" : "İptal"}</button>
               <button className="btn" onClick={handleDelete} disabled={deleteSubmitting}
                 style={{ background: "var(--color-danger)", color: "white", border: "none" }}>
-                {deleteSubmitting ? "Siliniyor..." : "Evet, Sil"}
+                {deleteSubmitting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
               </button>
             </div>
           </div>

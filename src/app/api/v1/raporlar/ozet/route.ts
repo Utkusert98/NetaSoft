@@ -40,9 +40,9 @@ export async function GET(req: NextRequest): Promise<Response> {
         orderBy: { registerDate: "asc" },
       }),
       prisma.sgkInvoice.findMany({
-        where: { pharmacyId, deletedAt: null, invoiceDate: { gte: start, lte: end } },
-        select: { invoiceDate: true, invoiceType: true, amount: true },
-        orderBy: { invoiceDate: "asc" },
+        where: { pharmacyId, deletedAt: null, expectedPaymentDate: { gte: start, lte: end } },
+        select: { expectedPaymentDate: true, invoiceType: true, amount: true },
+        orderBy: { expectedPaymentDate: "asc" },
       }),
       prisma.platformIncome.findMany({
         where: { pharmacyId, deletedAt: null, incomeDate: { gte: start, lte: end } },
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     m.kasa += v; m.gelir += v;
   });
   sgkInvoices.forEach(r => {
-    const m = ensureMonth(new Date(r.invoiceDate));
+    const m = ensureMonth(new Date(r.expectedPaymentDate));
     m.sgk += Number(r.amount); m.gelir += Number(r.amount);
   });
   platformIncomes.forEach(r => {

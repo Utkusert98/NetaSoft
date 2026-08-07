@@ -73,8 +73,9 @@ export async function POST(req: Request) {
     const dateStr = validated.invoiceDate.split("T")[0];
     const invoiceDate = new Date(`${dateStr}T00:00:00.000Z`);
 
-    // Otomatik hesaplama: fatura tarihinden tam 3 ay sonrası
-    const expectedPaymentDate = addMonths(invoiceDate, 3);
+    // Ödeme tarihi: fatura ayından 3 ay sonraki ayın 15'i (SGK ödeme kuralı)
+    const payMonth = addMonths(new Date(Date.UTC(invoiceDate.getUTCFullYear(), invoiceDate.getUTCMonth(), 1)), 3);
+    const expectedPaymentDate = new Date(Date.UTC(payMonth.getUTCFullYear(), payMonth.getUTCMonth(), 15));
 
     const invoice = await prisma.sgkInvoice.create({
       data: {

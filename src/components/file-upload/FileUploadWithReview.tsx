@@ -23,6 +23,7 @@ interface FileUploadWithReviewProps {
   acceptedTypes?: string;
   moduleName: string;
   maxFileSizeMB?: number;
+  lang?: string;
 }
 
 type UploadStep = "idle" | "parsing" | "review" | "importing" | "done";
@@ -32,6 +33,7 @@ export default function FileUploadWithReview({
   acceptedTypes = ".xlsx,.xls,.csv,.pdf",
   moduleName,
   maxFileSizeMB = 10,
+  lang = "tr",
 }: FileUploadWithReviewProps) {
   const [step, setStep] = useState<UploadStep>("idle");
   const [dragging, setDragging] = useState(false);
@@ -44,6 +46,8 @@ export default function FileUploadWithReview({
 
   const maxBytes = maxFileSizeMB * 1024 * 1024;
 
+  const en = lang === "en";
+
   const parseFile = useCallback(async (selectedFile: File) => {
     setStep("parsing");
     setError("");
@@ -55,6 +59,7 @@ export default function FileUploadWithReview({
 
       const response = await fetch("/api/v1/dosya/parse", {
         method: "POST",
+        headers: { "Accept-Language": lang },
         body: formData,
       });
 
@@ -65,28 +70,30 @@ export default function FileUploadWithReview({
       };
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error ?? "Dosya parse edilemedi");
+        throw new Error(data.error ?? (en ? "File could not be parsed" : "Dosya parse edilemedi"));
       }
 
       setParseResult(data.data!);
       setEditedRows(data.data!.rows);
       setStep("review");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dosya işlenirken hata oluştu");
+      setError(err instanceof Error ? err.message : (en ? "Error processing file" : "Dosya işlenirken hata oluştu"));
       setStep("idle");
     }
-  }, [moduleName]);
+  }, [moduleName, lang, en]);
 
   const handleFileSelect = useCallback(
     (selectedFile: File) => {
       if (selectedFile.size > maxBytes) {
-        setError(`Dosya boyutu ${maxFileSizeMB} MB'dan büyük olamaz`);
+        setError(en
+          ? `File size cannot exceed ${maxFileSizeMB} MB`
+          : `Dosya boyutu ${maxFileSizeMB} MB'dan büyük olamaz`);
         return;
       }
       setFile(selectedFile);
       void parseFile(selectedFile);
     },
-    [maxBytes, maxFileSizeMB, parseFile]
+    [maxBytes, maxFileSizeMB, parseFile, en]
   );
 
   const handleDrop = useCallback(
@@ -104,11 +111,7 @@ export default function FileUploadWithReview({
     if (selected) handleFileSelect(selected);
   };
 
-  const handleCellEdit = (
-    rowIndex: number,
-    field: string,
-    value: string
-  ) => {
+  const handleCellEdit = (rowIndex: number, field: string, value: string) => {
     setEditedRows((prev) =>
       prev.map((row) =>
         row.rowIndex === rowIndex
@@ -133,7 +136,7 @@ export default function FileUploadWithReview({
       setStep("done");
     } catch (err) {
       clearInterval(progressInterval);
-      setError(err instanceof Error ? err.message : "İçe aktarma başarısız oldu");
+      setError(err instanceof Error ? err.message : (en ? "Import failed" : "İçe aktarma başarısız oldu"));
       setStep("review");
     }
   };
@@ -148,58 +151,54 @@ export default function FileUploadWithReview({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  // TAMAMLANDI
   if (step === "done") {
     return (
       <div style={{ textAlign: "center", padding: "var(--spacing-12)" }}>
         <div style={{ fontSize: "64px", marginBottom: "16px" }}>✅</div>
         <h3 style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, marginBottom: "8px", color: "var(--color-success)" }}>
-          İçe Aktarma Tamamlandı
+          {en ? "Import Complete" : "İçe Aktarma Tamamlandı"}
         </h3>
         <p style={{ color: "var(--color-text-muted)", marginBottom: "24px" }}>
-          {editedRows.length} satır başarıyla veritabanına kaydedildi.
+          {en
+            ? `${editedRows.length} rows successfully saved to database.`
+            : `${editedRows.length} satır başarıyla veritabanına kaydedildi.`}
         </p>
         <button id="btn-new-upload" className="btn btn-primary" onClick={handleReset}>
-          Yeni Dosya Yükle
+          {en ? "Upload New File" : "Yeni Dosya Yükle"}
         </button>
       </div>
     );
   }
 
-  // PARSE EDİLİYOR
   if (step === "parsing") {
     return (
       <div style={{ textAlign: "center", padding: "var(--spacing-12)" }}>
         <div className="spinner" style={{ width: 48, height: 48, margin: "0 auto 16px", borderWidth: 4 }} />
         <p style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>
-          Dosya İşleniyor: {file?.name}
+          {en ? "Processing File:" : "Dosya İşleniyor:"} {file?.name}
         </p>
         <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "8px" }}>
-          Bu işlem birkaç saniye sürebilir...
+          {en ? "This may take a few seconds..." : "Bu işlem birkaç saniye sürebilir..."}
         </p>
       </div>
     );
   }
 
-  // IMPORT EDİLİYOR
   if (step === "importing") {
     return (
       <div style={{ textAlign: "center", padding: "var(--spacing-12)" }}>
         <div className="spinner" style={{ width: 48, height: 48, margin: "0 auto 16px", borderWidth: 4 }} />
-        <p style={{ fontWeight: 600, marginBottom: "16px" }}>Veriler Kaydediliyor...</p>
+        <p style={{ fontWeight: 600, marginBottom: "16px" }}>
+          {en ? "Saving Data..." : "Veriler Kaydediliyor..."}
+        </p>
         <div style={{
-          width: "300px",
-          height: "8px",
-          background: "var(--color-border)",
-          borderRadius: "var(--radius-full)",
-          margin: "0 auto",
-          overflow: "hidden",
+          width: "300px", height: "8px",
+          background: "var(--color-border)", borderRadius: "var(--radius-full)",
+          margin: "0 auto", overflow: "hidden",
         }}>
           <div style={{
-            width: `${importProgress}%`,
-            height: "100%",
-            background: "var(--color-primary-light)",
-            borderRadius: "var(--radius-full)",
+            width: `${importProgress}%`, height: "100%",
+            background: "var(--color-primary-light)", borderRadius: "var(--radius-full)",
             transition: "width 0.2s ease",
           }} />
         </div>
@@ -210,105 +209,82 @@ export default function FileUploadWithReview({
     );
   }
 
-  // İNCELEME EKRANI
   if (step === "review" && parseResult) {
     return (
       <div className="import-review" id="import-review-panel">
-        {/* Başlık */}
         <div className="import-review-header">
           <h2 className="import-review-title">
-            📋 Verileri Bu Şekilde Okudum, Doğru Mu?
+            📋 {en ? "Here's What I Read — Is This Correct?" : "Verileri Bu Şekilde Okudum, Doğru Mu?"}
           </h2>
           <p className="import-review-subtitle">
-            Lütfen aşağıdaki verileri kontrol edin. Hatalı hücreleri düzenleyebilirsiniz.
-            Onayladıktan sonra veriler veritabanına kaydedilecektir.
+            {en
+              ? "Please review the data below. You can edit incorrect cells. After confirming, data will be saved to the database."
+              : "Lütfen aşağıdaki verileri kontrol edin. Hatalı hücreleri düzenleyebilirsiniz. Onayladıktan sonra veriler veritabanına kaydedilecektir."}
           </p>
 
           <div className="import-stats">
             <div className="import-stat">
               <div className="import-stat-value">{parseResult.totalRows}</div>
-              <div className="import-stat-label">Toplam Satır</div>
+              <div className="import-stat-label">{en ? "Total Rows" : "Toplam Satır"}</div>
             </div>
             <div className="import-stat">
               <div className="import-stat-value" style={{ color: "var(--color-primary-light)" }}>
                 {parseResult.validRows}
               </div>
-              <div className="import-stat-label">Geçerli Satır</div>
+              <div className="import-stat-label">{en ? "Valid Rows" : "Geçerli Satır"}</div>
             </div>
             {parseResult.errorRows > 0 && (
               <div className="import-stat">
                 <div className="import-stat-value" style={{ color: "#ff6b6b" }}>
                   {parseResult.errorRows}
                 </div>
-                <div className="import-stat-label">Hatalı Satır</div>
+                <div className="import-stat-label">{en ? "Error Rows" : "Hatalı Satır"}</div>
               </div>
             )}
             <div className="import-stat">
               <div className="import-stat-value">{file ? formatFileSize(file.size) : "-"}</div>
-              <div className="import-stat-label">Dosya Boyutu</div>
+              <div className="import-stat-label">{en ? "File Size" : "Dosya Boyutu"}</div>
             </div>
           </div>
         </div>
 
-        {/* Tablo */}
         <div className="import-table-container">
-          <table className="table" aria-label="İçe Aktarma Önizleme Tablosu">
+          <table className="table" aria-label={en ? "Import Preview Table" : "İçe Aktarma Önizleme Tablosu"}>
             <thead>
               <tr>
                 <th scope="col" style={{ width: 50 }}>#</th>
                 {parseResult.headers.map((h) => (
                   <th key={h} scope="col">{h}</th>
                 ))}
-                <th scope="col" style={{ width: 80 }}>Durum</th>
+                <th scope="col" style={{ width: 80 }}>{en ? "Status" : "Durum"}</th>
               </tr>
             </thead>
             <tbody>
               {editedRows.map((row) => (
-                <tr
-                  key={row.rowIndex}
-                  id={`import-row-${row.rowIndex}`}
-                  className={row.isValid ? "" : "import-row-error"}
-                >
-                  <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>
-                    {row.rowIndex + 1}
-                  </td>
+                <tr key={row.rowIndex} id={`import-row-${row.rowIndex}`} className={row.isValid ? "" : "import-row-error"}>
+                  <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{row.rowIndex + 1}</td>
                   {parseResult.headers.map((header) => (
                     <td key={header}>
                       <input
                         type="text"
                         id={`cell-${row.rowIndex}-${header}`}
-                        aria-label={`Satır ${row.rowIndex + 1}, ${header}`}
+                        aria-label={en ? `Row ${row.rowIndex + 1}, ${header}` : `Satır ${row.rowIndex + 1}, ${header}`}
                         value={String(row.rawData[header] ?? "")}
-                        onChange={(e) =>
-                          handleCellEdit(row.rowIndex, header, e.target.value)
-                        }
+                        onChange={(e) => handleCellEdit(row.rowIndex, header, e.target.value)}
                         style={{
-                          width: "100%",
-                          minWidth: "80px",
-                          border: "1px solid transparent",
-                          background: "transparent",
-                          padding: "4px 6px",
-                          borderRadius: "4px",
-                          fontSize: "var(--font-size-sm)",
-                          fontFamily: "var(--font-family)",
-                          color: "inherit",
-                          outline: "none",
-                          transition: "border-color 0.15s ease",
+                          width: "100%", minWidth: "80px", border: "1px solid transparent",
+                          background: "transparent", padding: "4px 6px", borderRadius: "4px",
+                          fontSize: "var(--font-size-sm)", fontFamily: "var(--font-family)",
+                          color: "inherit", outline: "none", transition: "border-color 0.15s ease",
                         }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = "var(--color-primary)";
-                          e.target.style.background = "var(--color-surface)";
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = "transparent";
-                          e.target.style.background = "transparent";
-                        }}
+                        onFocus={(e) => { e.target.style.borderColor = "var(--color-primary)"; e.target.style.background = "var(--color-surface)"; }}
+                        onBlur={(e) => { e.target.style.borderColor = "transparent"; e.target.style.background = "transparent"; }}
                       />
                     </td>
                   ))}
                   <td>
                     <span className={`badge ${row.isValid ? "badge-success" : "badge-danger"}`}>
-                      {row.isValid ? "Geçerli" : "Hatalı"}
+                      {row.isValid ? (en ? "Valid" : "Geçerli") : (en ? "Error" : "Hatalı")}
                     </span>
                   </td>
                 </tr>
@@ -317,19 +293,14 @@ export default function FileUploadWithReview({
           </table>
         </div>
 
-        {/* Eylemler */}
         <div className="import-actions">
           {error && (
             <span style={{ color: "var(--color-danger)", fontSize: "var(--font-size-sm)", marginRight: "auto" }}>
               ⚠️ {error}
             </span>
           )}
-          <button
-            id="btn-import-cancel"
-            className="btn btn-secondary"
-            onClick={handleReset}
-          >
-            İptal
+          <button id="btn-import-cancel" className="btn btn-secondary" onClick={handleReset}>
+            {en ? "Cancel" : "İptal"}
           </button>
           <button
             id="btn-import-confirm"
@@ -337,29 +308,24 @@ export default function FileUploadWithReview({
             onClick={() => void handleConfirm()}
             disabled={parseResult.validRows === 0}
           >
-            ✓ Onayla Ve Kaydet ({parseResult.validRows} Satır)
+            ✓ {en
+              ? `Confirm & Save (${parseResult.validRows} Rows)`
+              : `Onayla Ve Kaydet (${parseResult.validRows} Satır)`}
           </button>
         </div>
       </div>
     );
   }
 
-  // BAŞLANGIÇ — Dosya Yükleme
   return (
     <div>
       {error && (
-        <div
-          role="alert"
-          style={{
-            background: "var(--color-danger-bg)",
-            border: "1px solid var(--color-danger-border)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--spacing-4)",
-            marginBottom: "var(--spacing-4)",
-            color: "var(--color-danger)",
-            fontSize: "var(--font-size-sm)",
-          }}
-        >
+        <div role="alert" style={{
+          background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)",
+          borderRadius: "var(--radius-md)", padding: "var(--spacing-4)",
+          marginBottom: "var(--spacing-4)", color: "var(--color-danger)",
+          fontSize: "var(--font-size-sm)",
+        }}>
           ⚠️ {error}
         </div>
       )}
@@ -369,7 +335,7 @@ export default function FileUploadWithReview({
         className={`file-upload-zone ${dragging ? "dragging" : ""}`}
         role="button"
         tabIndex={0}
-        aria-label="Dosya yüklemek için tıklayın veya sürükleyin"
+        aria-label={en ? "Click or drag to upload a file" : "Dosya yüklemek için tıklayın veya sürükleyin"}
         onClick={() => inputRef.current?.click()}
         onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -377,12 +343,16 @@ export default function FileUploadWithReview({
         onDrop={handleDrop}
       >
         <div className="file-upload-icon">📁</div>
-        <h3 className="file-upload-title">Dosyanızı Buraya Sürükleyin</h3>
+        <h3 className="file-upload-title">
+          {en ? "Drag Your File Here" : "Dosyanızı Buraya Sürükleyin"}
+        </h3>
         <p className="file-upload-hint">
-          veya dosya seçmek için tıklayın
+          {en ? "or click to select a file" : "veya dosya seçmek için tıklayın"}
         </p>
         <p style={{ marginTop: "var(--spacing-3)", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
-          Desteklenen formatlar: Excel (.xlsx, .xls), CSV, PDF · Maks. {maxFileSizeMB} MB
+          {en
+            ? `Supported formats: Excel (.xlsx, .xls), CSV, PDF · Max. ${maxFileSizeMB} MB`
+            : `Desteklenen formatlar: Excel (.xlsx, .xls), CSV, PDF · Maks. ${maxFileSizeMB} MB`}
         </p>
 
         <input
