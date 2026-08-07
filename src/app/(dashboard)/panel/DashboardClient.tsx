@@ -113,9 +113,10 @@ export default function DashboardClient({ data, pharmacistName }: {
 
   const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome } = data;
 
-  const sgkRatio = sgkVsCash.sgkTotal + sgkVsCash.cashTotal > 0
-    ? (sgkVsCash.sgkTotal / (sgkVsCash.sgkTotal + sgkVsCash.cashTotal)) * 100
-    : 0;
+  const platformTotal = platformIncome.reduce((s, p) => s + p.amount, 0);
+  const totalIncomeAll = sgkVsCash.cashTotal + sgkVsCash.sgkTotal + platformTotal;
+
+  const sgkRatio = totalIncomeAll > 0 ? (sgkVsCash.sgkTotal / totalIncomeAll) * 100 : 0;
 
   const unpaidNotes = promissoryNotes.filter((n) => !n.isPaid);
   const unpaidTotal = unpaidNotes.reduce((s, n) => s + n.amount, 0);
@@ -200,26 +201,41 @@ export default function DashboardClient({ data, pharmacistName }: {
           </div>
         </ChartCard>
 
-        {/* SGK vs Elden */}
-        <ChartCard title={tx(d.sgkRatio, lang)}>
-          <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={[
-                  { name: "SGK", value: sgkVsCash.sgkTotal },
-                  { name: tx(d.cashSales, lang), value: sgkVsCash.cashTotal },
-                ]} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
-                  <Cell fill={GREEN} />
-                  <Cell fill={ORANGE} />
-                </Pie>
-                <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <p style={{ textAlign: "center", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "var(--spacing-2)" }}>
-            {tx(d.sgkRate, lang)}: <strong>%{sgkRatio.toFixed(0)}</strong>
-          </p>
+        {/* Gelir Kaynakları */}
+        <ChartCard title={lang === "en" ? "Income Breakdown" : "Gelir Kaynakları"}>
+          {totalIncomeAll === 0 ? (
+            <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)", textAlign: "center" }}>
+                {lang === "en" ? "No income data for this month." : "Bu ay gelir kaydı bulunamadı."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: lang === "en" ? "Daily Sales" : "Kasa", value: sgkVsCash.cashTotal },
+                        { name: "SGK", value: sgkVsCash.sgkTotal },
+                        { name: lang === "en" ? "Platform" : "Platform", value: platformTotal },
+                      ].filter(d => d.value > 0)}
+                      cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value"
+                    >
+                      <Cell fill={GREEN} />
+                      <Cell fill={BLUE} />
+                      <Cell fill={ORANGE} />
+                    </Pie>
+                    <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <p style={{ textAlign: "center", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "var(--spacing-2)" }}>
+                {lang === "en" ? `SGK share: ${sgkRatio.toFixed(0)}%` : `SGK Oranı: %${sgkRatio.toFixed(0)}`}
+              </p>
+            </>
+          )}
         </ChartCard>
       </div>
 

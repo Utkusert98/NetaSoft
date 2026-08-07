@@ -173,6 +173,13 @@ export default function AylikOzetPage() {
                 <>
                   <StatRow label={lang === "en" ? "🏦 Cash Register (POS + Cash)" : "🏦 Kasa (POS + Nakit)"} cur={data.monthly[0].kasa} prev={prevData?.monthly[0]?.kasa ?? 0} />
                   <StatRow label={lang === "en" ? "🏥 SGK Invoices" : "🏥 SGK Faturaları"} cur={data.monthly[0].sgk} prev={prevData?.monthly[0]?.sgk ?? 0} />
+                  {data.monthly[0].sgk === 0 && (
+                    <p style={{ fontSize: "11px", color: "var(--color-text-muted)", padding: "4px 0 8px 0", fontStyle: "italic" }}>
+                      {lang === "en"
+                        ? "ℹ️ SGK income appears in the month payment is received (15th of the month, 3 months after the invoice date)."
+                        : "ℹ️ SGK geliri, fatura tarihinden 3 ay sonra her ayın 15'inde bu bölüme yansır."}
+                    </p>
+                  )}
                   <StatRow label={lang === "en" ? "📱 Platform Revenue" : "📱 Platform Gelirleri"} cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
                     <span>{lang === "en" ? "Total Income" : "Toplam Gelir"}</span>

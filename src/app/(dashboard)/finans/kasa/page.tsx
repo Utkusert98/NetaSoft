@@ -269,8 +269,8 @@ export default function KasaPage() {
                         <td style={{ textAlign: "center" }}>
                           <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                             <button onClick={() => openEdit(rec)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-text)" }}>
-                              ✏️ {lang === "en" ? "Edit" : "Düzenle"}
+                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}>
+                              {lang === "en" ? "Edit" : "Düzenle"}
                             </button>
                             <button onClick={() => setDeleteId(rec.id)}
                               style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}>

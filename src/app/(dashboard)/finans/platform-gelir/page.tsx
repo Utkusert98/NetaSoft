@@ -351,9 +351,9 @@ export default function PlatformGelirPage() {
                           <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                             <button
                               onClick={() => openEdit(inc)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-text)" }}
+                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}
                             >
-                              ✏️
+                              {lang === "en" ? "Edit" : "Düzenle"}
                             </button>
                             <button
                               onClick={() => setDeleteId(inc.id)}

@@ -348,7 +348,7 @@ export default function SenetPage() {
                                 {markingId === note.id ? "..." : lang === "en" ? "Paid" : "Ödendi"}
                               </button>
                               <button onClick={() => openEdit(note)}
-                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-info, #3b82f6)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 500 }}>
                                 {lang === "en" ? "Edit" : "Düzenle"}
                               </button>
                               <button onClick={() => setDeleteId(note.id)}

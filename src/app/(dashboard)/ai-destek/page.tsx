@@ -8,20 +8,36 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   id: string;
+  followUps?: string[];
 }
 
 const QUICK_ACTIONS: Record<Lang, string[]> = {
   tr: [
-    "Bu ay kârlılık durumum nasıl?",
-    "SGK faturalarımı nasıl takip etmeliyim?",
-    "Senet yönetiminde dikkat etmem gerekenler neler?",
-    "Platform gelirlerimi nasıl analiz ederim?",
+    "Bu ay kârda mıyım zararda mıyım?",
+    "SGK faturalarım ne zaman gelecek?",
+    "Vadesi yaklaşan senetlerim var mı?",
+    "Son 12 ayda en çok ne harcadım?",
   ],
   en: [
-    "How is my profitability this month?",
-    "How should I track my SGK invoices?",
-    "What should I pay attention to in promissory note management?",
-    "How do I analyze my platform income?",
+    "Am I profitable or in loss this month?",
+    "When will my SGK payments arrive?",
+    "Do I have any promissory notes due soon?",
+    "What was my biggest expense in the last 12 months?",
+  ],
+};
+
+const FOLLOW_UP_SUGGESTIONS: Record<Lang, string[][]> = {
+  tr: [
+    ["SGK ödemelerimin detayını ver", "Bu ayki en büyük giderim ne?", "Geçen aya göre durumum nasıl?"],
+    ["Kaç tane senetim var?", "Yaklaşan ödemelerimi göster", "Platform gelirlerimi analiz et"],
+    ["Net kâr marjım nedir?", "Personel giderlerim ne kadar?", "Depoya ne kadar havale yaptım?"],
+    ["Bu ay kâr ettim mi?", "SGK gelirim toplam ne kadar?", "Aylık sabit giderlerim neler?"],
+  ],
+  en: [
+    ["Give me SGK payment details", "What was my biggest expense this month?", "How do I compare to last month?"],
+    ["How many promissory notes do I have?", "Show me upcoming payments", "Analyze my platform income"],
+    ["What is my net profit margin?", "What are my staff expenses?", "How much did I transfer to warehouse?"],
+    ["Did I make a profit this month?", "What is my total SGK income?", "What are my monthly fixed expenses?"],
   ],
 };
 
@@ -31,20 +47,26 @@ const UI_TEXT: Record<Lang, {
   placeholder: string;
   send: string;
   welcome: string;
+  thinking: string;
+  suggestions: string;
 }> = {
   tr: {
     title: "🤖 AI Eczane Asistanı",
-    subtitle: "Eczane yönetimi ve finansı konularında sorularınızı yanıtlar.",
-    placeholder: "Eczane finansı veya yönetimi hakkında sorunuzu yazın... (Enter ile gönder)",
+    subtitle: "Eczane finansı hakkında sorularınızı sorun — tüm kayıtlarınıza göre analiz yapar.",
+    placeholder: "Eczane finansı hakkında sorunuzu yazın... (Enter ile gönder)",
     send: "Gönder ➤",
-    welcome: "Merhaba! Ben NetaSoft Eczane Asistanınım. Eczane finansı, SGK yönetimi, kârlılık analizi ve stok konularında size yardımcı olabilirim.\n\nNasıl yardımcı olabilirim?",
+    welcome: "Merhaba! Ben NetaSoft Eczane Asistanınım.\n\nSGK takibi, senet vadeleri, kârlılık analizi ve tüm finansal geçmişiniz hakkında sorularınızı yanıtlayabilirim.\n\nNasıl yardımcı olabilirim?",
+    thinking: "Analiz ediliyor...",
+    suggestions: "Bunları da sorabilirsiniz:",
   },
   en: {
     title: "🤖 AI Pharmacy Assistant",
-    subtitle: "Answers your questions about pharmacy management and finance.",
-    placeholder: "Type your question about pharmacy finance or management... (Enter to send)",
+    subtitle: "Ask questions about your pharmacy finances — analyzes all your records.",
+    placeholder: "Type your question about pharmacy finance... (Enter to send)",
     send: "Send ➤",
-    welcome: "Hello! I'm the NetaSoft Pharmacy Assistant. I can help you with pharmacy finance, SGK management, profitability analysis, and inventory topics.\n\nHow can I assist you?",
+    welcome: "Hello! I'm the NetaSoft Pharmacy Assistant.\n\nI can answer questions about SGK tracking, promissory note due dates, profitability analysis, and your complete financial history.\n\nHow can I assist you?",
+    thinking: "Analyzing...",
+    suggestions: "You can also ask:",
   },
 };
 
@@ -107,7 +129,7 @@ export default function AiDestek() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Dil değişince karşılama mesajını güncelle
+  // Update welcome message when lang changes
   useEffect(() => {
     setMessages([{ id: "welcome", role: "assistant", content: UI_TEXT[lang].welcome }]);
     setStreamingText("");
@@ -133,7 +155,7 @@ export default function AiDestek() {
 
       const res = await fetch("/api/v1/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify({ messages: apiMessages, lang }),
       });
 
@@ -153,10 +175,14 @@ export default function AiDestek() {
         setStreamingText(accumulated);
       }
 
+      // Pick random follow-up set
+      const followUpSet = FOLLOW_UP_SUGGESTIONS[lang][Math.floor(Math.random() * FOLLOW_UP_SUGGESTIONS[lang].length)];
+
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: "assistant",
         content: accumulated,
+        followUps: followUpSet,
       }]);
       setStreamingText("");
     } catch (err) {
@@ -193,7 +219,6 @@ export default function AiDestek() {
           </p>
         </div>
 
-        {/* Aktif dil göstergesi */}
         <a
           href="/ayarlar"
           title={lang === "tr" ? "Dil ayarlarına git" : "Go to language settings"}
@@ -216,11 +241,43 @@ export default function AiDestek() {
         borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",
         marginBottom: "var(--spacing-4)",
       }}>
-        {messages.map((msg) =>
-          msg.role === "assistant"
-            ? <AssistantMessage key={msg.id} content={msg.content} />
-            : <UserMessage key={msg.id} content={msg.content} />
-        )}
+        {messages.map((msg) => (
+          <div key={msg.id}>
+            {msg.role === "assistant"
+              ? <AssistantMessage content={msg.content} />
+              : <UserMessage content={msg.content} />}
+
+            {/* Follow-up suggestions after assistant message */}
+            {msg.role === "assistant" && msg.followUps && msg.followUps.length > 0 && !loading && (
+              <div style={{ marginTop: "10px", marginLeft: "48px" }}>
+                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "6px", fontWeight: 500 }}>
+                  {ui.suggestions}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {msg.followUps.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => void sendMessage(q)}
+                      style={{
+                        fontSize: "12px", padding: "5px 12px",
+                        borderRadius: "var(--radius-full)",
+                        border: "1px solid var(--color-primary)",
+                        background: "transparent",
+                        color: "var(--color-primary)",
+                        cursor: "pointer", fontWeight: 500,
+                        transition: "background 0.15s, color 0.15s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "white"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--color-primary)"; }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
 
         {streamingText && <AssistantMessage content={streamingText + "▍"} />}
 
@@ -229,14 +286,17 @@ export default function AiDestek() {
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #4e7c3f, #9fe870)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
               🤖
             </div>
-            <div style={{ display: "flex", gap: "5px", padding: "12px 16px", background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
-              {[0, 1, 2].map((i) => (
-                <div key={i} style={{
-                  width: 8, height: 8, borderRadius: "50%",
-                  background: "var(--color-primary)", opacity: 0.6,
-                  animation: `bounce 1s ${i * 0.15}s infinite`,
-                }} />
-              ))}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
+              <div style={{ display: "flex", gap: "5px" }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: "var(--color-primary)", opacity: 0.6,
+                    animation: `bounce 1s ${i * 0.15}s infinite`,
+                  }} />
+                ))}
+              </div>
+              <span style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 500 }}>{ui.thinking}</span>
             </div>
           </div>
         )}
@@ -244,7 +304,7 @@ export default function AiDestek() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions — only on first load */}
       {messages.length <= 2 && !loading && (
         <div style={{ display: "flex", gap: "var(--spacing-2)", flexWrap: "wrap", marginBottom: "var(--spacing-3)" }}>
           {QUICK_ACTIONS[lang].map((q) => (
