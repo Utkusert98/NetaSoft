@@ -61,7 +61,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     }),
     // SGK invoices current month
     prisma.sgkInvoice.findMany({
-      where: { pharmacyId, deletedAt: null, invoiceDate: { gte: startOfMonth, lte: endOfMonth } },
+      where: { pharmacyId, deletedAt: null, expectedPaymentDate: { gte: startOfMonth, lte: endOfMonth } },
       select: { amount: true },
     }),
     // Platform income current month
@@ -252,7 +252,7 @@ async function buildMonthlyTrend(pharmacyId: string): Promise<DashboardData["mon
 
     const [daily, sgk, platform, fixed, emp, notes] = await Promise.all([
       prisma.dailyRegister.findMany({ where: { pharmacyId, deletedAt: null, registerDate: { gte: start, lte: end } }, select: { posAmount: true, cashAmount: true, wireAmount: true } }),
-      prisma.sgkInvoice.aggregate({ where: { pharmacyId, deletedAt: null, invoiceDate: { gte: start, lte: end } }, _sum: { amount: true } }),
+      prisma.sgkInvoice.aggregate({ where: { pharmacyId, deletedAt: null, expectedPaymentDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.platformIncome.aggregate({ where: { pharmacyId, deletedAt: null, incomeDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.fixedExpense.aggregate({ where: { pharmacyId, deletedAt: null, expenseDate: { gte: start, lte: end } }, _sum: { amount: true } }),
       prisma.employeeExpense.aggregate({ where: { pharmacyId, expenseDate: { gte: start, lte: end } }, _sum: { totalAmount: true } }),
