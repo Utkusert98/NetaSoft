@@ -38,6 +38,9 @@ export default function KasaPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   const fetchRecords = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/finans/kasa", { headers: { "Accept-Language": lang } });
@@ -153,11 +156,72 @@ export default function KasaPage() {
 
   const fmt = (v: number) => Number(v).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 
+  const nowM = new Date();
+  const thisMonthRecords = records.filter(r => {
+    const d = new Date(r.registerDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyRecords = records.filter(r => {
+    const d = r.registerDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+  const thisMonthTotal = thisMonthRecords.reduce(
+    (sum, r) => sum + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount),
+    0
+  );
+
   const channelFields = [
     { name: "posAmount", label: "💳 POS" },
     { name: "cashAmount", label: lang === "en" ? "💵 Cash" : "💵 Nakit" },
     { name: "wireAmount", label: lang === "en" ? "🏦 Wire / EFT" : "🏦 Havale / EFT" },
   ];
+
+  const kasaTableHeader = (
+    <thead>
+      <tr>
+        <th>{lang === "en" ? "Date" : "Tarih"}</th>
+        <th style={{ textAlign: "right" }}>POS</th>
+        <th style={{ textAlign: "right" }}>{lang === "en" ? "Cash" : "Nakit"}</th>
+        <th style={{ textAlign: "right" }}>{lang === "en" ? "Wire" : "Havale"}</th>
+        <th style={{ textAlign: "right" }}>{lang === "en" ? "Total" : "Toplam"}</th>
+        <th>{lang === "en" ? "Notes" : "Notlar"}</th>
+        <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+      </tr>
+    </thead>
+  );
+
+  const renderKasaRows = (rows: Register[]) =>
+    rows.map(rec => {
+      const total = Number(rec.posAmount) + Number(rec.cashAmount) + Number(rec.wireAmount);
+      return (
+        <tr key={rec.id}>
+          <td style={{ fontWeight: 600 }}>
+            {format(new Date(rec.registerDate), "dd MMM yyyy", { locale })}
+          </td>
+          <td style={{ textAlign: "right" }}>{fmt(Number(rec.posAmount))}</td>
+          <td style={{ textAlign: "right" }}>{fmt(Number(rec.cashAmount))}</td>
+          <td style={{ textAlign: "right" }}>{fmt(Number(rec.wireAmount))}</td>
+          <td style={{ textAlign: "right", fontWeight: 700, color: "var(--color-primary)" }}>{fmt(total)}</td>
+          <td style={{ color: "var(--color-text-muted)", fontSize: "13px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {rec.notes || "—"}
+          </td>
+          <td style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+              <button onClick={() => openEdit(rec)}
+                style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}>
+                {lang === "en" ? "Edit" : "Düzenle"}
+              </button>
+              <button onClick={() => setDeleteId(rec.id)}
+                style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}>
+                🗑️ {lang === "en" ? "Delete" : "Sil"}
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    });
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
@@ -225,67 +289,75 @@ export default function KasaPage() {
           </form>
         </div>
 
-        {/* TABLE */}
+        {/* BU AY */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-            {lang === "en" ? "Register Records" : "Kasa Kayıtları"}
+            {lang === "en" ? "This Month" : "Bu Ay"}
           </h2>
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
-          ) : records.length === 0 ? (
+          ) : thisMonthRecords.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏦</div>
-              {lang === "en" ? "No cash records added yet." : "Henüz kasa kaydı eklenmemiş."}
+              {lang === "en" ? "No cash records this month." : "Bu ay kasa kaydı yok."}
             </div>
           ) : (
-            <div className="table-wrapper">
-              <table className="table" style={{ width: "100%", fontSize: "14px" }}>
-                <thead>
-                  <tr>
-                    <th>{lang === "en" ? "Date" : "Tarih"}</th>
-                    <th style={{ textAlign: "right" }}>POS</th>
-                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Cash" : "Nakit"}</th>
-                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Wire" : "Havale"}</th>
-                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Total" : "Toplam"}</th>
-                    <th>{lang === "en" ? "Notes" : "Notlar"}</th>
-                    <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map(rec => {
-                    const total = Number(rec.posAmount) + Number(rec.cashAmount) + Number(rec.wireAmount);
-                    return (
-                      <tr key={rec.id}>
-                        <td style={{ fontWeight: 600 }}>
-                          {format(new Date(rec.registerDate), "dd MMM yyyy", { locale })}
-                        </td>
-                        <td style={{ textAlign: "right" }}>{fmt(Number(rec.posAmount))}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(Number(rec.cashAmount))}</td>
-                        <td style={{ textAlign: "right" }}>{fmt(Number(rec.wireAmount))}</td>
-                        <td style={{ textAlign: "right", fontWeight: 700, color: "var(--color-primary)" }}>{fmt(total)}</td>
-                        <td style={{ color: "var(--color-text-muted)", fontSize: "13px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {rec.notes || "—"}
-                        </td>
-                        <td style={{ textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                            <button onClick={() => openEdit(rec)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}>
-                              {lang === "en" ? "Edit" : "Düzenle"}
-                            </button>
-                            <button onClick={() => setDeleteId(rec.id)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}>
-                              🗑️ {lang === "en" ? "Delete" : "Sil"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-3)", padding: "8px 12px", background: "var(--color-bg)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                  {lang === "en" ? `${thisMonthRecords.length} records` : `${thisMonthRecords.length} kayıt`}
+                </span>
+                <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)", color: "var(--color-primary)" }}>
+                  {fmt(thisMonthTotal)}
+                </span>
+              </div>
+              <div className="table-wrapper">
+                <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+                  {kasaTableHeader}
+                  <tbody>{renderKasaRows(thisMonthRecords)}</tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyRecords.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        {historyRecords.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+            {lang === "en" ? "No records in selected period." : "Seçili dönemde kayıt bulunamadı."}
+          </div>
+        ) : (
+          <div className="table-wrapper" style={{ maxHeight: "480px", overflowY: "auto" }}>
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              {kasaTableHeader}
+              <tbody>{renderKasaRows(historyRecords)}</tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* EDIT MODAL */}

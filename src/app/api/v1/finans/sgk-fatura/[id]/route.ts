@@ -49,8 +49,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     if (validated.invoiceDate) {
       const dateStr = validated.invoiceDate.split("T")[0];
-      updateData.invoiceDate = new Date(`${dateStr}T00:00:00.000Z`);
-      updateData.expectedPaymentDate = addMonths(updateData.invoiceDate, 3);
+      const invoiceDate = new Date(`${dateStr}T00:00:00.000Z`);
+      updateData.invoiceDate = invoiceDate;
+      // Fatura ayından 3 ay sonraki ayın 15'i (POST route ile aynı kural)
+      const payMonth = addMonths(new Date(Date.UTC(invoiceDate.getUTCFullYear(), invoiceDate.getUTCMonth(), 1)), 3);
+      updateData.expectedPaymentDate = new Date(Date.UTC(payMonth.getUTCFullYear(), payMonth.getUTCMonth(), 15));
     }
 
     const updated = await prisma.sgkInvoice.update({

@@ -290,6 +290,9 @@ export default function SgkFaturaPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   const fetchInvoices = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/finans/sgk-fatura", { headers: { "Accept-Language": lang } });
@@ -410,6 +413,18 @@ export default function SgkFaturaPage() {
     </select>
   );
 
+  const nowM = new Date();
+  const thisMonthInvoices = invoices.filter(r => {
+    const d = new Date(r.invoiceDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyInvoices = invoices.filter(r => {
+    const d = r.invoiceDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ marginBottom: "var(--spacing-6)" }}>
@@ -483,21 +498,21 @@ export default function SgkFaturaPage() {
           </form>
         </div>
 
-        {/* TABLE */}
+        {/* BU AY */}
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
-            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>{lang === "en" ? "Saved SGK Invoices" : "Kayıtlı SGK Faturaları"}</h2>
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>{lang === "en" ? "This Month" : "Bu Ay"}</h2>
             <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-              {invoices.length} {lang === "en" ? "records" : "kayıt"}
+              {thisMonthInvoices.length} {lang === "en" ? "records" : "kayıt"}
             </span>
           </div>
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
-          ) : invoices.length === 0 ? (
+          ) : thisMonthInvoices.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏥</div>
-              {lang === "en" ? "No SGK invoices added yet." : "Henüz SGK faturası eklenmemiş."}
+              {lang === "en" ? "No invoices for this month." : "Bu ay için fatura bulunamadı."}
             </div>
           ) : (
             <div className="table-wrapper">
@@ -512,7 +527,7 @@ export default function SgkFaturaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(inv => {
+                  {thisMonthInvoices.map(inv => {
                     const isUpcoming = new Date(inv.expectedPaymentDate) > new Date();
                     return (
                       <tr key={inv.id}>
@@ -562,6 +577,99 @@ export default function SgkFaturaPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyInvoices.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        <div className="table-wrapper" style={{ maxHeight: "480px", overflowY: "auto" }}>
+          {historyInvoices.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>
+              {lang === "en" ? "No records found." : "Kayıt bulunamadı."}
+            </div>
+          ) : (
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              <thead>
+                <tr>
+                  <th>{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</th>
+                  <th>{lang === "en" ? "Type" : "Tür"}</th>
+                  <th style={{ textAlign: "right" }}>{lang === "en" ? "Amount" : "Tutar"}</th>
+                  <th>{lang === "en" ? "Payment Date" : "Yatacak Tarih"}</th>
+                  <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyInvoices.map(inv => {
+                  const isUpcoming = new Date(inv.expectedPaymentDate) > new Date();
+                  return (
+                    <tr key={inv.id}>
+                      <td>{format(new Date(inv.invoiceDate), "dd MMM yyyy", { locale: dateLocale })}</td>
+                      <td>
+                        <span style={{
+                          padding: "3px 8px",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
+                          color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary)" : "#7c3aed",
+                        }}>
+                          {getTypeLabel(inv.invoiceType)}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 700 }}>{fmt(Number(inv.amount))}</td>
+                      <td>
+                        <span style={{ color: isUpcoming ? "var(--color-success)" : "var(--color-text-muted)", fontWeight: isUpcoming ? 600 : 400 }}>
+                          {format(new Date(inv.expectedPaymentDate), "dd MMM yyyy", { locale: dateLocale })}
+                        </span>
+                        {isUpcoming && (
+                          <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-success)" }}>
+                            ({lang === "en" ? "pending" : "bekliyor"})
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                          <button
+                            onClick={() => openEdit(inv)}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}
+                          >
+                            {lang === "en" ? "Edit" : "Düzenle"}
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(inv.id)}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                          >
+                            🗑️ {lang === "en" ? "Delete" : "Sil"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

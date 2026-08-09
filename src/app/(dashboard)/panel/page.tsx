@@ -168,6 +168,32 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     cashDays: currentDailyRegs.length,
   };
 
+  // ── New computed fields ───────────────────────────────────────────────────
+  const daysElapsed = Math.max(1, now.getDate());
+  const dailyAvgCiro = currentCash / daysElapsed;
+
+  const posTotal = currentDailyRegs.reduce((s: number, r: { posAmount: unknown }) => s + Number(r.posAmount), 0);
+  const actualCashTotal = currentDailyRegs.reduce((s: number, r: { cashAmount: unknown }) => s + Number(r.cashAmount), 0);
+
+  const fixedExpenseTotal = sumDecimal(currentFixedExp, "amount");
+  const empExpenseTotal = sumDecimal(currentEmpExp, "totalAmount");
+  const notesExpenseTotal = sumDecimal(currentNotes, "amount");
+
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const urgentNotesCount = promissoryNotes.filter(
+    (n: typeof promissoryNotes[number]) => !n.isPaid && n.dueDate <= sevenDaysFromNow
+  ).length;
+
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const upcoming30Notes = promissoryNotes
+    .filter((n: typeof promissoryNotes[number]) => !n.isPaid && n.dueDate >= now && n.dueDate <= thirtyDaysFromNow)
+    .reduce((s: number, n: typeof promissoryNotes[number]) => s + Number(n.amount), 0);
+
+  const runway30 = {
+    projectedIncome: dailyAvgCiro * 30,
+    committedExpense: upcoming30Notes + (totalExpense / daysElapsed) * 30,
+  };
+
   return {
     summary: {
       totalIncome,
@@ -196,6 +222,15 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       amount: Number(p._sum.amount ?? 0),
       status: p.status,
     })),
+    dailyAvgCiro,
+    cashPosSplit: { posTotal, cashTotal: actualCashTotal },
+    expenseBreakdown: [
+      { name: "Sabit Gider", nameEn: "Fixed", value: fixedExpenseTotal },
+      { name: "Personel", nameEn: "Staff", value: empExpenseTotal },
+      { name: "Senet", nameEn: "Notes", value: notesExpenseTotal },
+    ].filter(e => e.value > 0),
+    urgentNotesCount,
+    runway30,
   };
 }
 

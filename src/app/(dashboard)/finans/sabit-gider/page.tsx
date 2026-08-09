@@ -27,6 +27,9 @@ export default function SabitGiderPage() {
   const [editForm, setEditForm] = useState({ type: "INVOICE", customType: "", amount: "", expenseDate: "", notes: "" });
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   const [formData, setFormData] = useState({
     type: "INVOICE",
     customType: "",
@@ -128,6 +131,59 @@ export default function SabitGiderPage() {
     return labels[type]?.[lang] ?? type;
   };
 
+  const fmt = (v: number) => Number(v).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
+
+  const nowM = new Date();
+  const thisMonthExpenses = expenses.filter(exp => {
+    const d = new Date(exp.expenseDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyExpenses = expenses.filter(exp => {
+    const d = exp.expenseDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+  const thisMonthTotal = thisMonthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+
+  const expenseTableHeader = (
+    <thead>
+      <tr>
+        <th>{lang === "en" ? "Date" : "Tarih"}</th>
+        <th>{lang === "en" ? "Type" : "Tür"}</th>
+        <th>{lang === "en" ? "Amount" : "Tutar"}</th>
+        <th>{lang === "en" ? "Notes" : "Notlar"}</th>
+        <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+      </tr>
+    </thead>
+  );
+
+  const renderExpenseRows = (rows: Expense[]) =>
+    rows.map(exp => (
+      <tr key={exp.id}>
+        <td>{format(new Date(exp.expenseDate), "dd MMM yyyy", { locale })}</td>
+        <td>
+          <span style={{ padding: "4px 8px", background: "var(--color-bg)", borderRadius: "4px", fontSize: "12px", fontWeight: 500 }}>
+            {getTypeLabel(exp.type, exp.customType)}
+          </span>
+        </td>
+        <td style={{ fontWeight: 600 }}>{fmt(Number(exp.amount))}</td>
+        <td style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{exp.notes || "-"}</td>
+        <td style={{ textAlign: "right" }}>
+          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+            <button onClick={() => openEdit(exp)}
+              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+              {lang === "en" ? "Edit" : "Düzenle"}
+            </button>
+            <button onClick={() => setDeleteId(exp.id)}
+              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+              {lang === "en" ? "Delete" : "Sil"}
+            </button>
+          </div>
+        </td>
+      </tr>
+    ));
+
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
       <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>
@@ -187,60 +243,75 @@ export default function SabitGiderPage() {
           </form>
         </div>
 
-        {/* Table */}
+        {/* Bu Ay */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-            {lang === "en" ? "Past Expenses" : "Geçmiş Giderler"}
+            {lang === "en" ? "This Month" : "Bu Ay"}
           </h2>
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
-          ) : expenses.length === 0 ? (
+          ) : thisMonthExpenses.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>
-              {lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}
+              {lang === "en" ? "No expenses this month." : "Bu ay gider kaydı yok."}
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="table" style={{ width: "100%", fontSize: "14px" }}>
-                <thead>
-                  <tr>
-                    <th>{lang === "en" ? "Date" : "Tarih"}</th>
-                    <th>{lang === "en" ? "Type" : "Tür"}</th>
-                    <th>{lang === "en" ? "Amount" : "Tutar"}</th>
-                    <th>{lang === "en" ? "Notes" : "Notlar"}</th>
-                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((exp) => (
-                    <tr key={exp.id}>
-                      <td>{format(new Date(exp.expenseDate), "dd MMM yyyy", { locale })}</td>
-                      <td>
-                        <span style={{ padding: "4px 8px", background: "var(--color-bg)", borderRadius: "4px", fontSize: "12px", fontWeight: 500 }}>
-                          {getTypeLabel(exp.type, exp.customType)}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{Number(exp.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}</td>
-                      <td style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{exp.notes || "-"}</td>
-                      <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => openEdit(exp)}
-                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                            {lang === "en" ? "Edit" : "Düzenle"}
-                          </button>
-                          <button onClick={() => setDeleteId(exp.id)}
-                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                            {lang === "en" ? "Delete" : "Sil"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-3)", padding: "8px 12px", background: "var(--color-bg)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                  {lang === "en" ? `${thisMonthExpenses.length} records` : `${thisMonthExpenses.length} kayıt`}
+                </span>
+                <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)", color: "var(--color-primary)" }}>
+                  {fmt(thisMonthTotal)}
+                </span>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+                  {expenseTableHeader}
+                  <tbody>{renderExpenseRows(thisMonthExpenses)}</tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyExpenses.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        {historyExpenses.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+            {lang === "en" ? "No records in selected period." : "Seçili dönemde kayıt bulunamadı."}
+          </div>
+        ) : (
+          <div className="table-wrapper" style={{ maxHeight: "480px", overflowY: "auto" }}>
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              {expenseTableHeader}
+              <tbody>{renderExpenseRows(historyExpenses)}</tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}

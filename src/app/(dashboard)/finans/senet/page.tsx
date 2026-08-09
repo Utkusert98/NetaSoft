@@ -47,6 +47,9 @@ export default function SenetPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   useEffect(() => { fetchNotes(); }, []);
 
   const fetchNotes = async () => {
@@ -176,6 +179,20 @@ export default function SenetPage() {
   const paid = notes.filter(n => n.isPaid);
   const totalUnpaid = unpaid.reduce((s, n) => s + Number(n.amount), 0);
 
+  const nowM = new Date();
+  const thisMonthNotes = notes
+    .filter(r => {
+      const d = new Date(r.dueDate);
+      return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+    })
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const historyNotes = notes.filter(r => {
+    const d = r.dueDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "var(--spacing-6)" }}>
@@ -287,122 +304,85 @@ export default function SenetPage() {
           </form>
         </div>
 
-        {/* ── Tablo ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-5)" }}>
-
-          {/* Bekleyen senetler */}
-          <div className="card">
-            <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 600, marginBottom: "var(--spacing-4)", color: "var(--color-warning)" }}>
-              {lang === "en" ? `Pending Notes (${unpaid.length})` : `Bekleyen Senetler (${unpaid.length})`}
+        {/* ── Bu Ay ── */}
+        <div className="card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>
+              {lang === "en" ? "This Month" : "Bu Ay"}
             </h2>
-            {paidError && (
-              <div style={{ marginBottom: "var(--spacing-3)", padding: "10px 14px", background: "var(--color-danger-pale, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", fontWeight: 500 }}>
-                ⚠ {paidError}
-              </div>
-            )}
-            {loading ? (
-              <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
-            ) : unpaid.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px", color: "var(--color-text-muted)", fontSize: "14px" }}>
-                {lang === "en" ? "No pending notes." : "Bekleyen senet yok."}
-              </div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table className="table" style={{ width: "100%", fontSize: "13px" }}>
-                  <thead>
-                    <tr>
-                      <th>{lang === "en" ? "Note No" : "Senet No"}</th>
-                      <th>{lang === "en" ? "Supplier" : "Depo"}</th>
-                      <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
-                      <th>{lang === "en" ? "Amount" : "Tutar"}</th>
-                      <th>{lang === "en" ? "Notes" : "Notlar"}</th>
-                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {unpaid.map(note => {
-                      const isOverdue = new Date(note.dueDate) < new Date();
-                      return (
-                        <tr key={note.id}>
-                          <td>
-                            <span style={{ fontWeight: 600 }}>{note.noteNumber}</span>
-                            {note.installmentGroupId && (
-                              <span style={{ marginLeft: "6px", fontSize: "11px", padding: "2px 6px", background: "var(--color-primary-pale)", color: "var(--color-primary)", borderRadius: "4px" }}>
-                                {lang === "en" ? `${note.installmentNumber ?? ""}. installment` : `${note.installmentNumber}. taksit`}
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
-                          <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
-                            {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
-                            {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
-                          </td>
-                          <td style={{ fontWeight: 700, color: "var(--color-danger)" }}>
-                            {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
-                          </td>
-                          <td style={{ color: "var(--color-text-muted)", fontSize: "12px", maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {note.notes || "—"}
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
+              {thisMonthNotes.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+          {paidError && (
+            <div style={{ marginBottom: "var(--spacing-3)", padding: "10px 14px", background: "var(--color-danger-pale, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", fontWeight: 500 }}>
+              ⚠ {paidError}
+            </div>
+          )}
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
+          ) : thisMonthNotes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "30px", color: "var(--color-text-muted)", fontSize: "14px" }}>
+              {lang === "en" ? "No notes due this month." : "Bu ay vadeli senet yok."}
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>{lang === "en" ? "Note No" : "Senet No"}</th>
+                    <th>{lang === "en" ? "Supplier" : "Depo"}</th>
+                    <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
+                    <th>{lang === "en" ? "Amount" : "Tutar"}</th>
+                    <th>{lang === "en" ? "Notes" : "Notlar"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {thisMonthNotes.map(note => {
+                    const isOverdue = !note.isPaid && new Date(note.dueDate) < new Date();
+                    return (
+                      <tr key={note.id} style={{ opacity: note.isPaid ? 0.7 : 1 }}>
+                        <td>
+                          <span style={{ fontWeight: 600 }}>{note.noteNumber}</span>
+                          {note.installmentGroupId && (
+                            <span style={{ marginLeft: "6px", fontSize: "11px", padding: "2px 6px", background: "var(--color-primary-pale)", color: "var(--color-primary)", borderRadius: "4px" }}>
+                              {lang === "en" ? `${note.installmentNumber ?? ""}. installment` : `${note.installmentNumber}. taksit`}
+                            </span>
+                          )}
+                          {note.isPaid && (
+                            <span style={{ marginLeft: "6px", fontSize: "11px", padding: "2px 6px", background: "rgba(16,185,129,0.1)", color: "var(--color-success)", borderRadius: "4px" }}>
+                              {lang === "en" ? "Paid" : "Ödendi"}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
+                        <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
+                          {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
+                          {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
+                        </td>
+                        <td style={{ fontWeight: 700, color: note.isPaid ? "inherit" : "var(--color-danger)" }}>
+                          {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                        </td>
+                        <td style={{ color: "var(--color-text-muted)", fontSize: "12px", maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {note.notes || "—"}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                            {!note.isPaid ? (
                               <button onClick={() => void handleMarkPaid(note.id, true)} disabled={markingId === note.id}
                                 style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-success)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", fontWeight: 600, opacity: markingId === note.id ? 0.7 : 1 }}>
                                 {markingId === note.id ? "..." : lang === "en" ? "Paid" : "Ödendi"}
                               </button>
-                              <button onClick={() => openEdit(note)}
-                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 500 }}>
-                                {lang === "en" ? "Edit" : "Düzenle"}
+                            ) : (
+                              <button onClick={() => void handleMarkPaid(note.id, false)} disabled={markingId === note.id}
+                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-warning)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", opacity: markingId === note.id ? 0.7 : 1 }}>
+                                {markingId === note.id ? "..." : lang === "en" ? "Mark Unpaid" : "Ödenmedi"}
                               </button>
-                              <button onClick={() => setDeleteId(note.id)}
-                                style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                                {lang === "en" ? "Delete" : "Sil"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Ödenen senetler */}
-          {paid.length > 0 && (
-            <div className="card">
-              <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 600, marginBottom: "var(--spacing-4)", color: "var(--color-success)" }}>
-                {lang === "en" ? `Paid Notes (${paid.length})` : `Ödenen Senetler (${paid.length})`}
-              </h2>
-              <div style={{ overflowX: "auto" }}>
-                <table className="table" style={{ width: "100%", fontSize: "13px" }}>
-                  <thead>
-                    <tr>
-                      <th>{lang === "en" ? "Note No" : "Senet No"}</th>
-                      <th>{lang === "en" ? "Supplier" : "Depo"}</th>
-                      <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
-                      <th>{lang === "en" ? "Amount" : "Tutar"}</th>
-                      <th>{lang === "en" ? "Payment Date" : "Ödeme Tarihi"}</th>
-                      <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paid.map(note => (
-                      <tr key={note.id} style={{ opacity: 0.7 }}>
-                        <td style={{ fontWeight: 600 }}>{note.noteNumber}</td>
-                        <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
-                        <td>{format(new Date(note.dueDate), "dd MMM yyyy", { locale })}</td>
-                        <td style={{ fontWeight: 700 }}>
-                          {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
-                        </td>
-                        <td style={{ color: "var(--color-success)", fontSize: "12px" }}>
-                          {note.paidDate ? format(new Date(note.paidDate), "dd MMM yyyy", { locale }) : "—"}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                            <button onClick={() => void handleMarkPaid(note.id, false)} disabled={markingId === note.id}
-                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-warning)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", opacity: markingId === note.id ? 0.7 : 1 }}>
-                              {markingId === note.id ? "..." : lang === "en" ? "Mark Unpaid" : "Ödenmedi"}
+                            )}
+                            <button onClick={() => openEdit(note)}
+                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 500 }}>
+                              {lang === "en" ? "Edit" : "Düzenle"}
                             </button>
                             <button onClick={() => setDeleteId(note.id)}
                               style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
@@ -411,11 +391,115 @@ export default function SenetPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyNotes.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        <div className="table-wrapper" style={{ maxHeight: "480px", overflowY: "auto" }}>
+          {historyNotes.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>
+              {lang === "en" ? "No records found." : "Kayıt bulunamadı."}
+            </div>
+          ) : (
+            <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+              <thead>
+                <tr>
+                  <th>{lang === "en" ? "Note No" : "Senet No"}</th>
+                  <th>{lang === "en" ? "Supplier" : "Depo"}</th>
+                  <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
+                  <th>{lang === "en" ? "Amount" : "Tutar"}</th>
+                  <th>{lang === "en" ? "Status" : "Durum"}</th>
+                  <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyNotes.map(note => {
+                  const isOverdue = !note.isPaid && new Date(note.dueDate) < new Date();
+                  return (
+                    <tr key={note.id} style={{ opacity: note.isPaid ? 0.7 : 1 }}>
+                      <td>
+                        <span style={{ fontWeight: 600 }}>{note.noteNumber}</span>
+                        {note.installmentGroupId && (
+                          <span style={{ marginLeft: "6px", fontSize: "11px", padding: "2px 6px", background: "var(--color-primary-pale)", color: "var(--color-primary)", borderRadius: "4px" }}>
+                            {lang === "en" ? `${note.installmentNumber ?? ""}. installment` : `${note.installmentNumber}. taksit`}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
+                      <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
+                        {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
+                        {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
+                      </td>
+                      <td style={{ fontWeight: 700, color: note.isPaid ? "inherit" : "var(--color-danger)" }}>
+                        {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                      </td>
+                      <td>
+                        {note.isPaid ? (
+                          <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: "rgba(16,185,129,0.1)", color: "var(--color-success)", fontWeight: 600 }}>
+                            {lang === "en" ? "Paid" : "Ödendi"}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "4px", background: "rgba(245,158,11,0.1)", color: "var(--color-warning)", fontWeight: 600 }}>
+                            {lang === "en" ? "Pending" : "Bekliyor"}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                          {!note.isPaid ? (
+                            <button onClick={() => void handleMarkPaid(note.id, true)} disabled={markingId === note.id}
+                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-success)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", fontWeight: 600, opacity: markingId === note.id ? 0.7 : 1 }}>
+                              {markingId === note.id ? "..." : lang === "en" ? "Paid" : "Ödendi"}
+                            </button>
+                          ) : (
+                            <button onClick={() => void handleMarkPaid(note.id, false)} disabled={markingId === note.id}
+                              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-warning)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: markingId === note.id ? "not-allowed" : "pointer", opacity: markingId === note.id ? 0.7 : 1 }}>
+                              {markingId === note.id ? "..." : lang === "en" ? "Mark Unpaid" : "Ödenmedi"}
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(note)}
+                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 500 }}>
+                            {lang === "en" ? "Edit" : "Düzenle"}
+                          </button>
+                          <button onClick={() => setDeleteId(note.id)}
+                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                            {lang === "en" ? "Delete" : "Sil"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

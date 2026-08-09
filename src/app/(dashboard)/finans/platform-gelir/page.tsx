@@ -54,6 +54,9 @@ export default function PlatformGelirPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   const fetchIncomes = useCallback(async () => {
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : "";
@@ -177,6 +180,18 @@ export default function PlatformGelirPage() {
     .filter(i => i.status === "PENDING")
     .reduce((a, i) => a + Number(i.amount), 0);
 
+  const nowM = new Date();
+  const thisMonthIncomes = incomes.filter(r => {
+    const d = new Date(r.incomeDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyIncomes = incomes.filter(r => {
+    const d = r.incomeDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
       <div style={{ marginBottom: "var(--spacing-6)" }}>
@@ -275,7 +290,7 @@ export default function PlatformGelirPage() {
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
             <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>
-              {lang === "en" ? "Income Records" : "Bekleyen Gelirler"}
+              {lang === "en" ? "This Month" : "Bu Ay"}
             </h2>
             <select
               className="form-input"
@@ -292,10 +307,10 @@ export default function PlatformGelirPage() {
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
-          ) : incomes.length === 0 ? (
+          ) : thisMonthIncomes.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>💸</div>
-              {statusFilter ? (lang === "en" ? "No records for this filter." : "Bu filtreye ait kayıt yok.") : (lang === "en" ? "No platform income added yet." : "Henüz platform geliri eklenmemiş.")}
+              {lang === "en" ? "No income this month." : "Bu ay henüz gelir eklenmemiş."}
             </div>
           ) : (
             <div className="table-wrapper">
@@ -311,7 +326,7 @@ export default function PlatformGelirPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {incomes.map(inc => {
+                  {thisMonthIncomes.map(inc => {
                     const st = STATUS_MAP[inc.status];
                     const isOverdue = inc.status === "PENDING" && new Date(inc.expectedPaymentDate) < new Date();
                     return (
@@ -371,6 +386,108 @@ export default function PlatformGelirPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyIncomes.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        {historyIncomes.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            {lang === "en" ? "No records found." : "Kayıt bulunamadı."}
+          </div>
+        ) : (
+          <div className="table-wrapper">
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              <thead>
+                <tr>
+                  <th>Platform</th>
+                  <th>{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</th>
+                  <th style={{ textAlign: "right" }}>{lang === "en" ? "Amount" : "Tutar"}</th>
+                  <th>{lang === "en" ? "Payment Date" : "Yatacak Tarih"}</th>
+                  <th>{lang === "en" ? "Status" : "Durum"}</th>
+                  <th style={{ textAlign: "center" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyIncomes.map(inc => {
+                  const st = STATUS_MAP[inc.status];
+                  const isOverdue = inc.status === "PENDING" && new Date(inc.expectedPaymentDate) < new Date();
+                  return (
+                    <tr key={inc.id}>
+                      <td style={{ fontWeight: 600 }}>{inc.platformName}</td>
+                      <td style={{ color: "var(--color-text-muted)" }}>
+                        {format(new Date(inc.incomeDate), "dd MMM yyyy", { locale })}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 700 }}>{fmt(Number(inc.amount))}</td>
+                      <td>
+                        <span style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text)", fontWeight: isOverdue ? 700 : 400 }}>
+                          {format(new Date(inc.expectedPaymentDate), "dd MMM yyyy", { locale })}
+                        </span>
+                        {isOverdue && <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-danger)" }}>❗</span>}
+                      </td>
+                      <td>
+                        <select
+                          value={inc.status}
+                          onChange={e => handleStatusChange(inc.id, e.target.value)}
+                          style={{
+                            padding: "3px 8px",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            background: st.bg,
+                            color: st.color,
+                            border: `1px solid ${st.color}40`,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <option value="PENDING">{lang === "en" ? "Pending" : "Bekliyor"}</option>
+                          <option value="RECEIVED">{lang === "en" ? "Received" : "Hesaba Yattı"}</option>
+                          <option value="CANCELLED">{lang === "en" ? "Cancelled" : "İptal"}</option>
+                        </select>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                          <button
+                            onClick={() => openEdit(inc)}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "none", background: "var(--color-primary)", cursor: "pointer", fontSize: "12px", color: "white", fontWeight: 500 }}
+                          >
+                            {lang === "en" ? "Edit" : "Düzenle"}
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(inc.id)}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* EDIT MODAL */}

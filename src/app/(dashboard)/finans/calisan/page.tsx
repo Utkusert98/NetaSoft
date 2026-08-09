@@ -33,6 +33,8 @@ export default function CalisanPage() {
   const [editExp, setEditExp] = useState<EmployeeExpense | null>(null);
   const [editExpForm, setEditExpForm] = useState({ salaryAmount: "", sgkAmount: "", foodAmount: "", transportAmount: "", expenseDate: "", notes: "" });
   const [editExpSubmitting, setEditExpSubmitting] = useState(false);
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
 
   const [empData, setEmpData] = useState({ firstName: "", lastName: "", identityNumber: "", phone: "" });
   const [expData, setExpData] = useState({
@@ -183,6 +185,18 @@ export default function CalisanPage() {
     parseFloat(expData.foodAmount || "0") +
     parseFloat(expData.transportAmount || "0");
 
+  const nowM = new Date();
+  const thisMonthExpenses = expenses.filter(r => {
+    const d = new Date(r.expenseDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyExpenses = expenses.filter(r => {
+    const d = r.expenseDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
       <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>
@@ -274,14 +288,14 @@ export default function CalisanPage() {
         {/* Right: Table */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-            {lang === "en" ? "Past Staff Expenses" : "Geçmiş Personel Giderleri"}
+            {lang === "en" ? "This Month" : "Bu Ay"}
           </h2>
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
-          ) : expenses.length === 0 ? (
+          ) : thisMonthExpenses.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>
-              {lang === "en" ? "No expenses added yet." : "Henüz Gider Eklenmemiş."}
+              {lang === "en" ? "No expenses this month." : "Bu ay henüz gider eklenmemiş."}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -296,7 +310,7 @@ export default function CalisanPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.map((exp) => (
+                  {thisMonthExpenses.map((exp) => (
                     <tr key={exp.id}>
                       <td>{format(new Date(exp.expenseDate), "MMM yyyy", { locale })}</td>
                       <td style={{ fontWeight: 500 }}>{exp.employee.firstName} {exp.employee.lastName}</td>
@@ -328,6 +342,79 @@ export default function CalisanPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyExpenses.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        {historyExpenses.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            {lang === "en" ? "No records found." : "Kayıt bulunamadı."}
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              <thead>
+                <tr>
+                  <th>{lang === "en" ? "Date" : "Tarih"}</th>
+                  <th>{lang === "en" ? "Staff" : "Personel"}</th>
+                  <th>{lang === "en" ? "Total" : "Toplam"}</th>
+                  <th>{lang === "en" ? "Details" : "Detaylar"}</th>
+                  <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyExpenses.map((exp) => (
+                  <tr key={exp.id}>
+                    <td>{format(new Date(exp.expenseDate), "MMM yyyy", { locale })}</td>
+                    <td style={{ fontWeight: 500 }}>{exp.employee.firstName} {exp.employee.lastName}</td>
+                    <td style={{ fontWeight: 700, color: "var(--color-primary)" }}>
+                      {Number(exp.totalAmount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                    </td>
+                    <td style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                      {lang === "en" ? "Salary" : "Maaş"}: {exp.salaryAmount} ₺<br />
+                      SGK: {exp.sgkAmount} ₺<br />
+                      {lang === "en" ? "Meal" : "Yemek"}: {exp.foodAmount} ₺<br />
+                      {lang === "en" ? "Transport" : "Yol"}: {exp.transportAmount} ₺
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                        <button onClick={() => openEditExp(exp)}
+                          style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                          {lang === "en" ? "Edit" : "Düzenle"}
+                        </button>
+                        <button onClick={() => setDeleteExpId(exp.id)}
+                          style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                          {lang === "en" ? "Delete" : "Sil"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Edit Expense Modal */}

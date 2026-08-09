@@ -34,6 +34,11 @@ export interface DashboardData {
   monthlyTrend: Array<{ month: string; gelir: number; gider: number; kar: number }>;
   upcomingSgk: Array<{ id: string; invoiceType: string; amount: number; expectedPaymentDate: string }>;
   platformIncome: Array<{ platformName: string; amount: number; status: string }>;
+  dailyAvgCiro: number;
+  cashPosSplit: { posTotal: number; cashTotal: number };
+  expenseBreakdown: Array<{ name: string; nameEn: string; value: number }>;
+  urgentNotesCount: number;
+  runway30: { projectedIncome: number; committedExpense: number };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,7 +116,8 @@ export default function DashboardClient({ data, pharmacistName }: {
   const d = t.dashboard;
   const c = t.common;
 
-  const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome } = data;
+  const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome,
+          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30 } = data;
 
   const platformTotal = platformIncome.reduce((s, p) => s + p.amount, 0);
   const totalIncomeAll = sgkVsCash.cashTotal + sgkVsCash.sgkTotal + platformTotal;
@@ -120,6 +126,22 @@ export default function DashboardClient({ data, pharmacistName }: {
 
   const unpaidNotes = promissoryNotes.filter((n) => !n.isPaid);
   const unpaidTotal = unpaidNotes.reduce((s, n) => s + n.amount, 0);
+
+  const posTotal = cashPosSplit.posTotal;
+  const cashTotal = cashPosSplit.cashTotal;
+  const cashPosAll = posTotal + cashTotal;
+  const posRatio = cashPosAll > 0 ? (posTotal / cashPosAll) * 100 : 0;
+
+  const runway30Net = runway30.projectedIncome - runway30.committedExpense;
+
+  const now = Date.now();
+  const overdueUnpaid = unpaidNotes.filter(n => new Date(n.dueDate).getTime() < now);
+  const urgentUnpaid = unpaidNotes.filter(n => {
+    const t = new Date(n.dueDate).getTime();
+    return t >= now && t <= now + 7 * 86400000;
+  });
+  const overdueAmount = overdueUnpaid.reduce((s, n) => s + n.amount, 0);
+  const urgentAmount = urgentUnpaid.reduce((s, n) => s + n.amount, 0);
 
   // ── PDF Export ─────────────────────────────────────────────────────────
   const handleExportPdf = async () => {
@@ -158,11 +180,45 @@ export default function DashboardClient({ data, pharmacistName }: {
         </button>
       </div>
 
+      {/* ── Kritik Uyarı Banneri ── */}
+      {urgentNotesCount > 0 && (
+        <div style={{
+          background: "#fff5f5", border: "1px solid #feb2b2", borderRadius: "var(--radius-lg)",
+          padding: "12px 18px", marginBottom: "var(--spacing-5)",
+          display: "flex", alignItems: "center", gap: "12px",
+        }}>
+          <span style={{ fontSize: "22px", flexShrink: 0 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontWeight: 700, color: "#c53030", fontSize: "var(--font-size-sm)" }}>
+              {lang === "en"
+                ? `${urgentNotesCount} promissory note(s) due within 7 days!`
+                : `${urgentNotesCount} senetin vadesi 7 gün içinde doluyor!`}
+            </p>
+            <p style={{ fontSize: "var(--font-size-xs)", color: "#e53e3e", marginTop: "2px" }}>
+              {lang === "en" ? "Review your promissory notes immediately." : "Senetlerinizi hemen kontrol edin."}
+            </p>
+          </div>
+          <a href="/finans/senet" style={{
+            flexShrink: 0, padding: "6px 14px", borderRadius: "var(--radius-md)",
+            background: "#e53e3e", color: "white", textDecoration: "none",
+            fontSize: "var(--font-size-xs)", fontWeight: 700,
+          }}>
+            {lang === "en" ? "View Notes →" : "Senetlere Git →"}
+          </a>
+        </div>
+      )}
+
       {/* ── Özet Kartlar ── */}
-      <div className="grid-4 stat-grid" style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
         <StatCard label={tx(d.totalIncome, lang)} value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon="📈" accent="income" />
         <StatCard label={tx(d.totalExpense, lang)} value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon="📉" accent="expense" />
         <StatCard label={tx(d.netProfit, lang)} value={formatCurrency(summary.netProfit)} icon="💰" accent="profit" />
+        <StatCard
+          label={lang === "en" ? "Daily Avg. Sales" : "Günlük Ort. Ciro"}
+          value={formatCurrency(dailyAvgCiro)}
+          icon="📊"
+          accent="income"
+        />
         <StatCard
           label={tx(d.unpaidNote, lang)}
           value={unpaidNotes.length > 0 ? formatCurrency(unpaidTotal) : tx(d.none, lang)}
@@ -240,12 +296,10 @@ export default function DashboardClient({ data, pharmacistName }: {
       </div>
 
       {/* ── Platform Geliri + Yaklaşan SGK ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
-        {/* Platform gelirleri */}
-        <ChartCard title={tx(d.platformIncome, lang)}>
-          {platformIncome.length === 0 ? (
-            <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "32px" }}>{tx(d.noRecords, lang)}</p>
-          ) : (
+      <div style={{ display: "grid", gridTemplateColumns: platformIncome.length > 0 ? "1fr 1fr" : "1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+        {/* Platform gelirleri — gizle eğer kayıt yoksa */}
+        {platformIncome.length > 0 && (
+          <ChartCard title={tx(d.platformIncome, lang)}>
             <div style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={platformIncome} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
@@ -257,8 +311,8 @@ export default function DashboardClient({ data, pharmacistName }: {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          )}
-        </ChartCard>
+          </ChartCard>
+        )}
 
         {/* Yaklaşan SGK ödemeleri */}
         <ChartCard title={tx(d.upcomingSgk, lang)}>
@@ -289,22 +343,125 @@ export default function DashboardClient({ data, pharmacistName }: {
         </ChartCard>
       </div>
 
-      {/* ── Senetler ── */}
-      {unpaidNotes.length > 0 && (
-        <ChartCard title={lang === "en" ? `Upcoming Notes (${unpaidNotes.length} · ${formatCurrency(unpaidTotal)})` : `Yaklaşan Senetler (${unpaidNotes.length} adet · ${formatCurrency(unpaidTotal)})`}>
-          {/* Progress bar */}
-          <div style={{ marginBottom: "var(--spacing-4)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "6px" }}>
-              <span>{lang === "en" ? "Paid" : "Ödenen"}: {promissoryNotes.filter(n => n.isPaid).length}</span>
-              <span>{lang === "en" ? "Pending" : "Ödenecek"}: {unpaidNotes.length}</span>
+      {/* ── Analitik Satırı: Gider Dağılımı + Nakit/POS + 30 Günlük Pist ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+        {/* Gider Dağılımı Donut */}
+        <ChartCard title={lang === "en" ? "Expense Breakdown" : "Gider Dağılımı"}>
+          {expenseBreakdown.length === 0 ? (
+            <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)", textAlign: "center" }}>
+                {lang === "en" ? "No expense data." : "Bu ay gider kaydı yok."}
+              </p>
+            </div>
+          ) : (
+            <div style={{ height: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={expenseBreakdown.map(e => ({ ...e, name: lang === "en" ? e.nameEn : e.name }))}
+                    cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                    {expenseBreakdown.map((_, i) => (
+                      <Cell key={i} fill={[RED, ORANGE, BLUE][i % 3]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} formatter={(v) => v} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Nakit / POS Oranı */}
+        <ChartCard title={lang === "en" ? "Cash vs POS" : "Nakit / POS Oranı"}>
+          {cashPosAll === 0 ? (
+            <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)", textAlign: "center" }}>
+                {lang === "en" ? "No sales data." : "Bu ay kasa kaydı yok."}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)", paddingTop: "var(--spacing-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-sm)" }}>
+                <span style={{ color: "var(--color-text-muted)" }}>POS</span>
+                <span style={{ fontWeight: 700 }}>{formatCurrency(posTotal)} <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>%{posRatio.toFixed(0)}</span></span>
+              </div>
+              <div style={{ height: 10, background: "var(--color-border)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${posRatio}%`, background: BLUE, borderRadius: "var(--radius-full)", transition: "width 0.5s ease" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-sm)" }}>
+                <span style={{ color: "var(--color-text-muted)" }}>{lang === "en" ? "Cash" : "Nakit"}</span>
+                <span style={{ fontWeight: 700 }}>{formatCurrency(cashTotal)} <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>%{(100 - posRatio).toFixed(0)}</span></span>
+              </div>
+              <div style={{ height: 10, background: "var(--color-border)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${100 - posRatio}%`, background: GREEN, borderRadius: "var(--radius-full)", transition: "width 0.5s ease" }} />
+              </div>
+              <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", textAlign: "center", marginTop: "4px" }}>
+                {lang === "en" ? `Total sales: ${formatCurrency(cashPosAll)}` : `Toplam ciro: ${formatCurrency(cashPosAll)}`}
+              </p>
+            </div>
+          )}
+        </ChartCard>
+
+        {/* 30 Günlük Nakit Pist */}
+        <ChartCard title={lang === "en" ? "30-Day Outlook" : "30 Günlük Tahmini"}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)", paddingTop: "var(--spacing-2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                {lang === "en" ? "Projected income" : "Tahmini gelir"}
+              </span>
+              <span style={{ fontWeight: 700, color: GREEN, fontSize: "var(--font-size-sm)" }}>{formatCurrency(runway30.projectedIncome)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                {lang === "en" ? "Committed expense" : "Taahhüt edilen gider"}
+              </span>
+              <span style={{ fontWeight: 700, color: RED, fontSize: "var(--font-size-sm)" }}>{formatCurrency(runway30.committedExpense)}</span>
+            </div>
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>
+                {lang === "en" ? "Projected net" : "Tahmini net"}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: "var(--font-size-base)", color: runway30Net >= 0 ? GREEN : RED }}>
+                {formatCurrency(runway30Net)}
+              </span>
             </div>
             <div style={{ height: 8, background: "var(--color-border)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
               <div style={{
                 height: "100%",
-                width: `${(promissoryNotes.filter(n => n.isPaid).length / promissoryNotes.length) * 100}%`,
-                background: GREEN, borderRadius: "var(--radius-full)",
-                transition: "width 0.5s ease",
+                width: `${Math.min(100, runway30.projectedIncome > 0 ? (runway30.committedExpense / runway30.projectedIncome) * 100 : 100)}%`,
+                background: runway30Net >= 0 ? GREEN : RED,
+                borderRadius: "var(--radius-full)", transition: "width 0.5s ease",
               }} />
+            </div>
+            <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", textAlign: "center" }}>
+              {lang === "en" ? "Based on daily avg. sales" : "Günlük ortalama ciro baz alındı"}
+            </p>
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* ── Senetler ── */}
+      {unpaidNotes.length > 0 && (
+        <ChartCard title={lang === "en" ? `Upcoming Notes (${unpaidNotes.length} · ${formatCurrency(unpaidTotal)})` : `Yaklaşan Senetler (${unpaidNotes.length} adet · ${formatCurrency(unpaidTotal)})`}>
+          {/* Progress bar — urgency indicator */}
+          <div style={{ marginBottom: "var(--spacing-4)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+              <span style={{ color: overdueUnpaid.length > 0 ? RED : "var(--color-text-muted)" }}>
+                {lang === "en" ? "Overdue" : "Gecikmiş"}: {overdueUnpaid.length}
+              </span>
+              <span style={{ color: urgentUnpaid.length > 0 ? ORANGE : "var(--color-text-muted)" }}>
+                {lang === "en" ? "Due this week" : "Bu hafta"}: {urgentUnpaid.length}
+              </span>
+              <span>{lang === "en" ? "Upcoming" : "Gelecek"}: {unpaidNotes.length - overdueUnpaid.length - urgentUnpaid.length}</span>
+            </div>
+            {/* Segmented urgency bar */}
+            <div style={{ height: 8, background: "var(--color-border)", borderRadius: "var(--radius-full)", overflow: "hidden", display: "flex" }}>
+              {unpaidTotal > 0 && overdueAmount > 0 && (
+                <div style={{ height: "100%", width: `${(overdueAmount / unpaidTotal) * 100}%`, background: RED, flexShrink: 0 }} />
+              )}
+              {unpaidTotal > 0 && urgentAmount > 0 && (
+                <div style={{ height: "100%", width: `${(urgentAmount / unpaidTotal) * 100}%`, background: ORANGE, flexShrink: 0 }} />
+              )}
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-2)" }}>

@@ -35,6 +35,9 @@ export default function DepoHavalesiPage() {
   const [editForm, setEditForm] = useState({ supplierName: "", amount: "", transferDate: "", notes: "" });
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [histStart, setHistStart] = useState("");
+  const [histEnd, setHistEnd] = useState("");
+
   useEffect(() => { void fetchTransfers(); }, []);
 
   const fetchTransfers = async () => {
@@ -118,7 +121,62 @@ export default function DepoHavalesiPage() {
     finally { setEditSubmitting(false); }
   };
 
-  const totalAmount = transfers.reduce((s, t) => s + Number(t.amount), 0);
+  const fmt = (v: number) => Number(v).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
+
+  const totalAmount = transfers.reduce((s, tr) => s + Number(tr.amount), 0);
+
+  const nowM = new Date();
+  const thisMonthTransfers = transfers.filter(tr => {
+    const d = new Date(tr.transferDate);
+    return d.getMonth() === nowM.getMonth() && d.getFullYear() === nowM.getFullYear();
+  });
+  const historyTransfers = transfers.filter(tr => {
+    const d = tr.transferDate.substring(0, 10);
+    if (histStart && d < histStart) return false;
+    if (histEnd && d > histEnd) return false;
+    return true;
+  });
+  const thisMonthTotal = thisMonthTransfers.reduce((s, tr) => s + Number(tr.amount), 0);
+
+  const transferTableHeader = (
+    <thead>
+      <tr>
+        <th>{lang === "en" ? "Date" : "Tarih"}</th>
+        <th>{lang === "en" ? "Warehouse" : "Depo"}</th>
+        <th>{lang === "en" ? "Amount" : "Tutar"}</th>
+        <th>{lang === "en" ? "Description" : "Açıklama"}</th>
+        <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+      </tr>
+    </thead>
+  );
+
+  const renderTransferRows = (rows: SupplierTransfer[]) =>
+    rows.map(tr => (
+      <tr key={tr.id}>
+        <td style={{ whiteSpace: "nowrap" }}>
+          {format(new Date(tr.transferDate), "dd MMM yyyy", { locale })}
+        </td>
+        <td style={{ fontWeight: 600 }}>{tr.supplierName}</td>
+        <td style={{ fontWeight: 700, color: "var(--color-danger)" }}>
+          {fmt(Number(tr.amount))}
+        </td>
+        <td style={{ color: "var(--color-text-muted)", fontSize: "13px", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {tr.notes || "—"}
+        </td>
+        <td style={{ textAlign: "right" }}>
+          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+            <button onClick={() => openEdit(tr)}
+              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+              {lang === "en" ? "Edit" : "Düzenle"}
+            </button>
+            <button onClick={() => setDeleteId(tr.id)}
+              style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+              {lang === "en" ? "Delete" : "Sil"}
+            </button>
+          </div>
+        </td>
+      </tr>
+    ));
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1100px", margin: "0 auto" }}>
@@ -223,73 +281,75 @@ export default function DepoHavalesiPage() {
           </form>
         </div>
 
-        {/* Table */}
+        {/* Bu Ay */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            {lang === "en" ? "Transfer History" : "Havale Geçmişi"}
+            {lang === "en" ? "This Month" : "Bu Ay"}
           </h2>
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
-          ) : transfers.length === 0 ? (
+          ) : thisMonthTransfers.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)", fontSize: "14px" }}>
-              {lang === "en" ? "No transfer records yet." : "Henüz havale kaydı yok."}
+              {lang === "en" ? "No transfer records this month." : "Bu ay havale kaydı yok."}
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="table" style={{ width: "100%", fontSize: "14px" }}>
-                <thead>
-                  <tr>
-                    <th>{lang === "en" ? "Date" : "Tarih"}</th>
-                    <th>{lang === "en" ? "Warehouse" : "Depo"}</th>
-                    <th>{lang === "en" ? "Amount" : "Tutar"}</th>
-                    <th>{lang === "en" ? "Description" : "Açıklama"}</th>
-                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transfers.map(t => (
-                    <tr key={t.id}>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        {format(new Date(t.transferDate), "dd MMM yyyy", { locale })}
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{t.supplierName}</td>
-                      <td style={{ fontWeight: 700, color: "var(--color-danger)" }}>
-                        {Number(t.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
-                      </td>
-                      <td style={{ color: "var(--color-text-muted)", fontSize: "13px", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {t.notes || "—"}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => openEdit(t)}
-                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-primary)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                            {lang === "en" ? "Edit" : "Düzenle"}
-                          </button>
-                          <button onClick={() => setDeleteId(t.id)}
-                            style={{ padding: "4px 10px", fontSize: "12px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                            {lang === "en" ? "Delete" : "Sil"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: "2px solid var(--color-border)" }}>
-                    <td colSpan={2} style={{ fontWeight: 700, paddingTop: "12px" }}>
-                      {lang === "en" ? "Total" : "Toplam"}
-                    </td>
-                    <td style={{ fontWeight: 700, paddingTop: "12px", color: "var(--color-danger)" }}>
-                      {totalAmount.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
-                    </td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-3)", padding: "8px 12px", background: "var(--color-bg)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+                  {lang === "en" ? `${thisMonthTransfers.length} records` : `${thisMonthTransfers.length} kayıt`}
+                </span>
+                <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)", color: "var(--color-primary)" }}>
+                  {fmt(thisMonthTotal)}
+                </span>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+                  {transferTableHeader}
+                  <tbody>{renderTransferRows(thisMonthTransfers)}</tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
+      </div>
+
+      {/* Geçmiş Kayıtlar */}
+      <div className="card" style={{ marginTop: "var(--spacing-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginRight: "auto" }}>
+            {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
+          </h2>
+          <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
+            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
+              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            {(histStart || histEnd) && (
+              <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
+                style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Clear" : "Temizle"}
+              </button>
+            )}
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+              {historyTransfers.length} {lang === "en" ? "records" : "kayıt"}
+            </span>
+          </div>
+        </div>
+        {historyTransfers.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+            {lang === "en" ? "No records in selected period." : "Seçili dönemde kayıt bulunamadı."}
+          </div>
+        ) : (
+          <div className="table-wrapper" style={{ maxHeight: "480px", overflowY: "auto" }}>
+            <table className="table" style={{ width: "100%", fontSize: "14px" }}>
+              {transferTableHeader}
+              <tbody>{renderTransferRows(historyTransfers)}</tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
