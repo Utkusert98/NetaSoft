@@ -176,8 +176,8 @@ export default function AylikOzetPage() {
                   {data.monthly[0].sgk === 0 && (
                     <p style={{ fontSize: "11px", color: "var(--color-text-muted)", padding: "4px 0 8px 0", fontStyle: "italic" }}>
                       {lang === "en"
-                        ? "ℹ️ SGK income appears in the month payment is received (15th of the month, 3 months after the invoice date)."
-                        : "ℹ️ SGK geliri, fatura tarihinden 3 ay sonra her ayın 15'inde bu bölüme yansır."}
+                        ? "ℹ️ SGK invoices are shown by invoice date. Bank payment arrives on the 15th, 3 months after invoice date."
+                        : "ℹ️ SGK faturaları fatura tarihine göre gösterilir. Banka ödemesi fatura tarihinden 3 ay sonra her ayın 15'inde yatar."}
                     </p>
                   )}
                   <StatRow label={lang === "en" ? "📱 Platform Revenue" : "📱 Platform Gelirleri"} cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
@@ -206,23 +206,40 @@ export default function AylikOzetPage() {
                     <span>{lang === "en" ? "Total Expense" : "Toplam Gider"}</span>
                     <span style={{ color: "#e74c3c" }}>{fmt(data.monthly[0].gider)}</span>
                   </div>
-                  {data.monthly[0].gelir > 0 && (
-                    <div style={{ marginTop: "var(--spacing-3)", padding: "10px 14px", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}>
-                      <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Profit Margin" : "Kar Marjı"}</div>
-                      <div style={{ height: 8, background: "var(--color-border)", borderRadius: "99px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, (data.monthly[0].kar / data.monthly[0].gelir) * 100))}%`, background: "#4e7c3f", borderRadius: "99px" }} />
-                      </div>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#4e7c3f", marginTop: "4px" }}>
-                        %{data.monthly[0].gelir > 0 ? ((data.monthly[0].kar / data.monthly[0].gelir) * 100).toFixed(1) : "0"}
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : (
                 <p style={{ color: "var(--color-text-muted)", padding: "20px 0" }}>{lang === "en" ? "No expense records for this month." : "Bu ay için gider kaydı yok."}</p>
               )}
             </div>
           </div>
+
+          {/* Kar Marjı — full width below both detail panels */}
+          {data?.monthly[0] && data.monthly[0].gelir > 0 && (
+            <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Profit Margin" : "Kâr Marjı"}</span>
+                <span style={{ fontWeight: 800, fontSize: "var(--font-size-base)", color: data.monthly[0].kar >= 0 ? "#4e7c3f" : "#e74c3c" }}>
+                  %{((data.monthly[0].kar / data.monthly[0].gelir) * 100).toFixed(1)}
+                  <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text-muted)", marginLeft: "8px" }}>
+                    ({fmt(data.monthly[0].kar)} {lang === "en" ? "net profit" : "net kâr"})
+                  </span>
+                </span>
+              </div>
+              <div style={{ height: 12, background: "var(--color-border)", borderRadius: "99px", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.min(100, Math.max(0, (data.monthly[0].kar / data.monthly[0].gelir) * 100))}%`,
+                  background: data.monthly[0].kar >= 0 ? "#4e7c3f" : "#e74c3c",
+                  borderRadius: "99px",
+                  transition: "width 0.4s ease",
+                }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+                <span>{lang === "en" ? "Gelir:" : "Gelir:"} {fmt(data.monthly[0].gelir)}</span>
+                <span>{lang === "en" ? "Expense:" : "Gider:"} {fmt(data.monthly[0].gider)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Senetler Tablosu */}
           {data?.promissoryNotes && data.promissoryNotes.length > 0 && (

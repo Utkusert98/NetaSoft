@@ -312,6 +312,7 @@ export default function SenetPage() {
                   <thead>
                     <tr>
                       <th>{lang === "en" ? "Note No" : "Senet No"}</th>
+                      <th>{lang === "en" ? "Supplier" : "Depo"}</th>
                       <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
                       <th>{lang === "en" ? "Amount" : "Tutar"}</th>
                       <th>{lang === "en" ? "Notes" : "Notlar"}</th>
@@ -331,6 +332,7 @@ export default function SenetPage() {
                               </span>
                             )}
                           </td>
+                          <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
                           <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
                             {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
                             {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
@@ -377,6 +379,7 @@ export default function SenetPage() {
                   <thead>
                     <tr>
                       <th>{lang === "en" ? "Note No" : "Senet No"}</th>
+                      <th>{lang === "en" ? "Supplier" : "Depo"}</th>
                       <th>{lang === "en" ? "Due Date" : "Vade Tarihi"}</th>
                       <th>{lang === "en" ? "Amount" : "Tutar"}</th>
                       <th>{lang === "en" ? "Payment Date" : "Ödeme Tarihi"}</th>
@@ -387,6 +390,7 @@ export default function SenetPage() {
                     {paid.map(note => (
                       <tr key={note.id} style={{ opacity: 0.7 }}>
                         <td style={{ fontWeight: 600 }}>{note.noteNumber}</td>
+                        <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
                         <td>{format(new Date(note.dueDate), "dd MMM yyyy", { locale })}</td>
                         <td style={{ fontWeight: 700 }}>
                           {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}

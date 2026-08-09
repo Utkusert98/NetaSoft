@@ -245,6 +245,20 @@ const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   SGK_INVOICE_TYPES.filter(t => t.value).map(t => [t.value, t.label])
 );
 
+function getTypeLabel(type: string): string {
+  if (TYPE_LABEL[type]) return TYPE_LABEL[type];
+  const up = type.toUpperCase().replace(/[\s-]/g, "_");
+  if (TYPE_LABEL[up]) return TYPE_LABEL[up];
+  if (up === "GROUP" || up === "GRUP" || up === "A" || up.includes("GROUP_A") || up.includes("GRUBU_A") || up.includes("A_GRUP")) return "A Grubu";
+  if (up === "B" || up.includes("GROUP_B") || up.includes("GRUBU_B") || up.includes("B_GRUP")) return "B Grubu";
+  if (up === "C" || up.includes("GROUP_C") || up.includes("GRUBU_C") || up.includes("C_GRUP")) return "C Grubu";
+  for (const [k, v] of Object.entries(TYPE_LABEL)) {
+    if (k.toUpperCase() === up) return v;
+    if (v.toUpperCase() === type.toUpperCase()) return v;
+  }
+  return type;
+}
+
 type SgkInvoice = {
   id: string;
   invoiceDate: string;
@@ -512,7 +526,7 @@ export default function SgkFaturaPage() {
                             background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
                             color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary)" : "#7c3aed",
                           }}>
-                            {TYPE_LABEL[inv.invoiceType] || inv.invoiceType}
+                            {getTypeLabel(inv.invoiceType)}
                           </span>
                         </td>
                         <td style={{ textAlign: "right", fontWeight: 700 }}>{fmt(Number(inv.amount))}</td>

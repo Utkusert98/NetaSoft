@@ -23,6 +23,17 @@ interface ReportData {
 
 const INCOME_COLORS = ["#4e7c3f", "#3498db", "#9fe870"];
 const EXPENSE_COLORS = ["#e74c3c", "#e67e22", "#c0392b", "#f39c12", "#d35400", "#8e44ad", "#2c3e50"];
+
+const EXPENSE_LABELS: Record<string, [string, string]> = {
+  INVOICE:       ["Fatura",           "Invoice"],
+  ACCOUNTING:    ["Muhasebe",         "Accounting"],
+  TAX:           ["Vergi",            "Tax"],
+  RENT:          ["Kira",             "Rent"],
+  OTHER:         ["Diğer",            "Other"],
+  PERSONEL:      ["Personel",         "Staff"],
+  SENET:         ["Senet",            "Promissory Notes"],
+  DEPO_HAVALESI: ["Depo Havalesi",    "Warehouse Transfers"],
+};
 const TT = { background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" };
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
@@ -240,7 +251,7 @@ export default function GelirGiderPage() {
                         <div key={d.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "var(--font-size-sm)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <div style={{ width: 10, height: 10, borderRadius: "50%", background: EXPENSE_COLORS[i % EXPENSE_COLORS.length], flexShrink: 0 }} />
-                            <span style={{ textTransform: "capitalize" }}>{d.name.replace(/_/g, " ").toLowerCase()}</span>
+                            <span>{EXPENSE_LABELS[d.name] ? (lang === "en" ? EXPENSE_LABELS[d.name][1] : EXPENSE_LABELS[d.name][0]) : d.name}</span>
                           </div>
                           <div style={{ display: "flex", gap: "12px" }}>
                             <span style={{ color: "var(--color-text-muted)" }}>%{total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}</span>

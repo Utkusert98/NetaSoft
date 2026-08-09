@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
 
@@ -125,19 +125,38 @@ export default function AiDestek() {
   }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [streamingText, setStreamingText] = useState("");
+  const [displayedText, setDisplayedText] = useState("");
+  const pendingRef = useRef("");
+  const isAnimatingRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Update welcome message when lang changes
   useEffect(() => {
     setMessages([{ id: "welcome", role: "assistant", content: UI_TEXT[lang].welcome }]);
-    setStreamingText("");
+    setDisplayedText("");
+    pendingRef.current = "";
+    isAnimatingRef.current = false;
   }, [lang]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+  }, [messages, displayedText]);
+
+  const startTypewriter = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    const tick = () => {
+      const pending = pendingRef.current;
+      if (!pending) { isAnimatingRef.current = false; return; }
+      // Take up to 2 chars per tick for a natural pace (~160 chars/sec at 12ms)
+      const take = Math.min(2, pending.length);
+      pendingRef.current = pending.slice(take);
+      setDisplayedText(prev => prev + pending.slice(0, take));
+      setTimeout(tick, 12);
+    };
+    setTimeout(tick, 12);
+  }, []);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -146,7 +165,9 @@ export default function AiDestek() {
     setMessages(history);
     setInput("");
     setLoading(true);
-    setStreamingText("");
+    setDisplayedText("");
+    pendingRef.current = "";
+    isAnimatingRef.current = false;
 
     try {
       const apiMessages = history
@@ -171,9 +192,19 @@ export default function AiDestek() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setStreamingText(accumulated);
+        const chunk = decoder.decode(value, { stream: true });
+        accumulated += chunk;
+        pendingRef.current += chunk;
+        startTypewriter();
       }
+
+      // Wait for typewriter to drain (max 8s) then snap to full text
+      await new Promise<void>(resolve => {
+        const deadline = setTimeout(() => { isAnimatingRef.current = false; resolve(); }, 8000);
+        const check = setInterval(() => {
+          if (!isAnimatingRef.current) { clearInterval(check); clearTimeout(deadline); resolve(); }
+        }, 50);
+      });
 
       // Pick random follow-up set
       const followUpSet = FOLLOW_UP_SUGGESTIONS[lang][Math.floor(Math.random() * FOLLOW_UP_SUGGESTIONS[lang].length)];
@@ -184,7 +215,8 @@ export default function AiDestek() {
         content: accumulated,
         followUps: followUpSet,
       }]);
-      setStreamingText("");
+      setDisplayedText("");
+      pendingRef.current = "";
     } catch (err) {
       const msg = err instanceof Error ? err.message : (lang === "tr" ? "Bağlantı hatası" : "Connection error");
       setMessages((prev) => [...prev, {
@@ -192,7 +224,8 @@ export default function AiDestek() {
         role: "assistant",
         content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}`,
       }]);
-      setStreamingText("");
+      setDisplayedText("");
+      pendingRef.current = "";
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -279,9 +312,9 @@ export default function AiDestek() {
           </div>
         ))}
 
-        {streamingText && <AssistantMessage content={streamingText + "▍"} />}
+        {displayedText && <AssistantMessage content={displayedText + "▍"} />}
 
-        {loading && !streamingText && (
+        {loading && !displayedText && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #4e7c3f, #9fe870)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
               🤖
