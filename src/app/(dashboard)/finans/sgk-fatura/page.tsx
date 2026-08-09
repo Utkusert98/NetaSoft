@@ -307,15 +307,21 @@ export default function SgkFaturaPage() {
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
-  // Tarih + 3 ay önizlemesi
+  // Tarih + 3 ay önizlemesi — her zaman o ayın 15'i
   const dateLocale = lang === "en" ? enUS : tr;
 
+  const toPaymentDate = (dateStr: string): Date => {
+    const d = new Date(dateStr + "T00:00:00");
+    const pm = addMonths(new Date(d.getFullYear(), d.getMonth(), 1), 3);
+    return new Date(pm.getFullYear(), pm.getMonth(), 15);
+  };
+
   const previewPaymentDate = formData.invoiceDate
-    ? format(addMonths(new Date(formData.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: dateLocale })
+    ? format(toPaymentDate(formData.invoiceDate), "dd MMMM yyyy", { locale: dateLocale })
     : "—";
 
   const editPreviewDate = editForm.invoiceDate
-    ? format(addMonths(new Date(editForm.invoiceDate + "T00:00:00"), 3), "dd MMMM yyyy", { locale: dateLocale })
+    ? format(toPaymentDate(editForm.invoiceDate), "dd MMMM yyyy", { locale: dateLocale })
     : "—";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
