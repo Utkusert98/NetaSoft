@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { apiError } from "@/lib/utils";
 import { rateLimit } from "@/lib/utils/rate-limit";
 import { getLang, m } from "@/lib/i18n/api-messages";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const AI_CHAT_RATE_LIMIT = 15;
 const AI_CHAT_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -54,13 +55,10 @@ WHAT YOU CAN DO (only for data entered into the system):
 async function getFinancialContext(userId: string, lang: string): Promise<string> {
   const isEn = lang === "en";
   try {
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId },
-      select: { pharmacyId: true },
-    });
-    if (!userRole) return isEn ? "No pharmacy found for this user." : "Kullanıcıya ait eczane bulunamadı.";
+    const activePharmacyId = await getActivePharmacyId(userId);
+    if (!activePharmacyId) return isEn ? "No pharmacy found for this user." : "Kullanıcıya ait eczane bulunamadı.";
 
-    const pharmacyId = userRole.pharmacyId;
+    const pharmacyId = activePharmacyId;
     const now = new Date();
     const y = now.getUTCFullYear();
     const mo = now.getUTCMonth() + 1;

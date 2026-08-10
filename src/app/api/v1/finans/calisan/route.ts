@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { apiError, apiResponse } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 import { getLang, m } from "@/lib/i18n/api-messages";
 
 const employeeSchema = z.object({
@@ -19,19 +20,15 @@ export async function POST(req: Request): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const body = await req.json();
     const validated = employeeSchema.parse(body);
 
     const employee = await prisma.employee.create({
       data: {
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         firstName: validated.firstName,
         lastName: validated.lastName,
         identityNumber: validated.identityNumber || null,
@@ -42,7 +39,7 @@ export async function POST(req: Request): Promise<Response> {
 
     await logAudit({
       userId: session.user.id,
-      pharmacyId: userRole.pharmacyId,
+      pharmacyId,
       action: "CREATE",
       entityType: "Employee",
       entityId: employee.id,
@@ -65,15 +62,11 @@ export async function GET(req: Request): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const employees = await prisma.employee.findMany({
-      where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
+      where: { pharmacyId, deletedAt: null },
       orderBy: { firstName: "asc" },
     });
 

@@ -5,6 +5,7 @@ import { addDays } from "date-fns";
 import { apiError, apiResponse } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { getLang, m } from "@/lib/i18n/api-messages";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const platformUpdateSchema = z.object({
   platformName: z.string().min(1).optional(),
@@ -14,21 +15,13 @@ const platformUpdateSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const userRole = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return userRole?.pharmacyId ?? null;
-}
-
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
     if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { id } = await params;
@@ -84,7 +77,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
     if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { id } = await params;

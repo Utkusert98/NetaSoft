@@ -3,21 +3,14 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError, apiResponse } from "@/lib/utils";
 import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
-
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const role = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return role?.pharmacyId ?? null;
-}
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 export async function GET(req: NextRequest): Promise<Response> {
   const lang = getLang(req);
   const session = await auth();
   if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-  const pharmacyId = await getPharmacyId(session.user.id);
+  const pharmacyId = await getActivePharmacyId(session.user.id);
   if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
   const { searchParams } = new URL(req.url);

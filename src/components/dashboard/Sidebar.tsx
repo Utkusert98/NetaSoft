@@ -8,6 +8,13 @@ import { NetaSoftIcon, NetaSoftLogoFull } from "@/components/ui/NetaSoftLogo";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
+interface PharmacyOption {
+  id: string;
+  name: string;
+  city: string | null;
+  role: string;
+}
+
 interface NavItem {
   href: string;
   labelKey: keyof typeof t.sidebar;
@@ -45,6 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/raporlar/aylik", labelKey: "monthlySummary", icon: "📅" },
       { href: "/satis/rapor", labelKey: "salesReport", icon: "🧾" },
       { href: "/stok/envanter", labelKey: "inventory", icon: "📦" },
+      { href: "/raporlar/denetim", labelKey: "auditLog", icon: "🕵️" },
     ],
   },
   {
@@ -60,6 +68,49 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const { lang } = useLangContext();
+  const [pharmacies, setPharmacies] = useState<PharmacyOption[]>([]);
+  const [activePharmacyId, setActivePharmacyId] = useState<string>("");
+  const [switching, setSwitching] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/ayarlar/eczaneler");
+        const json = await res.json() as {
+          success: boolean;
+          data?: { pharmacies: PharmacyOption[]; activePharmacyId: string | null };
+        };
+        if (!cancelled && json.success && json.data) {
+          setPharmacies(json.data.pharmacies);
+          setActivePharmacyId(json.data.activePharmacyId ?? "");
+        }
+      } catch {
+        // Sessizce yoksay — eczane listesi alınamazsa değiştirici görüntülenmez
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handlePharmacyChange = async (pharmacyId: string): Promise<void> => {
+    setSwitching(true);
+    try {
+      const res = await fetch("/api/v1/ayarlar/eczaneler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pharmacyId }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        setSwitching(false);
+      }
+    } catch {
+      setSwitching(false);
+    }
+  };
 
   // Close sidebar on route change (mobile) — render sırasında state senkronizasyonu
   if (pathname !== prevPathname) {
@@ -116,6 +167,51 @@ export default function Sidebar() {
             Neta<span>Soft</span>
           </span>
         </div>
+
+        {/* Eczane Değiştirici */}
+        {pharmacies.length > 1 && (
+          <div style={{ padding: "0 16px 12px" }}>
+            <label
+              htmlFor="pharmacy-switcher"
+              style={{
+                display: "block",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.5)",
+                marginBottom: "6px",
+                textTransform: "uppercase",
+                letterSpacing: "0.03em",
+              }}
+            >
+              {tx(t.sidebar.activePharmacy, lang)}
+            </label>
+            <select
+              id="pharmacy-switcher"
+              value={activePharmacyId}
+              disabled={switching}
+              onChange={(e) => void handlePharmacyChange(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.05)",
+                color: "white",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: switching ? "not-allowed" : "pointer",
+                opacity: switching ? 0.6 : 1,
+              }}
+            >
+              {pharmacies.map((p) => (
+                <option key={p.id} value={p.id} style={{ color: "#111" }}>
+                  {p.name}
+                  {p.city ? ` (${p.city})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Navigasyon */}
         <nav className="sidebar-nav">

@@ -4,18 +4,11 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { DashboardData } from "./DashboardClient";
 import DashboardClient from "./DashboardClient";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 export const metadata: Metadata = {
   title: "Gösterge Paneli",
 };
-
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const role = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return role?.pharmacyId ?? null;
-}
 
 async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const now = new Date();
@@ -312,7 +305,7 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/giris");
 
-  const pharmacyId = await getPharmacyId(session.user.id);
+  const pharmacyId = await getActivePharmacyId(session.user.id);
   if (!pharmacyId) redirect("/giris");
 
   const [data, pharmacy] = await Promise.all([

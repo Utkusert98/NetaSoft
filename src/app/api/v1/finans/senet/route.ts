@@ -4,6 +4,7 @@ import { z } from "zod";
 import { addMonths } from "date-fns";
 import { apiError, apiResponse } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 import { getLang, m } from "@/lib/i18n/api-messages";
 
 const senetSchema = z.object({
@@ -25,13 +26,10 @@ export async function POST(req: Request): Promise<Response> {
       return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
-    // Get user's pharmacy
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
+    // Get user's active pharmacy
+    const pharmacyId = await getActivePharmacyId(session.user.id);
 
-    if (!userRole) {
+    if (!pharmacyId) {
       return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
     }
 
@@ -47,7 +45,7 @@ export async function POST(req: Request): Promise<Response> {
       const groupId = `grp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       const notesToCreate = Array.from({ length: count }).map((_, i) => ({
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         noteNumber: `${validated.noteNumber}-${i + 1}/${count}`,
         supplierName: validated.supplierName,
         issueDate,
@@ -64,7 +62,7 @@ export async function POST(req: Request): Promise<Response> {
 
       await logAudit({
         userId: session.user.id,
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         action: "CREATE",
         entityType: "PromissoryNote",
         entityId: groupId,
@@ -76,7 +74,7 @@ export async function POST(req: Request): Promise<Response> {
       // Single note
       const note = await prisma.promissoryNote.create({
         data: {
-          pharmacyId: userRole.pharmacyId,
+          pharmacyId,
           noteNumber: validated.noteNumber,
           supplierName: validated.supplierName,
           issueDate,
@@ -88,7 +86,7 @@ export async function POST(req: Request): Promise<Response> {
 
       await logAudit({
         userId: session.user.id,
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         action: "CREATE",
         entityType: "PromissoryNote",
         entityId: note.id,
@@ -114,15 +112,11 @@ export async function GET(req: Request): Promise<Response> {
       return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const notes = await prisma.promissoryNote.findMany({
-      where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
+      where: { pharmacyId, deletedAt: null },
       orderBy: { dueDate: "asc" },
     });
 

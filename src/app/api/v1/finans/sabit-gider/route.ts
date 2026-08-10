@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { apiError, apiResponse } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 import { getLang, m } from "@/lib/i18n/api-messages";
 
 const fixedExpenseSchema = z.object({
@@ -21,12 +22,8 @@ export async function POST(req: Request): Promise<Response> {
       return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) {
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) {
       return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
     }
 
@@ -35,7 +32,7 @@ export async function POST(req: Request): Promise<Response> {
 
     const expense = await prisma.fixedExpense.create({
       data: {
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         type: validated.type,
         customType: validated.type === "OTHER" ? validated.customType : null,
         amount: validated.amount,
@@ -46,7 +43,7 @@ export async function POST(req: Request): Promise<Response> {
 
     await logAudit({
       userId: session.user.id,
-      pharmacyId: userRole.pharmacyId,
+      pharmacyId,
       action: "CREATE",
       entityType: "FixedExpense",
       entityId: expense.id,
@@ -69,15 +66,11 @@ export async function GET(req: Request): Promise<Response> {
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const expenses = await prisma.fixedExpense.findMany({
-      where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
+      where: { pharmacyId, deletedAt: null },
       orderBy: { expenseDate: "desc" },
     });
 

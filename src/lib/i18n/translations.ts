@@ -19,9 +19,11 @@ export const t = {
     monthlySummary: { tr: "Aylık Özet", en: "Monthly Summary" },
     inventory: { tr: "Stok Envanteri", en: "Inventory" },
     salesReport: { tr: "Satış Raporu", en: "Sales Report" },
+    auditLog: { tr: "Denetim Kayıtları", en: "Audit Log" },
     settings: { tr: "Ayarlar", en: "Settings" },
     logout: { tr: "Çıkış Yap", en: "Sign Out" },
     pharmacyMgmt: { tr: "Eczane Yönetim", en: "Pharmacy Mgmt" },
+    activePharmacy: { tr: "Aktif Eczane", en: "Active Pharmacy" },
   },
 
   // ─── Common ────────────────────────────────────────────────
