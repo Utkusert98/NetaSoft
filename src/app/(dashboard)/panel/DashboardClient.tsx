@@ -56,6 +56,15 @@ export interface DashboardData {
     changePct: number;
     hasData: boolean;
   };
+  monthComparison: {
+    pos: { current: number; previous: number; changePct: number };
+    cash: { current: number; previous: number; changePct: number };
+    sgk: { current: number; previous: number; changePct: number };
+    platform: { current: number; previous: number; changePct: number };
+    totalIncome: { current: number; previous: number; changePct: number };
+    totalExpense: { current: number; previous: number; changePct: number };
+    netProfit: { current: number; previous: number; changePct: number };
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,6 +141,35 @@ function sgkTypeLabel(type: string, lang: string): string {
   return type.replace(/_/g, " ");
 }
 
+// ── Bu Ay vs Geçen Ay: değişim rozeti ───────────────────────────────────────
+function MonthChangeBadge({ current, previous, changePct, invert }: {
+  current: number; previous: number; changePct: number; invert?: boolean;
+}) {
+  const { lang } = useLangContext();
+
+  // Geçen ay veri yoktu ama bu ay var — yüzde anlamsız, "Yeni" göster
+  if (previous === 0) {
+    if (current === 0) {
+      return <span style={{ color: "var(--color-text-muted)", fontWeight: 700 }}>—</span>;
+    }
+    const favorable = !invert;
+    return (
+      <span style={{ color: favorable ? GREEN : RED, fontWeight: 700, whiteSpace: "nowrap" }}>
+        ▲ {lang === "en" ? "New" : "Yeni"}
+      </span>
+    );
+  }
+
+  const favorable = invert ? changePct < 0 : changePct > 0;
+  const color = changePct === 0 ? "var(--color-text-muted)" : favorable ? GREEN : RED;
+  const arrow = changePct > 0 ? "▲" : changePct < 0 ? "▼" : "▬";
+  return (
+    <span style={{ color, fontWeight: 700, whiteSpace: "nowrap" }}>
+      {arrow} %{Math.abs(changePct).toFixed(1)}
+    </span>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function DashboardClient({ data, pharmacistName }: {
   data: DashboardData;
@@ -143,7 +181,7 @@ export default function DashboardClient({ data, pharmacistName }: {
   const c = t.common;
 
   const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome,
-          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30, dayComparison, weekComparison } = data;
+          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30, dayComparison, weekComparison, monthComparison } = data;
 
   const platformTotal = platformIncome.reduce((s, p) => s + p.amount, 0);
   const totalIncomeAll = sgkVsCash.cashTotal + sgkVsCash.sgkTotal + platformTotal;
@@ -159,6 +197,21 @@ export default function DashboardClient({ data, pharmacistName }: {
   const posRatio = cashPosAll > 0 ? (posTotal / cashPosAll) * 100 : 0;
 
   const runway30Net = runway30.projectedIncome - runway30.committedExpense;
+
+  // Bu Ay vs Geçen Ay — karşılaştırma satırları
+  const monthComparisonRows: Array<{
+    label: string; labelEn: string;
+    current: number; previous: number; changePct: number;
+    invert?: boolean;
+  }> = [
+    { label: "POS", labelEn: "POS", ...monthComparison.pos },
+    { label: "Nakit", labelEn: "Cash", ...monthComparison.cash },
+    { label: "SGK Geliri", labelEn: "SGK Income", ...monthComparison.sgk },
+    { label: "Platform Geliri", labelEn: "Platform Income", ...monthComparison.platform },
+    { label: "Toplam Gelir", labelEn: "Total Income", ...monthComparison.totalIncome },
+    { label: "Toplam Gider", labelEn: "Total Expense", ...monthComparison.totalExpense, invert: true },
+    { label: "Net Kâr", labelEn: "Net Profit", ...monthComparison.netProfit },
+  ];
 
   const [now] = useState(() => Date.now());
   const overdueUnpaid = unpaidNotes.filter(n => new Date(n.dueDate).getTime() < now);
@@ -287,6 +340,41 @@ export default function DashboardClient({ data, pharmacistName }: {
           </div>
         </div>
       )}
+
+      {/* ── Bu Ay vs Geçen Ay ── */}
+      <div style={{ marginBottom: "var(--spacing-5)" }}>
+        <ChartCard title={lang === "en" ? "This Month vs Last Month" : "Bu Ay vs Geçen Ay"}>
+          <div className="table-container" style={{ border: "none", boxShadow: "none" }}>
+            <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+              <thead>
+                <tr>
+                  <th>{lang === "en" ? "Metric" : "Metrik"}</th>
+                  <th>{lang === "en" ? "This Month" : "Bu Ay"}</th>
+                  <th>{lang === "en" ? "Last Month" : "Geçen Ay"}</th>
+                  <th>{lang === "en" ? "Change" : "Değişim"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthComparisonRows.map((row) => (
+                  <tr key={row.label}>
+                    <td style={{ fontWeight: 700 }}>{lang === "en" ? row.labelEn : row.label}</td>
+                    <td style={{ fontWeight: 600 }}>{formatCurrency(row.current)}</td>
+                    <td style={{ color: "var(--color-text-muted)" }}>{formatCurrency(row.previous)}</td>
+                    <td>
+                      <MonthChangeBadge
+                        current={row.current}
+                        previous={row.previous}
+                        changePct={row.changePct}
+                        invert={row.invert}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ChartCard>
+      </div>
 
       {/* ── Özet Kartlar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
