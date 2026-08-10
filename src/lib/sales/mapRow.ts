@@ -115,6 +115,17 @@ function isNetCol(colName: string): boolean {
   return ["net tutar", "tutar", "toplam tutar", "satis tutari", "net amount", "toplam"].some(k => n === k);
 }
 
+/**
+ * Ad, tarih ve fiyat sütunları otomatik bulunduysa (miktar da bulunduysa veya
+ * fiyat zaten net/toplam tutar ise) kullanıcıdan manuel kolon eşleştirmesi
+ * istemeye gerek yoktur — doğrudan önizlemeye geçilebilir.
+ */
+export function isColumnMapConfident(colMap: ColumnMap): boolean {
+  const found = (v: string) => v !== "" && v !== "(bulunamadı)" && v !== "—";
+  const hasQty = colMap.priceIsNet || found(colMap.quantity);
+  return found(colMap.name) && found(colMap.date) && found(colMap.price) && hasQty;
+}
+
 export function mapRow(headers: string[], row: unknown[], override: ColumnOverride): MappedRow {
   const gi = (col: string | undefined, keys: string[]) =>
     col ? findByName(headers, col) : findIdx(headers, keys);

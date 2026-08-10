@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
-import { mapRow, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
+import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 
 interface SaleRecord extends ParsedSaleRow { id: string }
@@ -91,8 +91,8 @@ export default function SatisRaporPage() {
   // Dosya sadece BİR KEZ yüklenir (bu fonksiyon aracılığıyla). Kolon eşleştirmesi
   // değiştirildiğinde dosya tekrar sunucuya gönderilmez — `dataRows` önbelleğe
   // alınır ve `mapRow` istemci tarafında (senkron) tekrar çalıştırılır.
-  const callParse = async () => {
-    if (!file) return;
+  const callParse = async (): Promise<ColumnMap | null> => {
+    if (!file) return null;
     setParsing(true); setParseError("");
     try {
       const fd = new FormData();
@@ -118,16 +118,18 @@ export default function SatisRaporPage() {
       setColumnMap(json.data!.columnMap ?? null);
       setHeaders(json.data!.headers ?? []);
       setDataRows(json.data!.dataRows ?? []);
+      return json.data!.columnMap ?? null;
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+      return null;
     } finally { setParsing(false); }
   };
 
   // CSV/Excel dosyaları tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya
   // yüklenmez, bu yüzden platformun istek boyutu sınırına takılma riski olmaz.
   // Yalnızca PDF (konum tabanlı, pdfjs gerektirir) sunucu üzerinden işlenir.
-  const handleReadFileClient = async () => {
-    if (!file) return;
+  const handleReadFileClient = async (): Promise<ColumnMap | null> => {
+    if (!file) return null;
     setParsing(true); setParseError("");
     try {
       const { headers: parsedHeaders, dataRows: rawDataRows } = await parseSalesFileClient(file);
@@ -145,18 +147,22 @@ export default function SatisRaporPage() {
       setColumnMap(map);
       setHeaders(parsedHeaders);
       setDataRows(nonEmptyRows);
+      return map;
     } catch (err) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "File could not be read" : "Dosya okunamadı"));
+      return null;
     } finally { setParsing(false); }
   };
 
+  // Ad, tarih, fiyat ve adet (veya net tutar) sütunları otomatik ve güvenilir
+  // şekilde bulunduysa kullanıcıdan manuel kolon eşleştirmesi istenmez —
+  // doğrudan önizlemeye geçilir. "← Kolonları Düzenle" ile her zaman geri
+  // dönülüp düzeltilebilir.
   const handleReadFile = async () => {
-    if (file && isClientParseable(file.name)) {
-      await handleReadFileClient();
-    } else {
-      await callParse();
-    }
-    setStep("mapping");
+    const map = file && isClientParseable(file.name)
+      ? await handleReadFileClient()
+      : await callParse();
+    setStep(map && isColumnMapConfident(map) ? "preview" : "mapping");
   };
 
   // Ağ isteği YOK — kolon eşleştirmesi, önbellekteki `dataRows` üzerinde
