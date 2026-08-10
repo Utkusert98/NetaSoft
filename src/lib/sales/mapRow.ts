@@ -97,10 +97,23 @@ function norm(h: string): string {
     .replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
 }
 
-function findIdx(headers: string[], keys: string[]): number {
+// NOT: `claimed` seti olmadan, iki farklı alan (ör. adet ve fiyat) aynı sütuna
+// atanabilirdi — bu, envanter modülünde tespit edilen ve tutarların karesi
+// alınmış gibi devasa yanlış sonuçlar üreten hatanın AYNISIYDI. Artık her
+// sütun yalnızca bir alana atanabiliyor, ayrıca tam eşleşme her zaman
+// bulanık (substring) eşleşmeye tercih ediliyor (ör. "Fiyat" tam eşleşmesi,
+// "İskonto Fiyatı" gibi başka bir sütunu içeren bulanık eşleşmeden önce gelir).
+function findIdx(headers: string[], keys: string[], claimed: Set<number>): number {
+  const normalized = headers.map(norm);
+  // 1. geçiş: tam eşleşme (en güvenilir)
   for (const k of keys) {
-    const idx = headers.findIndex(h => norm(h).includes(k));
-    if (idx >= 0) return idx;
+    const idx = normalized.findIndex((h, i) => h === k && !claimed.has(i));
+    if (idx !== -1) { claimed.add(idx); return idx; }
+  }
+  // 2. geçiş: başlık, alias ifadesini bir bütün olarak içeriyor
+  for (const k of keys) {
+    const idx = normalized.findIndex((h, i) => h.includes(k) && !claimed.has(i));
+    if (idx !== -1) { claimed.add(idx); return idx; }
   }
   return -1;
 }
@@ -127,18 +140,14 @@ export function isColumnMapConfident(colMap: ColumnMap): boolean {
 }
 
 export function mapRow(headers: string[], row: unknown[], override: ColumnOverride): MappedRow {
+  // Sütun ele geçirme sırası önemlidir: parasal tutarı doğrudan etkileyen alanlar
+  // (fiyat, adet, ad, tarih) önce sütunlarını "ele geçirir" (claimed), böylece
+  // daha az kritik alanlar (grup, tip, iskonto) yanlışlıkla aynı sütunu çalamaz.
+  const claimed = new Set<number>();
   const gi = (col: string | undefined, keys: string[]) =>
-    col ? findByName(headers, col) : findIdx(headers, keys);
+    col ? findByName(headers, col) : findIdx(headers, keys, claimed);
   const gv = (i: number) => i >= 0 ? row[i] : "";
   const gh = (i: number) => i >= 0 ? (headers[i] ?? "") : "(bulunamadı)";
-
-  const dateIdx  = gi(override.date,     ["tarih", "date", "satis tarihi", "sale date", "islem tarihi"]);
-  const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "urun", "product", "adi", "name", "stok"]);
-  const groupIdx = gi(override.group,    ["urun grubu", "grup", "group", "product group", "kategori", "category", "ana grup"]);
-  const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "tip", "type", "recete", "prescription"]);
-  const qtyIdx   = gi(override.quantity, ["adet", "miktar", "quantity", "qty", "sayi", "satis adedi"]);
-  const discIdx  = gi(override.discount, ["iskonto tutari", "iskonto tutar", "indirim tutari", "iskonto", "discount amount", "discount", "indirim", "ind."]);
-  const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
 
   let priceIdx = -1;
   let priceIsNet = override.priceIsNet ?? false;
@@ -148,13 +157,22 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
     if (override.priceIsNet === undefined) priceIsNet = isNetCol(override.price);
   } else {
     // Önce birim fiyat kolonlarını ara
-    priceIdx = findIdx(headers, ["birim fiyat", "liste fiyati", "satis fiyati", "fiyat", "price", "birim", "unit price"]);
+    priceIdx = findIdx(headers, ["birim fiyat", "liste fiyati", "satis fiyati", "fiyat", "price", "birim", "unit price"], claimed);
     if (priceIdx < 0) {
       // Yoksa net tutar türü kolonları bul — otomatik olarak net mod
-      priceIdx = findIdx(headers, ["net tutar", "tutar", "toplam", "amount", "net amount"]);
+      priceIdx = findIdx(headers, ["net tutar", "tutar", "toplam", "amount", "net amount"], claimed);
       if (priceIdx >= 0) priceIsNet = true;
     }
   }
+  if (priceIdx >= 0) claimed.add(priceIdx);
+
+  const qtyIdx   = gi(override.quantity, ["adet", "miktar", "quantity", "qty", "sayi", "satis adedi"]);
+  const dateIdx  = gi(override.date,     ["tarih", "date", "satis tarihi", "sale date", "islem tarihi"]);
+  const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "urun", "product", "adi", "name", "stok"]);
+  const groupIdx = gi(override.group,    ["urun grubu", "grup", "group", "product group", "kategori", "category", "ana grup"]);
+  const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "tip", "type", "recete", "prescription"]);
+  const discIdx  = gi(override.discount, ["iskonto tutari", "iskonto tutar", "indirim tutari", "iskonto", "discount amount", "discount", "indirim", "ind."]);
+  const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
 
   const priceNum = parseNum(gv(priceIdx));
   const qtyNum = Math.max(1, Math.round(parseNum(gv(qtyIdx)) || 1));
