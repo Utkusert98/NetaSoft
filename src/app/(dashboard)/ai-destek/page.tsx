@@ -181,8 +181,14 @@ export default function AiDestek() {
       });
 
       if (!res.ok || !res.body) {
-        const err = await res.json() as { error?: string };
-        throw new Error(err.error ?? (lang === "tr" ? "Bir hata oluştu" : "An error occurred"));
+        let errMessage = lang === "tr" ? "Bir hata oluştu" : "An error occurred";
+        try {
+          const err = await res.json() as { error?: string };
+          if (err.error) errMessage = err.error;
+        } catch {
+          // Sunucu/ağ katmanı JSON olmayan bir hata döndürdü (ör. zaman aşımı) — genel mesajı kullan
+        }
+        throw new Error(errMessage);
       }
 
       const reader = res.body.getReader();

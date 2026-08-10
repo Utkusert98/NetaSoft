@@ -33,6 +33,11 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const lastMonthDayStart = new Date(`${py}-${pmm}-${String(sameDayLastMonthNum).padStart(2, "0")}T00:00:00.000Z`);
   const lastMonthDayEnd = new Date(`${py}-${pmm}-${String(sameDayLastMonthNum).padStart(2, "0")}T23:59:59.999Z`);
 
+  // Bu hafta (son 7 gün) ve geçen hafta (ondan önceki 7 gün) — hafta-hafta kıyaslama
+  const weekStart = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const prevWeekStart = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
+  const prevWeekEnd = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
   // ── Parallel queries ──────────────────────────────────────────────────
   const [
     currentDailyRegs,
@@ -51,6 +56,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     platformIncomeList,
     todayRegs,
     lastMonthDayRegs,
+    weekRegs,
+    prevWeekRegs,
   ] = await Promise.all([
     // Daily register current month
     prisma.dailyRegister.findMany({
@@ -143,6 +150,16 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       where: { pharmacyId, deletedAt: null, registerDate: { gte: lastMonthDayStart, lte: lastMonthDayEnd } },
       select: { posAmount: true, cashAmount: true, wireAmount: true },
     }),
+    // Bu hafta (son 7 gün) kasa kaydı
+    prisma.dailyRegister.findMany({
+      where: { pharmacyId, deletedAt: null, registerDate: { gte: weekStart, lte: todayEnd } },
+      select: { posAmount: true, cashAmount: true, wireAmount: true },
+    }),
+    // Geçen hafta (ondan önceki 7 gün) kasa kaydı
+    prisma.dailyRegister.findMany({
+      where: { pharmacyId, deletedAt: null, registerDate: { gte: prevWeekStart, lte: prevWeekEnd } },
+      select: { posAmount: true, cashAmount: true, wireAmount: true },
+    }),
   ]);
 
   // ── Compute totals ────────────────────────────────────────────────────
@@ -202,9 +219,13 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     .filter((n: typeof promissoryNotes[number]) => !n.isPaid && n.dueDate >= now && n.dueDate <= thirtyDaysFromNow)
     .reduce((s: number, n: typeof promissoryNotes[number]) => s + Number(n.amount), 0);
 
+  // Sabit gider ve personel gideri ayda bir kez girilir (günlük tekrar eden bir gider değildir),
+  // bu yüzden günlük ortalamaya göre 30 güne ekstrapolasyon yapmak yanlış sonuç verir.
+  // Bu ayki gerçek sabit+personel gider toplamı + önümüzdeki 30 gün içinde vadesi gelecek
+  // ödenmemiş senetler kullanılır.
   const runway30 = {
     projectedIncome: dailyAvgCiro * 30,
-    committedExpense: upcoming30Notes + (totalExpense / daysElapsed) * 30,
+    committedExpense: fixedExpenseTotal + empExpenseTotal + upcoming30Notes,
   };
 
   // Bugün vs geçen ayın aynı günü
@@ -223,6 +244,19 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     posChangePct: pct(todayPos, lastMonthDayPos),
     cashChangePct: pct(todayCash, lastMonthDayCash),
     hasData: todayRegs.length > 0 && lastMonthDayRegs.length > 0,
+  };
+
+  // Bu hafta vs geçen hafta (kasa geliri)
+  const weekIncome = weekRegs.reduce((s: number, r: { posAmount: unknown; cashAmount: unknown; wireAmount: unknown }) =>
+    s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
+  const prevWeekIncome = prevWeekRegs.reduce((s: number, r: { posAmount: unknown; cashAmount: unknown; wireAmount: unknown }) =>
+    s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
+
+  const weekComparison = {
+    weekIncome,
+    prevWeekIncome,
+    changePct: pct(weekIncome, prevWeekIncome),
+    hasData: weekRegs.length > 0 && prevWeekRegs.length > 0,
   };
 
   return {
@@ -263,6 +297,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     urgentNotesCount,
     runway30,
     dayComparison,
+    weekComparison,
   };
 }
 

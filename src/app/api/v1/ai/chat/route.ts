@@ -10,6 +10,10 @@ import { getActivePharmacyId } from "@/lib/pharmacy";
 const AI_CHAT_RATE_LIMIT = 15;
 const AI_CHAT_RATE_WINDOW_MS = 5 * 60 * 1000;
 
+// Vercel varsayılan fonksiyon zaman aşımı (Hobby planda 10sn) AI yanıtı için yetersiz kalabiliyor;
+// bu da platformdan JSON olmayan bir hata gövdesi dönmesine ve istemcide "Unexpected token" hatasına yol açıyordu.
+export const maxDuration = 60;
+
 const SYSTEM_PROMPT_TR = `MUTLAK KURAL — ÇOK ÖNEMLİ: Her yanıtının %100'ü yalnızca TÜRKÇE olmalıdır. İngilizce, Arapça, Fransızca, Almanca, Çince, Japonca, Korece, Rusça veya BAŞKA HERHANGİ BİR DİLDEN tek bir kelime dahi kullanmak KESİNLİKLE YASAKTIR. Arapça harf içeren herhangi bir karakter kullanma. SADECE TÜRKÇE YAZI.
 
 Sen NetaSoft Eczane Yönetim Sistemi'nin Türkçe yapay zeka asistanısın.
