@@ -120,7 +120,7 @@ function SummaryCard({ label, value, sub, accent }: {
   );
 }
 
-function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string }) {
+function TopSellersChart({ data, lang, onProductClick }: { data: InventoryRow[]; lang: string; onProductClick?: (name: string) => void }) {
   const en = lang === "en";
   // Satış adedi (birim) ve gelir (₺) çok farklı büyüklük mertebelerinde olduğundan
   // aynı doğrusal eksende gösterilirse gelir çubukları adet çubuklarını görünmez kılar.
@@ -155,7 +155,15 @@ function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string })
             }}
           />
           <Legend formatter={() => (en ? "Units Sold (revenue shown on hover)" : "Satış Adedi (gelir üzerine gelince görünür)")} />
-          <Bar dataKey="adet" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
+          <Bar
+            dataKey="adet"
+            fill={CHART_COLORS[0]}
+            radius={[0, 4, 4, 0]}
+            cursor={onProductClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { fullName?: string } }) => {
+              if (onProductClick && entry?.payload?.fullName) onProductClick(entry.payload.fullName);
+            }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -196,10 +204,11 @@ function SoldUnsoldPieChart({ sold, unsold, lang }: { sold: number; unsold: numb
   );
 }
 
-function ProfitChart({ data, lang }: { data: Array<{ name: string; profit: number; margin: number }>; lang: string }) {
+function ProfitChart({ data, lang, onProductClick }: { data: Array<{ name: string; profit: number; margin: number }>; lang: string; onProductClick?: (name: string) => void }) {
   const en = lang === "en";
   const chartData = data.map((r) => ({
     name: r.name.length > 16 ? r.name.slice(0, 14) + "…" : r.name,
+    fullName: r.name,
     kar: Math.round(r.profit * 100) / 100,
     marj: Math.round(r.margin * 10) / 10,
   }));
@@ -220,7 +229,15 @@ function ProfitChart({ data, lang }: { data: Array<{ name: string; profit: numbe
             }) as AnyFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
-          <Bar dataKey="kar" fill={CHART_COLORS[1]} radius={[0, 4, 4, 0]} />
+          <Bar
+            dataKey="kar"
+            fill={CHART_COLORS[1]}
+            radius={[0, 4, 4, 0]}
+            cursor={onProductClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { fullName?: string } }) => {
+              if (onProductClick && entry?.payload?.fullName) onProductClick(entry.payload.fullName);
+            }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -229,10 +246,11 @@ function ProfitChart({ data, lang }: { data: Array<{ name: string; profit: numbe
 
 // Satış adedi bilgisi olmayan (stok değerleme) dosyalar için: elde mevcut
 // stoğun satış fiyatı üzerinden en değerli 10 ürünü.
-function StockValueChart({ data, lang }: { data: Array<{ name: string; stockValue: number; closingStock: number }>; lang: string }) {
+function StockValueChart({ data, lang, onProductClick }: { data: Array<{ name: string; stockValue: number; closingStock: number }>; lang: string; onProductClick?: (name: string) => void }) {
   const en = lang === "en";
   const chartData = data.map((r) => ({
     name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
+    fullName: r.name,
     deger: Math.round(r.stockValue * 100) / 100,
     adet: r.closingStock,
   }));
@@ -254,7 +272,15 @@ function StockValueChart({ data, lang }: { data: Array<{ name: string; stockValu
             }) as AnyFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
-          <Bar dataKey="deger" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
+          <Bar
+            dataKey="deger"
+            fill={CHART_COLORS[0]}
+            radius={[0, 4, 4, 0]}
+            cursor={onProductClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { fullName?: string } }) => {
+              if (onProductClick && entry?.payload?.fullName) onProductClick(entry.payload.fullName);
+            }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -263,18 +289,36 @@ function StockValueChart({ data, lang }: { data: Array<{ name: string; stockValu
 
 // Kategori bazında stok değeri dağılımı — dilim sayısı çok fazlaysa (ör. "Tanımsız"
 // gibi bir grup baskınsa) okunaklı kalması için ilk 6 kategori + "Diğer" gösterilir.
-function CategoryValuePieChart({ data, lang }: { data: Array<{ category: string; value: number }>; lang: string }) {
+function CategoryValuePieChart({ data, lang, onCategoryClick }: { data: Array<{ category: string; value: number }>; lang: string; onCategoryClick?: (category: string, isOther: boolean, otherCategories: string[]) => void }) {
   const en = lang === "en";
   const sorted = [...data].sort((a, b) => b.value - a.value).filter((d) => d.value > 0);
   const top = sorted.slice(0, 6);
-  const rest = sorted.slice(6).reduce((s, d) => s + d.value, 0);
-  const chartData = rest > 0 ? [...top, { category: en ? "Other" : "Diğer", value: rest }] : top;
+  const rest = sorted.slice(6);
+  const restSum = rest.reduce((s, d) => s + d.value, 0);
+  const chartData = restSum > 0 ? [...top, { category: en ? "Other" : "Diğer", value: restSum }] : top;
+  const otherCategories = rest.map((d) => d.category);
 
   return (
     <div style={{ height: 300 }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={3} dataKey="value" nameKey="category">
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            innerRadius={55}
+            outerRadius={95}
+            paddingAngle={3}
+            dataKey="value"
+            nameKey="category"
+            cursor={onCategoryClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { category?: string } }) => {
+              const category = entry?.payload?.category;
+              if (!onCategoryClick || !category) return;
+              const isOther = category === (en ? "Other" : "Diğer") && restSum > 0;
+              onCategoryClick(category, isOther, otherCategories);
+            }}
+          >
             {chartData.map((_entry, i) => (
               <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
             ))}
@@ -290,6 +334,150 @@ function CategoryValuePieChart({ data, lang }: { data: Array<{ category: string;
   );
 }
 
+// Kalan stok adedine göre ürünleri kovalara ayırır — çok sayıda 0 stoklu ürün ölü stoğa işaret eder.
+const STOCK_BUCKETS: Array<{ label: string; test: (qty: number) => boolean }> = [
+  { label: "0", test: (q) => q === 0 },
+  { label: "1-5", test: (q) => q >= 1 && q <= 5 },
+  { label: "6-20", test: (q) => q >= 6 && q <= 20 },
+  { label: "21-50", test: (q) => q >= 21 && q <= 50 },
+  { label: "50+", test: (q) => q > 50 },
+];
+
+function StockLevelChart({ data, lang, onBucketClick }: { data: InventoryRow[]; lang: string; onBucketClick?: (label: string) => void }) {
+  const chartData = STOCK_BUCKETS.map((b) => ({
+    label: b.label,
+    count: data.filter((r) => b.test(r.closingStock)).length,
+  }));
+
+  return (
+    <div style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} allowDecimals={false} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar
+            dataKey="count"
+            fill={CHART_COLORS[3]}
+            radius={[4, 4, 0, 0]}
+            cursor={onBucketClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { label?: string } }) => {
+              if (onBucketClick && entry?.payload?.label) onBucketClick(entry.payload.label);
+            }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Kâr marjı (%) aralıklarına göre ürün sayısı — hangi marj bandının en yoğun olduğunu gösterir.
+const MARGIN_BUCKETS: Array<{ label: string; test: (m: number) => boolean }> = [
+  { label: "<0%", test: (m) => m < 0 },
+  { label: "0-10%", test: (m) => m >= 0 && m < 10 },
+  { label: "10-25%", test: (m) => m >= 10 && m < 25 },
+  { label: "25-50%", test: (m) => m >= 25 && m < 50 },
+  { label: "50%+", test: (m) => m >= 50 },
+];
+
+function MarginDistributionChart({ data, lang, onBucketClick }: { data: InventoryRow[]; lang: string; onBucketClick?: (label: string) => void }) {
+  const withMargin = data
+    .filter((r) => r.salePrice > 0 && r.purchasePrice > 0)
+    .map((r) => ({ row: r, margin: ((r.salePrice - r.purchasePrice) / r.salePrice) * 100 }));
+  const chartData = MARGIN_BUCKETS.map((b) => ({
+    label: b.label,
+    count: withMargin.filter((r) => b.test(r.margin)).length,
+  }));
+
+  return (
+    <div style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} allowDecimals={false} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar
+            dataKey="count"
+            fill={CHART_COLORS[5]}
+            radius={[4, 4, 0, 0]}
+            cursor={onBucketClick ? "pointer" : undefined}
+            onClick={(entry: { payload?: { label?: string } }) => {
+              if (onBucketClick && entry?.payload?.label) onBucketClick(entry.payload.label);
+            }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function ProductDetailModal({ title, rows, lang, onClose }: { title: string; rows: InventoryRow[]; lang: string; onClose: () => void }) {
+  const en = lang === "en";
+  const shown = rows.slice(0, 200);
+  const extra = rows.length - shown.length;
+  const totalStockValue = rows.reduce((s, r) => s + r.closingStock * r.salePrice, 0);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+      <div className="card" style={{ width: "min(900px, 100%)", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "var(--spacing-6)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
+          <h3 style={{ fontWeight: 700, fontSize: "var(--font-size-base)" }}>{title} — {rows.length} {en ? "products" : "ürün"}</h3>
+          <button className="btn btn-secondary" onClick={onClose}>{en ? "Close" : "Kapat"}</button>
+        </div>
+        <div style={{ overflow: "auto", flex: 1 }}>
+          <table className="table" aria-label={en ? "Product Detail Table" : "Ürün Detay Tablosu"}>
+            <thead>
+              <tr>
+                <th scope="col">{en ? "Product Name" : "Ürün Adı"}</th>
+                <th scope="col">{en ? "Barcode" : "Barkod"}</th>
+                <th scope="col">{en ? "Category" : "Kategori"}</th>
+                <th scope="col">{en ? "Remaining Stock" : "Kalan Stok"}</th>
+                <th scope="col">{en ? "Purchase Price" : "Alış Fiyatı"}</th>
+                <th scope="col">{en ? "Sale Price" : "Satış Fiyatı"}</th>
+                <th scope="col">{en ? "Stock Value" : "Stok Değeri"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((row, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 500 }}>{row.name}</td>
+                  <td style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{row.barcode || "—"}</td>
+                  <td><span className="badge badge-info">{row.category}</span></td>
+                  <td>{row.closingStock.toLocaleString("tr-TR")}</td>
+                  <td>{row.purchasePrice > 0 ? formatCurrency(row.purchasePrice) : "—"}</td>
+                  <td>{row.salePrice > 0 ? formatCurrency(row.salePrice) : "—"}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {row.purchasePrice > 0 || row.salePrice > 0
+                      ? formatCurrency(row.closingStock * row.salePrice)
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {extra > 0 && (
+            <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--spacing-2)", textAlign: "center" }}>
+              +{extra} {en ? "more rows" : "satır daha"}
+            </p>
+          )}
+        </div>
+        <div style={{ marginTop: "var(--spacing-4)", paddingTop: "var(--spacing-3)", borderTop: "1px solid var(--color-border)", display: "flex", justifyContent: "flex-end", fontSize: "14px" }}>
+          <span style={{ color: "var(--color-text-muted)", marginRight: "8px" }}>{en ? "Total Stock Value:" : "Toplam Stok Değeri:"}</span>
+          <span style={{ fontWeight: 700 }}>{formatCurrency(totalStockValue)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   analysis: InventoryAnalysis;
   inventoryRows: InventoryRow[];
@@ -298,6 +486,42 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   const en = lang === "en";
   const { summary, hasSalesData } = analysis;
   const categoryValueData = analysis.categoryBreakdown.map((c) => ({ category: c.category, value: hasSalesData ? c.revenue : c.stockValue }));
+
+  const [detail, setDetail] = useState<{ title: string; rows: InventoryRow[] } | null>(null);
+
+  const handleProductClick = (name: string): void => {
+    const rows = inventoryRows.filter((r) => r.name === name);
+    setDetail({ title: name, rows });
+  };
+
+  const handleCategoryClick = (category: string, isOther: boolean, otherCategories: string[]): void => {
+    const rows = isOther
+      ? inventoryRows.filter((r) => otherCategories.includes(r.category || "Genel"))
+      : inventoryRows.filter((r) => (r.category || "Genel") === category);
+    setDetail({ title: category, rows });
+  };
+
+  const handleStockBucketClick = (label: string): void => {
+    const bucket = STOCK_BUCKETS.find((b) => b.label === label);
+    const rows = bucket ? inventoryRows.filter((r) => bucket.test(r.closingStock)) : [];
+    const title = en ? `Stock Level: ${label}` : `Stok Seviyesi: ${label}`;
+    setDetail({ title, rows });
+  };
+
+  const handleMarginBucketClick = (label: string): void => {
+    const bucket = MARGIN_BUCKETS.find((b) => b.label === label);
+    const rows = bucket
+      ? inventoryRows.filter((r) => {
+          if (!(r.salePrice > 0 && r.purchasePrice > 0)) return false;
+          const margin = ((r.salePrice - r.purchasePrice) / r.salePrice) * 100;
+          return bucket.test(margin);
+        })
+      : [];
+    const title = en ? `Profit Margin: ${label}` : `Kâr Marjı: ${label}`;
+    setDetail({ title, rows });
+  };
+
+  const rowsWithMargin = inventoryRows.filter((r) => r.salePrice > 0 && r.purchasePrice > 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
@@ -369,10 +593,10 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           </h3>
           {hasSalesData
             ? (analysis.topSellers.length > 0
-                ? <TopSellersChart data={analysis.topSellers} lang={lang} />
+                ? <TopSellersChart data={analysis.topSellers} lang={lang} onProductClick={handleProductClick} />
                 : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No sales data found" : "Satış verisi bulunamadı"}</p>)
             : (analysis.topByStockValue.length > 0
-                ? <StockValueChart data={analysis.topByStockValue} lang={lang} />
+                ? <StockValueChart data={analysis.topByStockValue} lang={lang} onProductClick={handleProductClick} />
                 : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No stock value data found" : "Stok değeri verisi bulunamadı"}</p>)
           }
         </section>
@@ -383,7 +607,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           </h3>
           {hasSalesData
             ? <SoldUnsoldPieChart sold={summary.soldProducts} unsold={summary.unsoldProducts} lang={lang} />
-            : <CategoryValuePieChart data={categoryValueData} lang={lang} />
+            : <CategoryValuePieChart data={categoryValueData} lang={lang} onCategoryClick={handleCategoryClick} />
           }
         </section>
       </div>
@@ -393,7 +617,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
             {hasSalesData ? (en ? "Top 10 Most Profitable Products" : "En Kârlı 10 Ürün") : (en ? "Top 10 Highest Potential Profit" : "En Yüksek Potansiyel Kârlı 10 Ürün")}
           </h3>
-          <ProfitChart data={analysis.profitByProduct} lang={lang} />
+          <ProfitChart data={analysis.profitByProduct} lang={lang} onProductClick={handleProductClick} />
         </section>
       )}
 
@@ -420,13 +644,49 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
                   if (hasSalesData) return v === "revenue" ? (en ? "Revenue" : "Gelir") : (en ? "Profit" : "Kâr");
                   return v === "revenue" ? (en ? "Stock Value" : "Stok Değeri") : (en ? "Stock Cost" : "Stok Maliyeti");
                 }} />
-                <Bar dataKey="revenue" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="profit" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="revenue"
+                  fill={CHART_COLORS[0]}
+                  radius={[4, 4, 0, 0]}
+                  cursor="pointer"
+                  onClick={(entry: { payload?: { category?: string } }) => {
+                    if (entry?.payload?.category) handleCategoryClick(entry.payload.category, false, []);
+                  }}
+                />
+                <Bar
+                  dataKey="profit"
+                  fill={CHART_COLORS[2]}
+                  radius={[4, 4, 0, 0]}
+                  cursor="pointer"
+                  onClick={(entry: { payload?: { category?: string } }) => {
+                    if (entry?.payload?.category) handleCategoryClick(entry.payload.category, false, []);
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
       )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--spacing-6)" }}>
+        <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+          <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
+            {en ? "Stock Level Distribution" : "Stok Seviyesi Dağılımı"}
+          </h3>
+          {inventoryRows.length > 0
+            ? <StockLevelChart data={inventoryRows} lang={lang} onBucketClick={handleStockBucketClick} />
+            : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No stock data found" : "Stok verisi bulunamadı"}</p>}
+        </section>
+
+        <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+          <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
+            {en ? "Profit Margin Distribution" : "Kâr Marjı Dağılımı"}
+          </h3>
+          {rowsWithMargin.length > 0
+            ? <MarginDistributionChart data={inventoryRows} lang={lang} onBucketClick={handleMarginBucketClick} />
+            : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "Not enough price data to calculate profit margins" : "Kâr marjı hesaplamak için yeterli fiyat verisi yok"}</p>}
+        </section>
+      </div>
 
       {hasSalesData && analysis.unsoldProducts.length > 0 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
@@ -537,6 +797,8 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           </table>
         </div>
       </details>
+
+      {detail && <ProductDetailModal title={detail.title} rows={detail.rows} lang={lang} onClose={() => setDetail(null)} />}
     </div>
   );
 }

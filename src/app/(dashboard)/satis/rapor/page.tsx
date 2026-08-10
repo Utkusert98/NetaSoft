@@ -1,11 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
-import { mapRow, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
+import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
+} from "recharts";
+import { formatCurrency } from "@/lib/utils";
+
+// recharts v3 Tooltip formatter tipi intersection kullanıyor — any cast gerekli
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFormatter = (...args: any[]) => any;
+
+const CHART_COLORS = ["#4e7c3f", "#6aaa58", "#9ec97a", "#f5a623", "#e74c3c", "#3498db", "#9b59b6", "#1abc9c"];
+const PIE_COLORS = ["#4e7c3f", "#1565c0"];
 
 interface SaleRecord extends ParsedSaleRow { id: string }
 
@@ -28,6 +51,244 @@ const badge = (t: string, lang: string) => ({
 }[t] ?? { bg: "#f5f5f5", color: "#555", label: t });
 
 type UploadStep = "select" | "mapping" | "preview";
+
+function DrillDownModal({ title, records, lang, onClose }: {
+  title: string;
+  records: SaleRecord[];
+  lang: string;
+  onClose: () => void;
+}) {
+  const en = lang === "en";
+  const totalQty = records.reduce((s, r) => s + r.quantity, 0);
+  const totalRevenue = records.reduce((s, r) => s + r.netRevenue, 0);
+  const shown = records.slice(0, 200);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+      <div className="card" style={{ width: "100%", maxWidth: "800px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h3 style={{ fontWeight: 700, fontSize: "15px" }}>{title}</h3>
+          <button className="btn" onClick={onClose} style={{ padding: "4px 10px", fontSize: "13px" }}>
+            {en ? "Close" : "Kapat"}
+          </button>
+        </div>
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+            <thead style={{ position: "sticky", top: 0, background: "var(--color-surface)" }}>
+              <tr>
+                <th>{en ? "Date" : "Tarih"}</th>
+                <th>{en ? "Product Name" : "Ürün Adı"}</th>
+                <th>{en ? "Group" : "Grup"}</th>
+                <th>{en ? "Qty" : "Adet"}</th>
+                <th>{en ? "Net Revenue" : "Net Gelir"}</th>
+                <th>{en ? "Type" : "Tip"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(r => {
+                const b = badge(r.saleType, lang);
+                return (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>{format(new Date(r.saleDate), "dd MMM yyyy", { locale: en ? enUS : tr })}</td>
+                    <td style={{ fontWeight: 500 }}>{r.productName}</td>
+                    <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{r.productGroup}</td>
+                    <td>{r.quantity}</td>
+                    <td style={{ fontWeight: 700 }}>{r.netRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</td>
+                    <td>
+                      <span style={{ padding: "2px 8px", borderRadius: "99px", fontSize: "11px", fontWeight: 600, background: b.bg, color: b.color }}>
+                        {b.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {records.length > 200 && (
+            <div style={{ padding: "10px 18px", color: "var(--color-text-muted)", fontSize: "13px", borderTop: "1px solid var(--color-border)" }}>
+              {en
+                ? `+ ${(records.length - 200).toLocaleString("tr-TR")} more rows`
+                : `+ ${(records.length - 200).toLocaleString("tr-TR")} satır daha`}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--color-border)", display: "flex", gap: "24px", fontSize: "13px", fontWeight: 600 }}>
+          <span>{en ? "Total Qty" : "Toplam Adet"}: {totalQty.toLocaleString("tr-TR")}</span>
+          <span>{en ? "Total Revenue" : "Toplam Gelir"}: {fmt(totalRevenue)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DailyRevenueChart({ data, lang, onPointClick }: {
+  data: Array<{ date: string; label: string; revenue: number }>;
+  lang: string;
+  onPointClick: (date: string) => void;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ height: 280 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Ciro"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Line
+            type="monotone"
+            dataKey="revenue"
+            stroke={CHART_COLORS[0]}
+            strokeWidth={2}
+            dot={{ r: 3, cursor: "pointer" }}
+            activeDot={{ r: 5, cursor: "pointer" }}
+            onClick={(point: unknown) => {
+              const p = point as { payload?: { date: string } };
+              if (p?.payload?.date) onPointClick(p.payload.date);
+            }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, onSliceClick }: {
+  prescriptionRevenue: number;
+  retailRevenue: number;
+  lang: string;
+  onSliceClick: (type: "PRESCRIPTION" | "RETAIL") => void;
+}) {
+  const en = lang === "en";
+  const data = [
+    { name: en ? "Prescription (SGK)" : "Reçeteli (SGK)", value: prescriptionRevenue, type: "PRESCRIPTION" as const },
+    { name: en ? "Retail" : "Perakende", value: retailRevenue, type: "RETAIL" as const },
+  ];
+  return (
+    <div style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={100}
+            paddingAngle={4}
+            dataKey="value"
+            onClick={(entry: unknown) => {
+              const e = entry as { type?: "PRESCRIPTION" | "RETAIL" };
+              if (e?.type) onSliceClick(e.type);
+            }}
+            style={{ cursor: "pointer" }}
+          >
+            {data.map((_entry, i) => (
+              <Cell key={i} fill={PIE_COLORS[i]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Gelir"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function GroupRevenueChart({ data, lang, onBarClick }: {
+  data: Array<{ group: string; revenue: number }>;
+  lang: string;
+  onBarClick: (group: string) => void;
+}) {
+  const chartData = data.map(d => ({
+    name: d.group.length > 20 ? d.group.slice(0, 18) + "…" : d.group,
+    fullName: d.group,
+    revenue: d.revenue,
+  }));
+  return (
+    <div style={{ height: 320 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 32, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), lang === "en" ? "Revenue" : "Gelir"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar
+            dataKey="revenue"
+            fill={CHART_COLORS[0]}
+            radius={[0, 4, 4, 0]}
+            style={{ cursor: "pointer" }}
+            onClick={(entry: unknown) => {
+              const e = entry as { fullName?: string };
+              if (e?.fullName) onBarClick(e.fullName);
+            }}
+          >
+            {chartData.map((_entry, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TopProductsChart({ data, lang, onBarClick }: {
+  data: Array<{ name: string; quantity: number; revenue: number }>;
+  lang: string;
+  onBarClick: (name: string) => void;
+}) {
+  const en = lang === "en";
+  const chartData = data.map(d => ({
+    name: d.name.length > 20 ? d.name.slice(0, 18) + "…" : d.name,
+    fullName: d.name,
+    adet: d.quantity,
+    gelir: d.revenue,
+  }));
+  return (
+    <div style={{ height: 320 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 32, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <Tooltip
+            formatter={((_value: string | number | undefined, _name: string | number | undefined, item: { payload?: { adet: number; gelir: number } }) => {
+              const p = item?.payload;
+              return [
+                `${formatCurrency(p?.gelir ?? 0)} (${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units" : "adet"})`,
+                en ? "Revenue" : "Gelir",
+              ];
+            }) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar
+            dataKey="gelir"
+            fill={CHART_COLORS[1]}
+            radius={[0, 4, 4, 0]}
+            style={{ cursor: "pointer" }}
+            onClick={(entry: unknown) => {
+              const e = entry as { fullName?: string };
+              if (e?.fullName) onBarClick(e.fullName);
+            }}
+          >
+            {chartData.map((_entry, i) => (
+              <Cell key={i} fill={CHART_COLORS[(i + 2) % CHART_COLORS.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function SatisRaporPage() {
   const { lang } = useLangContext();
@@ -57,6 +318,45 @@ export default function SatisRaporPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+  const [drillDown, setDrillDown] = useState<{ title: string; records: SaleRecord[] } | null>(null);
+
+  const dailyRevenueData = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const r of records) {
+      const day = r.saleDate.split("T")[0];
+      byDay.set(day, (byDay.get(day) ?? 0) + r.netRevenue);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, revenue]) => ({
+        date,
+        label: format(new Date(date), "dd MMM", { locale: lang === "en" ? enUS : tr }),
+        revenue,
+      }));
+  }, [records, lang]);
+
+  const groupRevenueData = useMemo(() => {
+    if (!summary) return [];
+    const sorted = Object.entries(summary.byGroup).sort(([, a], [, b]) => b - a);
+    const top = sorted.slice(0, 10).map(([group, revenue]) => ({ group, revenue }));
+    const restTotal = sorted.slice(10).reduce((s, [, v]) => s + v, 0);
+    if (restTotal > 0) top.push({ group: lang === "en" ? "Other" : "Diğer", revenue: restTotal });
+    return top;
+  }, [summary, lang]);
+
+  const topProductsData = useMemo(() => {
+    const byProduct = new Map<string, { quantity: number; revenue: number }>();
+    for (const r of records) {
+      const cur = byProduct.get(r.productName) ?? { quantity: 0, revenue: 0 };
+      cur.quantity += r.quantity;
+      cur.revenue += r.netRevenue;
+      byProduct.set(r.productName, cur);
+    }
+    return Array.from(byProduct.entries())
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+  }, [records]);
 
   const fetchRecords = useCallback(async () => {
     setListLoading(true);
@@ -91,8 +391,8 @@ export default function SatisRaporPage() {
   // Dosya sadece BİR KEZ yüklenir (bu fonksiyon aracılığıyla). Kolon eşleştirmesi
   // değiştirildiğinde dosya tekrar sunucuya gönderilmez — `dataRows` önbelleğe
   // alınır ve `mapRow` istemci tarafında (senkron) tekrar çalıştırılır.
-  const callParse = async () => {
-    if (!file) return;
+  const callParse = async (): Promise<ColumnMap | null> => {
+    if (!file) return null;
     setParsing(true); setParseError("");
     try {
       const fd = new FormData();
@@ -118,16 +418,18 @@ export default function SatisRaporPage() {
       setColumnMap(json.data!.columnMap ?? null);
       setHeaders(json.data!.headers ?? []);
       setDataRows(json.data!.dataRows ?? []);
+      return json.data!.columnMap ?? null;
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+      return null;
     } finally { setParsing(false); }
   };
 
   // CSV/Excel dosyaları tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya
   // yüklenmez, bu yüzden platformun istek boyutu sınırına takılma riski olmaz.
   // Yalnızca PDF (konum tabanlı, pdfjs gerektirir) sunucu üzerinden işlenir.
-  const handleReadFileClient = async () => {
-    if (!file) return;
+  const handleReadFileClient = async (): Promise<ColumnMap | null> => {
+    if (!file) return null;
     setParsing(true); setParseError("");
     try {
       const { headers: parsedHeaders, dataRows: rawDataRows } = await parseSalesFileClient(file);
@@ -145,18 +447,22 @@ export default function SatisRaporPage() {
       setColumnMap(map);
       setHeaders(parsedHeaders);
       setDataRows(nonEmptyRows);
+      return map;
     } catch (err) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "File could not be read" : "Dosya okunamadı"));
+      return null;
     } finally { setParsing(false); }
   };
 
+  // Ad, tarih, fiyat ve adet (veya net tutar) sütunları otomatik ve güvenilir
+  // şekilde bulunduysa kullanıcıdan manuel kolon eşleştirmesi istenmez —
+  // doğrudan önizlemeye geçilir. "← Kolonları Düzenle" ile her zaman geri
+  // dönülüp düzeltilebilir.
   const handleReadFile = async () => {
-    if (file && isClientParseable(file.name)) {
-      await handleReadFileClient();
-    } else {
-      await callParse();
-    }
-    setStep("mapping");
+    const map = file && isClientParseable(file.name)
+      ? await handleReadFileClient()
+      : await callParse();
+    setStep(map && isColumnMapConfident(map) ? "preview" : "mapping");
   };
 
   // Ağ isteği YOK — kolon eşleştirmesi, önbellekteki `dataRows` üzerinde
@@ -522,17 +828,84 @@ export default function SatisRaporPage() {
             </div>
           )}
 
-          {summary && Object.keys(summary.byGroup).length > 0 && (
-            <div className="card" style={{ marginBottom: "var(--spacing-5)", padding: "var(--spacing-4)" }}>
-              <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>{lang === "en" ? "Product Group Distribution" : "Ürün Grubu Dağılımı"}</h3>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                {Object.entries(summary.byGroup).sort(([, a], [, b]) => b - a).map(([group, total]) => (
-                  <div key={group} style={{ padding: "8px 14px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)", fontSize: "13px" }}>
-                    <span style={{ fontWeight: 600 }}>{group}</span>
-                    <span style={{ marginLeft: "8px", color: "var(--color-primary)", fontWeight: 700 }}>{fmt(total)}</span>
-                  </div>
-                ))}
+          {records.length > 0 && summary && (
+            <div style={{ marginBottom: "var(--spacing-5)" }}>
+              <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                {lang === "en" ? "Click a bar/point/slice for details" : "Detay için bir çubuğa/noktaya/dilime tıklayın"}
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Daily Revenue Trend" : "Günlük Ciro Trendi"}</h3>
+                  <DailyRevenueChart
+                    data={dailyRevenueData}
+                    lang={lang}
+                    onPointClick={(date) => {
+                      const dayRecords = records.filter(r => r.saleDate.split("T")[0] === date);
+                      const label = format(new Date(date), "dd MMMM yyyy", { locale: lang === "en" ? enUS : tr });
+                      setDrillDown({
+                        title: lang === "en" ? `${label} — ${dayRecords.length} sales` : `${label} — ${dayRecords.length} satış`,
+                        records: dayRecords,
+                      });
+                    }}
+                  />
+                </section>
+
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Prescription vs Retail Distribution" : "Reçeteli vs Perakende Dağılımı"}</h3>
+                  <TypeDistributionPieChart
+                    prescriptionRevenue={summary.prescriptionRevenue}
+                    retailRevenue={summary.retailRevenue}
+                    lang={lang}
+                    onSliceClick={(type) => {
+                      const filtered = records.filter(r => r.saleType === type);
+                      const b = badge(type, lang);
+                      setDrillDown({
+                        title: lang === "en" ? `${b.label} — ${filtered.length} sales` : `${b.label} — ${filtered.length} satış`,
+                        records: filtered,
+                      });
+                    }}
+                  />
+                </section>
               </div>
+
+              {groupRevenueData.length > 0 && (
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Revenue by Product Group" : "Ürün Grubu Bazında Gelir"}</h3>
+                  <GroupRevenueChart
+                    data={groupRevenueData}
+                    lang={lang}
+                    onBarClick={(group) => {
+                      const isOtherBucket = group === (lang === "en" ? "Other" : "Diğer") && !(group in summary.byGroup);
+                      const topGroupNames = new Set(groupRevenueData.slice(0, -1).map(g => g.group));
+                      const filtered = isOtherBucket
+                        ? records.filter(r => !topGroupNames.has(r.productGroup))
+                        : records.filter(r => r.productGroup === group);
+                      setDrillDown({
+                        title: lang === "en" ? `${group} — ${filtered.length} sales` : `${group} — ${filtered.length} satış`,
+                        records: filtered,
+                      });
+                    }}
+                  />
+                </section>
+              )}
+
+              {topProductsData.length > 0 && (
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün"}</h3>
+                  <TopProductsChart
+                    data={topProductsData}
+                    lang={lang}
+                    onBarClick={(name) => {
+                      const filtered = records.filter(r => r.productName === name);
+                      setDrillDown({
+                        title: lang === "en" ? `${name} — ${filtered.length} sales` : `${name} — ${filtered.length} satış`,
+                        records: filtered,
+                      });
+                    }}
+                  />
+                </section>
+              )}
             </div>
           )}
 
@@ -612,6 +985,15 @@ export default function SatisRaporPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {drillDown && (
+        <DrillDownModal
+          title={drillDown.title}
+          records={drillDown.records}
+          lang={lang}
+          onClose={() => setDrillDown(null)}
+        />
       )}
     </div>
   );
