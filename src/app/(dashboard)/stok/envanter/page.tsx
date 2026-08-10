@@ -57,16 +57,34 @@ interface InventoryReportFull extends InventoryReportSummary {
 // ekranındaki sıralaması. Gelir/kâr hesaplamalarını doğrudan etkileyen dört alan
 // (ad, satış adedi, alış/satış fiyatı) "required" işaretlenir — zorunlu değildir,
 // ama boş bırakılırsa kullanıcı uyarılır.
-const INVENTORY_FIELDS: Array<{ key: keyof InventoryRow; tr: string; en: string; required?: boolean }> = [
-  { key: "name", tr: "Ürün Adı", en: "Product Name", required: true },
-  { key: "barcode", tr: "Barkod", en: "Barcode" },
-  { key: "category", tr: "Kategori", en: "Category" },
-  { key: "openingStock", tr: "Dönem Başı Stok", en: "Opening Stock" },
-  { key: "purchaseQty", tr: "Alış Adedi", en: "Purchase Quantity" },
-  { key: "salesQty", tr: "Satış Adedi", en: "Sales Quantity", required: true },
-  { key: "closingStock", tr: "Dönem Sonu Stok", en: "Closing Stock" },
-  { key: "purchasePrice", tr: "Alış Fiyatı", en: "Purchase Price", required: true },
-  { key: "salePrice", tr: "Satış Fiyatı", en: "Sale Price", required: true },
+const INVENTORY_FIELDS: Array<{ key: keyof InventoryRow; tr: string; en: string; required?: boolean; hintTr: string; hintEn: string }> = [
+  { key: "name", tr: "Ürün Adı", en: "Product Name", required: true,
+    hintTr: "Ürünün adı veya açıklaması. Örn: \"PAROL 500 MG 20 TB\"",
+    hintEn: "The product's name or description. E.g. \"PAROL 500 MG 20 TB\"" },
+  { key: "barcode", tr: "Barkod", en: "Barcode",
+    hintTr: "Ürün/ilaç kodu veya barkod numarası.",
+    hintEn: "Product/drug code or barcode number." },
+  { key: "category", tr: "Kategori", en: "Category",
+    hintTr: "Ürün grubu (İlaç, OTC, Dermokozmetik vb.)",
+    hintEn: "Product group (Drug, OTC, Dermocosmetics, etc.)" },
+  { key: "openingStock", tr: "Dönem Başı Stok", en: "Opening Stock",
+    hintTr: "Dönem başındaki stok adedi (varsa).",
+    hintEn: "Stock quantity at the start of the period (if available)." },
+  { key: "purchaseQty", tr: "Alış Adedi", en: "Purchase Quantity",
+    hintTr: "Bu dönem içinde satın alınan/girişi yapılan adet.",
+    hintEn: "Quantity purchased/received during this period." },
+  { key: "salesQty", tr: "Satış Adedi", en: "Sales Quantity", required: true,
+    hintTr: "Bu dönemde SATILAN ürün adedi — küçük tam sayı (0, 3, 12...). Fiyat sütunu ile karıştırmayın.",
+    hintEn: "The quantity SOLD in this period — a small whole number (0, 3, 12...). Do not confuse with the price column." },
+  { key: "closingStock", tr: "Dönem Sonu Stok", en: "Closing Stock",
+    hintTr: "Dönem sonunda elde kalan stok adedi.",
+    hintEn: "Remaining stock quantity at the end of the period." },
+  { key: "purchasePrice", tr: "Alış Fiyatı", en: "Purchase Price", required: true,
+    hintTr: "Ürünün BİRİM alış/maliyet fiyatı (₺) — toplam tutar değil, tek ürünün fiyatı. Örn: 12,50",
+    hintEn: "The UNIT purchase/cost price (₺) — not a total amount, the price of one unit. E.g. 12.50" },
+  { key: "salePrice", tr: "Satış Fiyatı", en: "Sale Price", required: true,
+    hintTr: "Ürünün BİRİM satış fiyatı (₺) — toplam tutar değil, tek ürünün fiyatı. Örn: 45,90",
+    hintEn: "The UNIT sale price (₺) — not a total amount, the price of one unit. E.g. 45.90" },
 ];
 
 const CHART_COLORS = ["#4e7c3f", "#6aaa58", "#9ec97a", "#f5a623", "#e74c3c", "#3498db", "#9b59b6", "#1abc9c"];
@@ -651,26 +669,64 @@ export default function EnvanterPage() {
         <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
 
         <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--spacing-4)" }}>
-            {INVENTORY_FIELDS.map((f) => (
-              <div key={f.key} className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">
-                  {en ? f.en : f.tr}{f.required ? " *" : ""}
-                </label>
-                <select
-                  className="form-input"
-                  value={columnOverride[f.key] ?? ""}
-                  onChange={(e) =>
-                    setColumnOverride((prev) => ({ ...prev, [f.key]: e.target.value || null }))
-                  }
-                >
-                  <option value="">{en ? "— Not Selected —" : "— Seçilmedi —"}</option>
-                  {mappingData.headers.map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+            {INVENTORY_FIELDS.map((f) => {
+              const selectedHeader = columnOverride[f.key];
+              const samples = selectedHeader
+                ? mappingData.rows
+                    .slice(0, 3)
+                    .map((r) => String(r.rawData[selectedHeader] ?? "").trim())
+                    .filter((v) => v !== "")
+                : [];
+              return (
+                <div key={f.key} style={{
+                  display: "grid", gridTemplateColumns: "220px 1fr", gap: "var(--spacing-4)",
+                  alignItems: "start", padding: "var(--spacing-3) 0",
+                  borderBottom: "1px solid var(--color-border)",
+                }}>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: "4px", display: "block" }}>
+                      {en ? f.en : f.tr}{f.required ? " *" : ""}
+                    </label>
+                    <p style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                      {en ? f.hintEn : f.hintTr}
+                    </p>
+                  </div>
+                  <div>
+                    <select
+                      className="form-input"
+                      value={selectedHeader ?? ""}
+                      onChange={(e) =>
+                        setColumnOverride((prev) => ({ ...prev, [f.key]: e.target.value || null }))
+                      }
+                    >
+                      <option value="">{en ? "— Not Selected —" : "— Seçilmedi —"}</option>
+                      {mappingData.headers.map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <div style={{ marginTop: "6px", fontSize: "12px", minHeight: "18px" }}>
+                      {selectedHeader ? (
+                        samples.length > 0 ? (
+                          <span style={{ color: "var(--color-text-muted)" }}>
+                            {en ? "Sample values: " : "Örnek değerler: "}
+                            <span style={{ fontWeight: 600, color: "var(--color-text)" }}>{samples.join(" · ")}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--color-text-muted)" }}>
+                            {en ? "This column appears to be empty in the first rows." : "Bu sütun ilk satırlarda boş görünüyor."}
+                          </span>
+                        )
+                      ) : (
+                        <span style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>
+                          {en ? "Select a column to preview its values" : "Değerleri görmek için bir sütun seçin"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {missingLabels.length > 0 && (
