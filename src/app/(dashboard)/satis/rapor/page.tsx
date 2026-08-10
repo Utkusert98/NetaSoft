@@ -305,6 +305,7 @@ export default function SatisRaporPage() {
   const [dataRows, setDataRows] = useState<unknown[][]>([]);
   const [override, setOverride] = useState<ColumnOverride>({});
   const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // List state
@@ -474,28 +475,52 @@ export default function SatisRaporPage() {
     setStep("preview");
   };
 
+  // Tüm satırları TEK bir JSON isteğinde göndermek, büyük dosyalarda (binlerce
+  // satır) platformun istek boyutu sınırına takılıp "geçersiz yanıt" hatasına
+  // yol açıyordu. Satırlar artık makul boyutlu gruplar (chunk) halinde, aynı
+  // importBatchId ile ardışık olarak gönderiliyor.
+  const SAVE_CHUNK_SIZE = 1000;
+
   const handleConfirm = async () => {
-    setSaving(true); setParseError("");
+    setSaving(true); setParseError(""); setSaveProgress(null);
     try {
-      const res = await fetch("/api/v1/satis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" , "Accept-Language": lang },
-        body: JSON.stringify({ rows: previewRows }),
-      });
-      let json: { success: boolean; count?: number; error?: string };
-      try {
-        json = await res.json() as { success: boolean; count?: number; error?: string };
-      } catch {
-        throw new Error(lang === "en" ? "Server returned an invalid response. The file may be too large." : "Sunucudan geçersiz bir yanıt alındı. Dosya çok büyük olabilir.");
+      const batchId = `batch_${Date.now()}`;
+      const chunks: ParsedSaleRow[][] = [];
+      for (let i = 0; i < previewRows.length; i += SAVE_CHUNK_SIZE) {
+        chunks.push(previewRows.slice(i, i + SAVE_CHUNK_SIZE));
       }
-      if (!res.ok || !json.success) throw new Error(json.error ?? (lang === "en" ? "Save failed" : "Kayıt başarısız"));
+
+      let savedCount = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        setSaveProgress({ done: i, total: chunks.length });
+        const res = await fetch("/api/v1/satis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept-Language": lang },
+          body: JSON.stringify({ rows: chunks[i], importBatchId: batchId }),
+        });
+        let json: { success: boolean; count?: number; error?: string };
+        try {
+          json = await res.json() as { success: boolean; count?: number; error?: string };
+        } catch {
+          throw new Error(lang === "en"
+            ? `Server returned an invalid response while saving rows ${i * SAVE_CHUNK_SIZE + 1}-${i * SAVE_CHUNK_SIZE + chunks[i].length}. ${savedCount} rows were already saved before this point.`
+            : `${i * SAVE_CHUNK_SIZE + 1}-${i * SAVE_CHUNK_SIZE + chunks[i].length} satırları kaydedilirken sunucudan geçersiz bir yanıt alındı. Bu noktaya kadar ${savedCount} satır zaten kaydedildi.`);
+        }
+        if (!res.ok || !json.success) {
+          throw new Error((json.error ?? (lang === "en" ? "Save failed" : "Kayıt başarısız"))
+            + (savedCount > 0 ? (lang === "en" ? ` (${savedCount} rows were already saved before this point.)` : ` (Bu noktaya kadar ${savedCount} satır zaten kaydedildi.)`) : ""));
+        }
+        savedCount += json.count ?? chunks[i].length;
+      }
+
+      setSaveProgress(null);
       resetUpload();
       setSaveSuccess(true);
       await fetchRecords();
       setTab("list");
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "Save failed" : "Kayıt başarısız"));
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setSaveProgress(null); }
   };
 
   const handleDelete = async () => {
@@ -704,7 +729,11 @@ export default function SatisRaporPage() {
                 <button className="btn" onClick={() => setStep("mapping")}>{lang === "en" ? "← Edit Columns" : "← Kolonları Düzenle"}</button>
                 <button className="btn btn-primary" disabled={saving} onClick={() => void handleConfirm()} style={{ minWidth: "240px" }}>
                   {saving
-                    ? (lang === "en" ? "Saving..." : "Kaydediliyor...")
+                    ? (saveProgress
+                        ? (lang === "en"
+                            ? `Saving... (${saveProgress.done}/${saveProgress.total})`
+                            : `Kaydediliyor... (${saveProgress.done}/${saveProgress.total})`)
+                        : (lang === "en" ? "Saving..." : "Kaydediliyor..."))
                     : (lang === "en"
                         ? `Confirm & Save ${previewRows.length.toLocaleString("en-US")} Sales`
                         : `${previewRows.length.toLocaleString("tr-TR")} Satışı Onayla ve Kaydet`)}
