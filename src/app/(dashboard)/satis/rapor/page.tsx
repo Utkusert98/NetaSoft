@@ -392,7 +392,7 @@ export default function SatisRaporPage() {
   // Dosya sadece BİR KEZ yüklenir (bu fonksiyon aracılığıyla). Kolon eşleştirmesi
   // değiştirildiğinde dosya tekrar sunucuya gönderilmez — `dataRows` önbelleğe
   // alınır ve `mapRow` istemci tarafında (senkron) tekrar çalıştırılır.
-  const callParse = async (): Promise<ColumnMap | null> => {
+  const callParse = async (): Promise<{ map: ColumnMap | null; rows: ParsedSaleRow[] } | null> => {
     if (!file) return null;
     setParsing(true); setParseError("");
     try {
@@ -419,7 +419,7 @@ export default function SatisRaporPage() {
       setColumnMap(json.data!.columnMap ?? null);
       setHeaders(json.data!.headers ?? []);
       setDataRows(json.data!.dataRows ?? []);
-      return json.data!.columnMap ?? null;
+      return { map: json.data!.columnMap ?? null, rows: json.data!.rows };
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       return null;
@@ -429,7 +429,7 @@ export default function SatisRaporPage() {
   // CSV/Excel dosyaları tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya
   // yüklenmez, bu yüzden platformun istek boyutu sınırına takılma riski olmaz.
   // Yalnızca PDF (konum tabanlı, pdfjs gerektirir) sunucu üzerinden işlenir.
-  const handleReadFileClient = async (): Promise<ColumnMap | null> => {
+  const handleReadFileClient = async (): Promise<{ map: ColumnMap | null; rows: ParsedSaleRow[] } | null> => {
     if (!file) return null;
     setParsing(true); setParseError("");
     try {
@@ -448,7 +448,7 @@ export default function SatisRaporPage() {
       setColumnMap(map);
       setHeaders(parsedHeaders);
       setDataRows(nonEmptyRows);
-      return map;
+      return { map, rows };
     } catch (err) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "File could not be read" : "Dosya okunamadı"));
       return null;
@@ -459,11 +459,26 @@ export default function SatisRaporPage() {
   // şekilde bulunduysa kullanıcıdan manuel kolon eşleştirmesi istenmez —
   // doğrudan önizlemeye geçilir. "← Kolonları Düzenle" ile her zaman geri
   // dönülüp düzeltilebilir.
+  //
+  // Ek güvenlik kontrolü: tarih sütunu "bulunmuş" görünse bile, o sütundaki
+  // değerler gerçekten ayrıştırılamıyorsa (ör. beklenmeyen bir tarih biçimi),
+  // parseDate sessizce BUGÜNÜN tarihine düşer — bu da tüm satırların aynı
+  // güne yığılmasına yol açan gerçek bir üretim hatasıydı. Bu yüzden birden
+  // fazla satır varsa, üretilen tarihlerin en az ikisinin FARKLI olması
+  // isteniyor; aksi halde (tek bir tarihe yığılma şüphesi) manuel kontrol
+  // ekranı gösterilir.
+  const looksLikeDateFallback = (rows: ParsedSaleRow[]): boolean => {
+    if (rows.length < 5) return false;
+    const distinctDates = new Set(rows.slice(0, 200).map(r => r.saleDate.split("T")[0]));
+    return distinctDates.size === 1;
+  };
+
   const handleReadFile = async () => {
-    const map = file && isClientParseable(file.name)
+    const result = file && isClientParseable(file.name)
       ? await handleReadFileClient()
       : await callParse();
-    setStep(map && isColumnMapConfident(map) ? "preview" : "mapping");
+    const confident = !!result?.map && isColumnMapConfident(result.map) && !looksLikeDateFallback(result.rows);
+    setStep(confident ? "preview" : "mapping");
   };
 
   // Ağ isteği YOK — kolon eşleştirmesi, önbellekteki `dataRows` üzerinde

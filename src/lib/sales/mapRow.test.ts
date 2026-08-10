@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapRow, isColumnMapConfident } from "./mapRow";
+import { mapRow, isColumnMapConfident, parseDate, isParseableDate } from "./mapRow";
 
 describe("mapRow — sütun çakışması koruması", () => {
   // Birden fazla benzer isimli sütun içeren, gerçekçi bir zorlayıcı başlık seti:
@@ -51,5 +51,52 @@ describe("mapRow — net tutar modu", () => {
     expect(mapped.price).toBeCloseTo(1250, 2);
     expect(mapped.quantity).toBe(1);
     expect(mapped.netRevenue).toBeCloseTo(1250, 2);
+  });
+});
+
+describe("parseDate — tarih+saat ve gerçek üretim hatası senaryosu", () => {
+  it("saat eki olan tarihleri doğru ayrıştırır (önceden bugüne düşüyordu)", () => {
+    const iso = parseDate("10.08.2026 14:23:00");
+    expect(iso.startsWith("2026-08-10")).toBe(true);
+  });
+
+  it("saat eki + milisaniye/Z olan ISO benzeri değerleri de ayrıştırır", () => {
+    const iso = parseDate("2026-08-10 14:23:00.000");
+    expect(iso.startsWith("2026-08-10")).toBe(true);
+  });
+
+  it("2 haneli yıl içeren tarihleri 20xx olarak yorumlar", () => {
+    const iso = parseDate("10.08.26");
+    expect(iso.startsWith("2026-08-10")).toBe(true);
+  });
+
+  it("gerçekten ayrıştırılamayan bir değeri isParseableDate ile false olarak işaretler", () => {
+    expect(isParseableDate("Adisyon #48213")).toBe(false);
+    expect(isParseableDate("10.08.2026 14:23:00")).toBe(true);
+  });
+});
+
+describe("mapRow — ilgisiz sütunların ürün adı/tarih sanılması hatası (gerçek üretim hatası)", () => {
+  // Gerçek bir hata: "Adisyon No" (fiş numarası, artan tam sayı) sütunu, "adi"
+  // bare alias'ı yüzünden "Ürün Adı" sanılıyordu; tarih sütunu saat eki içerdiği
+  // için ayrıştırılamayıp TÜM satırlar bugünün tarihine düşüyordu.
+  const headers = ["Adisyon No", "İşlem Tarihi", "Ürün Adı", "Ürün Grubu", "Adet", "Fiyat", "Satış Tipi"];
+  const row = ["27204", "10.08.2026 14:23:00", "PAROL 500 MG", "İLAÇ", "3", "45.90", "Perakende"];
+
+  it("'Adisyon No' ürün adı sütunu olarak yakalanmaz", () => {
+    const { colMap } = mapRow(headers, row, {});
+    expect(colMap.name).toBe("Ürün Adı");
+    expect(colMap.name).not.toBe("Adisyon No");
+  });
+
+  it("ürün adı gerçek ürün adını taşır, sıra numarasını değil", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.productName).toBe("PAROL 500 MG");
+    expect(mapped.productName).not.toBe("27204");
+  });
+
+  it("saat ekli tarih doğru ayrıştırılır, bugüne düşmez", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.saleDate.startsWith("2026-08-10")).toBe(true);
   });
 });
