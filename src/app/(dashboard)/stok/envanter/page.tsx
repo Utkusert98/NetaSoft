@@ -23,10 +23,12 @@ import FileUploadWithReview from "@/components/file-upload/FileUploadWithReview"
 import {
   parseInventoryRows,
   analyzeInventory,
+  detectInventoryColumnMap,
   type InventoryAnalysis,
   type InventoryRow,
+  type InventoryColumnMap,
 } from "@/lib/utils/inventory-analysis";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface ParsedRow {
   rowIndex: number;
@@ -34,6 +36,38 @@ interface ParsedRow {
   isValid: boolean;
   errors?: string[];
 }
+
+interface InventoryReportSummary {
+  id: string;
+  fileName: string;
+  totalProducts: number;
+  soldProducts: number;
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  profitMargin: number;
+  createdAt: string;
+}
+
+interface InventoryReportFull extends InventoryReportSummary {
+  items: InventoryRow[];
+}
+
+// Envanter satırı alanlarının Türkçe/İngilizce etiketleri ve kolon eşleştirme
+// ekranındaki sıralaması. Gelir/kâr hesaplamalarını doğrudan etkileyen dört alan
+// (ad, satış adedi, alış/satış fiyatı) "required" işaretlenir — zorunlu değildir,
+// ama boş bırakılırsa kullanıcı uyarılır.
+const INVENTORY_FIELDS: Array<{ key: keyof InventoryRow; tr: string; en: string; required?: boolean }> = [
+  { key: "name", tr: "Ürün Adı", en: "Product Name", required: true },
+  { key: "barcode", tr: "Barkod", en: "Barcode" },
+  { key: "category", tr: "Kategori", en: "Category" },
+  { key: "openingStock", tr: "Dönem Başı Stok", en: "Opening Stock" },
+  { key: "purchaseQty", tr: "Alış Adedi", en: "Purchase Quantity" },
+  { key: "salesQty", tr: "Satış Adedi", en: "Sales Quantity", required: true },
+  { key: "closingStock", tr: "Dönem Sonu Stok", en: "Closing Stock" },
+  { key: "purchasePrice", tr: "Alış Fiyatı", en: "Purchase Price", required: true },
+  { key: "salePrice", tr: "Satış Fiyatı", en: "Sale Price", required: true },
+];
 
 const CHART_COLORS = ["#4e7c3f", "#6aaa58", "#9ec97a", "#f5a623", "#e74c3c", "#3498db", "#9b59b6", "#1abc9c"];
 const PIE_COLORS = ["#4e7c3f", "#e74c3c"];
@@ -69,6 +103,9 @@ function SummaryCard({ label, value, sub, accent }: {
 
 function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string }) {
   const en = lang === "en";
+  // Satış adedi (birim) ve gelir (₺) çok farklı büyüklük mertebelerinde olduğundan
+  // aynı doğrusal eksende gösterilirse gelir çubukları adet çubuklarını görünmez kılar.
+  // Bu yüzden tek bir "adet" ekseni kullanılır; gelir bilgisi tooltip'te ayrıca gösterilir.
   const chartData = data.map((r) => ({
     name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
     fullName: r.name,
@@ -84,11 +121,12 @@ function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string })
           <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => v.toLocaleString("tr-TR")} />
           <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
           <Tooltip
-            formatter={((value: string | number | undefined, name?: string | number) => {
-              const v = Number(value ?? 0);
-              return String(name) === "adet"
-                ? [v.toLocaleString("tr-TR") + (en ? " units" : " adet"), en ? "Sales" : "Satış"]
-                : [formatCurrency(v), en ? "Revenue" : "Gelir"];
+            formatter={((_value: string | number | undefined, _name: string | number | undefined, item: { payload?: { adet: number; gelir: number } }) => {
+              const p = item?.payload;
+              return [
+                `${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units" : "adet"} · ${formatCurrency(p?.gelir ?? 0)}`,
+                en ? "Sales" : "Satış",
+              ];
             }) as AnyFormatter}
             contentStyle={{
               background: "var(--color-surface)",
@@ -97,9 +135,8 @@ function TopSellersChart({ data, lang }: { data: InventoryRow[]; lang: string })
               fontSize: "12px",
             }}
           />
-          <Legend formatter={(v) => v === "adet" ? (en ? "Units Sold" : "Satış Adedi") : (en ? "Revenue (₺)" : "Gelir (₺)")} />
+          <Legend formatter={() => (en ? "Units Sold (revenue shown on hover)" : "Satış Adedi (gelir üzerine gelince görünür)")} />
           <Bar dataKey="adet" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
-          <Bar dataKey="gelir" fill={CHART_COLORS[3]} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -368,29 +405,307 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   );
 }
 
+function ViewTabs({ viewMode, onSelect, en }: {
+  viewMode: "new" | "history";
+  onSelect: (mode: "new" | "history") => void;
+  en: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: "8px", marginBottom: "var(--spacing-6)" }}>
+      {(["new", "history"] as const).map((v) => (
+        <button
+          key={v}
+          className="btn"
+          onClick={() => onSelect(v)}
+          style={{
+            background: viewMode === v ? "var(--color-primary)" : "var(--color-surface)",
+            color: viewMode === v ? "white" : "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            fontWeight: 600,
+            fontSize: "13px",
+          }}
+        >
+          {v === "new" ? (en ? "New Analysis" : "Yeni Analiz") : (en ? "Report History" : "Geçmiş Raporlar")}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function EnvanterPage() {
   const { lang } = useLangContext();
   const en = lang === "en";
+
+  const [viewMode, setViewMode] = useState<"new" | "history">("new");
+  const [phase, setPhase] = useState<"upload" | "mapping" | "analysis">("upload");
+  const [mappingData, setMappingData] = useState<{ headers: string[]; rows: ParsedRow[] } | null>(null);
+  const [columnOverride, setColumnOverride] = useState<Partial<InventoryColumnMap>>({});
   const [analysis, setAnalysis] = useState<InventoryAnalysis | null>(null);
   const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveMessage, setSaveMessage] = useState<string>("");
+
+  const [historyList, setHistoryList] = useState<InventoryReportSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string>("");
 
   const handleConfirm = async (rows: ParsedRow[], headers: string[]): Promise<void> => {
     const validRows = rows.filter((r) => r.isValid);
-    const parsed = parseInventoryRows(headers, validRows);
+    setMappingData({ headers, rows: validRows });
+    setColumnOverride(detectInventoryColumnMap(headers));
+    setPhase("mapping");
+  };
+
+  const handleCreateAnalysis = (): void => {
+    if (!mappingData) return;
+    const parsed = parseInventoryRows(mappingData.headers, mappingData.rows, columnOverride);
     const result = analyzeInventory(parsed);
     setInventoryRows(parsed);
     setAnalysis(result);
+    setFileName(`${en ? "Inventory Report" : "Envanter Raporu"} - ${new Date().toLocaleDateString("tr-TR")}`);
+    setSaveState("idle");
+    setSaveMessage("");
+    setPhase("analysis");
   };
 
-  const handleReset = () => {
+  const handleBackToUpload = (): void => {
+    setMappingData(null);
+    setColumnOverride({});
+    setPhase("upload");
+  };
+
+  const handleReset = (): void => {
     setAnalysis(null);
     setInventoryRows([]);
+    setMappingData(null);
+    setColumnOverride({});
+    setFileName("");
+    setSaveState("idle");
+    setSaveMessage("");
+    setPhase("upload");
   };
 
-  if (analysis) {
+  const handleSave = async (): Promise<void> => {
+    if (!analysis) return;
+    setSaveState("saving");
+    setSaveMessage("");
+    try {
+      const res = await fetch("/api/v1/stok/envanter-raporu", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({
+          fileName: fileName || (en ? "Inventory Report" : "Envanter Raporu"),
+          items: inventoryRows,
+          summary: analysis.summary,
+        }),
+      });
+      let data: { success: boolean; data?: { id: string }; error?: string };
+      try {
+        data = (await res.json()) as { success: boolean; data?: { id: string }; error?: string };
+      } catch {
+        throw new Error(en ? "Server returned an invalid response. The report may be too large." : "Sunucudan geçersiz bir yanıt alındı. Rapor çok büyük olabilir.");
+      }
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? (en ? "Save failed" : "Kaydetme başarısız oldu"));
+      }
+      setSaveState("saved");
+      setSaveMessage(en ? "Report saved successfully." : "Rapor başarıyla kaydedildi.");
+    } catch (err) {
+      setSaveState("error");
+      setSaveMessage(err instanceof Error ? err.message : (en ? "Save failed" : "Kaydetme başarısız oldu"));
+    }
+  };
+
+  const fetchHistory = async (): Promise<void> => {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const res = await fetch("/api/v1/stok/envanter-raporu", { headers: { "Accept-Language": lang } });
+      const data = (await res.json()) as { success: boolean; data?: InventoryReportSummary[]; error?: string };
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? (en ? "Failed to load history" : "Geçmiş yüklenemedi"));
+      }
+      setHistoryList(data.data ?? []);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : (en ? "Failed to load history" : "Geçmiş yüklenemedi"));
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleSelectTab = (mode: "new" | "history"): void => {
+    setViewMode(mode);
+    if (mode === "history") void fetchHistory();
+  };
+
+  const handleSelectHistoryReport = async (id: string): Promise<void> => {
+    setHistoryError("");
+    try {
+      const res = await fetch(`/api/v1/stok/envanter-raporu?id=${id}`, { headers: { "Accept-Language": lang } });
+      const data = (await res.json()) as { success: boolean; data?: InventoryReportFull; error?: string };
+      if (!res.ok || !data.success || !data.data) {
+        throw new Error(data.error ?? (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
+      }
+      const report = data.data;
+      const items = Array.isArray(report.items) ? report.items : [];
+      const result = analyzeInventory(items);
+      setInventoryRows(items);
+      setAnalysis(result);
+      setFileName(report.fileName);
+      // Geçmişten yüklenen rapor zaten kayıtlı — tekrar kaydedip mükerrer kayıt oluşmasın diye buton kilitlenir.
+      setSaveState("saved");
+      setSaveMessage("");
+      setViewMode("new");
+      setPhase("analysis");
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
+    }
+  };
+
+  if (viewMode === "history") {
     return (
       <main>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-8)" }}>
+        <div style={{ marginBottom: "var(--spacing-8)" }}>
+          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
+            {en ? "Inventory Analysis" : "Envanter Analizi"}
+          </h1>
+          <p style={{ color: "var(--color-text-muted)" }}>
+            {en ? "View your previously saved inventory reports." : "Daha önce kaydedilmiş envanter raporlarınızı görüntüleyin."}
+          </p>
+        </div>
+
+        <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
+
+        <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+          <h2 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
+            {en ? "Report History" : "Geçmiş Raporlar"}
+          </h2>
+
+          {historyLoading && (
+            <p style={{ color: "var(--color-text-muted)" }}>{en ? "Loading..." : "Yükleniyor..."}</p>
+          )}
+
+          {!historyLoading && historyError && (
+            <p style={{ color: "var(--color-danger)" }}>⚠ {historyError}</p>
+          )}
+
+          {!historyLoading && !historyError && historyList.length === 0 && (
+            <p style={{ color: "var(--color-text-muted)" }}>
+              {en ? "No saved reports yet." : "Henüz kaydedilmiş rapor yok."}
+            </p>
+          )}
+
+          {!historyLoading && !historyError && historyList.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table" aria-label={en ? "Report History Table" : "Geçmiş Raporlar Tablosu"}>
+                <thead>
+                  <tr>
+                    <th scope="col">{en ? "File Name" : "Dosya Adı"}</th>
+                    <th scope="col">{en ? "Date" : "Tarih"}</th>
+                    <th scope="col">{en ? "Total Revenue" : "Toplam Gelir"}</th>
+                    <th scope="col">{en ? "Net Profit" : "Net Kâr"}</th>
+                    <th scope="col"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyList.map((r) => (
+                    <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => void handleSelectHistoryReport(r.id)}>
+                      <td style={{ fontWeight: 500 }}>{r.fileName}</td>
+                      <td>{formatDate(r.createdAt, true)}</td>
+                      <td>{formatCurrency(Number(r.totalRevenue))}</td>
+                      <td style={{ color: Number(r.totalProfit) >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                        {formatCurrency(Number(r.totalProfit))}
+                      </td>
+                      <td><span className="badge badge-info">{en ? "View" : "Görüntüle"}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (phase === "mapping" && mappingData) {
+    const missingLabels = INVENTORY_FIELDS
+      .filter((f) => f.required && !columnOverride[f.key])
+      .map((f) => (en ? f.en : f.tr));
+
+    return (
+      <main>
+        <div style={{ marginBottom: "var(--spacing-8)" }}>
+          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
+            {en ? "Column Mapping" : "Kolon Eşleştirme"}
+          </h1>
+          <p style={{ color: "var(--color-text-muted)" }}>
+            {en
+              ? "The system auto-mapped the columns below. Review and fix any wrong fields before creating the analysis."
+              : "Sistem aşağıdaki sütunları otomatik eşleştirdi. Analizi oluşturmadan önce yanlış alanları düzeltin."}
+          </p>
+        </div>
+
+        <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
+
+        <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--spacing-4)" }}>
+            {INVENTORY_FIELDS.map((f) => (
+              <div key={f.key} className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">
+                  {en ? f.en : f.tr}{f.required ? " *" : ""}
+                </label>
+                <select
+                  className="form-input"
+                  value={columnOverride[f.key] ?? ""}
+                  onChange={(e) =>
+                    setColumnOverride((prev) => ({ ...prev, [f.key]: e.target.value || null }))
+                  }
+                >
+                  <option value="">{en ? "— Not Selected —" : "— Seçilmedi —"}</option>
+                  {mappingData.headers.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          {missingLabels.length > 0 && (
+            <div style={{
+              marginTop: "var(--spacing-4)",
+              padding: "12px 14px",
+              background: "#fff7ed",
+              border: "1px solid #fed7aa",
+              borderRadius: "var(--radius-md)",
+              fontSize: "13px",
+              color: "#92400e",
+            }}>
+              ⚠ {en
+                ? "This field may leave calculations incomplete if left unmapped:"
+                : "Bu alan boş bırakılırsa hesaplamalar eksik olabilir:"} {missingLabels.join(", ")}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-5)" }}>
+            <button className="btn btn-secondary" onClick={handleBackToUpload}>
+              {en ? "← Back" : "← Geri"}
+            </button>
+            <button className="btn btn-primary" onClick={handleCreateAnalysis}>
+              {en ? "Create Analysis" : "Analizi Oluştur"}
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (phase === "analysis" && analysis) {
+    return (
+      <main>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-6)", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
           <div>
             <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-1)" }}>
               {en ? "Inventory Analysis" : "Envanter Analizi"}
@@ -399,13 +714,31 @@ export default function EnvanterPage() {
               {inventoryRows.length} {en ? "products analyzed" : "ürün analiz edildi"}
             </p>
           </div>
-          <button
-            className="btn btn-secondary"
-            onClick={handleReset}
-          >
-            {en ? "Upload New Report" : "Yeni Rapor Yükle"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", flexWrap: "wrap" }}>
+            {saveMessage && (
+              <span style={{ fontSize: "13px", color: saveState === "error" ? "var(--color-danger)" : "var(--color-success)" }}>
+                {saveState === "error" ? "⚠ " : "✓ "}{saveMessage}
+              </span>
+            )}
+            <button
+              className="btn btn-primary"
+              disabled={saveState === "saving" || saveState === "saved"}
+              onClick={() => void handleSave()}
+            >
+              {saveState === "saving"
+                ? (en ? "Saving..." : "Kaydediliyor...")
+                : saveState === "saved"
+                  ? (en ? "Saved" : "Kaydedildi")
+                  : (en ? "Save" : "Kaydet")}
+            </button>
+            <button className="btn btn-secondary" onClick={handleReset}>
+              {en ? "Upload New Report" : "Yeni Rapor Yükle"}
+            </button>
+          </div>
         </div>
+
+        <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
+
         <AnalysisDashboard analysis={analysis} inventoryRows={inventoryRows} lang={lang} />
       </main>
     );
@@ -423,6 +756,8 @@ export default function EnvanterPage() {
             : "Eczane envanter raporunuzu yükleyin. Sistem satılan ve satılmayan ürünleri otomatik analiz eder."}
         </p>
       </div>
+
+      <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
 
       <div style={{
         background: "var(--color-surface)",

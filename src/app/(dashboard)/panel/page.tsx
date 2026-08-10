@@ -43,7 +43,9 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     currentDailyRegs,
     prevDailyRegs,
     currentSgk,
+    prevSgk,
     currentPlatform,
+    prevPlatform,
     currentFixedExp,
     currentEmpExp,
     prevFixedExp,
@@ -74,9 +76,19 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       where: { pharmacyId, deletedAt: null, expectedPaymentDate: { gte: startOfMonth, lte: endOfMonth } },
       select: { amount: true },
     }),
+    // SGK invoices prev month
+    prisma.sgkInvoice.findMany({
+      where: { pharmacyId, deletedAt: null, expectedPaymentDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+      select: { amount: true },
+    }),
     // Platform income current month
     prisma.platformIncome.findMany({
       where: { pharmacyId, deletedAt: null, incomeDate: { gte: startOfMonth, lte: endOfMonth } },
+      select: { amount: true },
+    }),
+    // Platform income prev month
+    prisma.platformIncome.findMany({
+      where: { pharmacyId, deletedAt: null, incomeDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
       select: { amount: true },
     }),
     // Fixed expenses current month
@@ -173,10 +185,12 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const currentCash = cashIncome(currentDailyRegs);
   const prevCash = cashIncome(prevDailyRegs);
   const currentSgkTotal = sumDecimal(currentSgk, "amount");
+  const prevSgkTotal = sumDecimal(prevSgk, "amount");
   const currentPlatformTotal = sumDecimal(currentPlatform, "amount");
+  const prevPlatformTotal = sumDecimal(prevPlatform, "amount");
 
   const totalIncome = currentCash + currentSgkTotal + currentPlatformTotal;
-  const prevIncome = prevCash;
+  const prevIncome = prevCash + prevSgkTotal + prevPlatformTotal;
 
   const totalExpense =
     sumDecimal(currentFixedExp, "amount") +
@@ -204,6 +218,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
 
   const posTotal = currentDailyRegs.reduce((s: number, r: { posAmount: unknown }) => s + Number(r.posAmount), 0);
   const actualCashTotal = currentDailyRegs.reduce((s: number, r: { cashAmount: unknown }) => s + Number(r.cashAmount), 0);
+  const prevPosTotal = prevDailyRegs.reduce((s: number, r: { posAmount: unknown }) => s + Number(r.posAmount), 0);
+  const prevActualCashTotal = prevDailyRegs.reduce((s: number, r: { cashAmount: unknown }) => s + Number(r.cashAmount), 0);
 
   const fixedExpenseTotal = sumDecimal(currentFixedExp, "amount");
   const empExpenseTotal = sumDecimal(currentEmpExp, "totalAmount");
@@ -259,6 +275,21 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     hasData: weekRegs.length > 0 && prevWeekRegs.length > 0,
   };
 
+  // Bu ay vs geçen ay (çok metrikli kıyaslama paneli)
+  const monthComparison = {
+    pos: { current: posTotal, previous: prevPosTotal, changePct: pct(posTotal, prevPosTotal) },
+    cash: { current: actualCashTotal, previous: prevActualCashTotal, changePct: pct(actualCashTotal, prevActualCashTotal) },
+    sgk: { current: currentSgkTotal, previous: prevSgkTotal, changePct: pct(currentSgkTotal, prevSgkTotal) },
+    platform: { current: currentPlatformTotal, previous: prevPlatformTotal, changePct: pct(currentPlatformTotal, prevPlatformTotal) },
+    totalIncome: { current: totalIncome, previous: prevIncome, changePct: pct(totalIncome, prevIncome) },
+    totalExpense: { current: totalExpense, previous: prevExpense, changePct: pct(totalExpense, prevExpense) },
+    netProfit: {
+      current: totalIncome - totalExpense,
+      previous: prevIncome - prevExpense,
+      changePct: pct(totalIncome - totalExpense, prevIncome - prevExpense),
+    },
+  };
+
   return {
     summary: {
       totalIncome,
@@ -298,6 +329,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     runway30,
     dayComparison,
     weekComparison,
+    monthComparison,
   };
 }
 
