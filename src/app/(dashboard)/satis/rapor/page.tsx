@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
-import type { ParsedSaleRow, ColumnMap, ColumnOverride } from "@/app/api/v1/satis/parse/route";
+import { mapRow, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
 
 interface SaleRecord extends ParsedSaleRow { id: string }
 
@@ -40,6 +40,7 @@ export default function SatisRaporPage() {
   const [previewRows, setPreviewRows] = useState<ParsedSaleRow[]>([]);
   const [columnMap, setColumnMap] = useState<ColumnMap | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [dataRows, setDataRows] = useState<unknown[][]>([]);
   const [override, setOverride] = useState<ColumnOverride>({});
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -62,7 +63,13 @@ export default function SatisRaporPage() {
       const p = new URLSearchParams({ start: startDate, end: endDate });
       if (filterType) p.set("type", filterType);
       const res = await fetch(`/api/v1/satis?${p}`, { headers: { "Accept-Language": lang } });
-      const json = await res.json() as { success: boolean; data?: { records: SaleRecord[]; summary: SaleSummary } };
+      let json: { success: boolean; data?: { records: SaleRecord[]; summary: SaleSummary } };
+      try {
+        json = await res.json() as { success: boolean; data?: { records: SaleRecord[]; summary: SaleSummary } };
+      } catch {
+        // Sunucu/platform katmanı JSON olmayan bir hata döndürdü — sessizce geç
+        return;
+      }
       if (json.success && json.data) { setRecords(json.data.records); setSummary(json.data.summary); }
     } catch { /* silent */ } finally { setListLoading(false); }
   }, [startDate, endDate, filterType]);
@@ -71,7 +78,7 @@ export default function SatisRaporPage() {
 
   const resetUpload = () => {
     setFile(null); setStep("select"); setParseError("");
-    setPreviewRows([]); setColumnMap(null); setHeaders([]);
+    setPreviewRows([]); setColumnMap(null); setHeaders([]); setDataRows([]);
     setOverride({}); setSaveSuccess(false);
   };
 
@@ -80,37 +87,52 @@ export default function SatisRaporPage() {
     if (f) { setFile(f); setParseError(""); setStep("select"); }
   };
 
-  const callParse = async (overrideData: ColumnOverride) => {
+  // Dosya sadece BİR KEZ yüklenir (bu fonksiyon aracılığıyla). Kolon eşleştirmesi
+  // değiştirildiğinde dosya tekrar sunucuya gönderilmez — `dataRows` önbelleğe
+  // alınır ve `mapRow` istemci tarafında (senkron) tekrar çalıştırılır.
+  const callParse = async () => {
     if (!file) return;
     setParsing(true); setParseError("");
     try {
       const fd = new FormData();
       fd.append("file", file);
-      if (Object.keys(overrideData).length > 0) {
-        fd.append("columnOverride", JSON.stringify(overrideData));
-      }
       const res = await fetch("/api/v1/satis/parse", { method: "POST", headers: { "Accept-Language": lang }, body: fd });
-      const json = await res.json() as {
+      let json: {
         success: boolean;
-        data?: { rows: ParsedSaleRow[]; columnMap: ColumnMap; headers: string[] };
+        data?: { rows: ParsedSaleRow[]; columnMap: ColumnMap | null; headers: string[]; dataRows: unknown[][] };
         error?: string;
       };
+      try {
+        json = await res.json() as {
+          success: boolean;
+          data?: { rows: ParsedSaleRow[]; columnMap: ColumnMap | null; headers: string[]; dataRows: unknown[][] };
+          error?: string;
+        };
+      } catch {
+        // Sunucu/platform katmanı JSON olmayan bir hata döndürdü (ör. "Request Entity Too Large")
+        throw new Error(lang === "en" ? "Server returned an invalid response. The file may be too large." : "Sunucudan geçersiz bir yanıt alındı. Dosya çok büyük olabilir.");
+      }
       if (!res.ok || !json.success) throw new Error(json.error ?? (lang === "en" ? "File could not be read" : "Dosya okunamadı"));
       setPreviewRows(json.data!.rows);
       setColumnMap(json.data!.columnMap ?? null);
       setHeaders(json.data!.headers ?? []);
+      setDataRows(json.data!.dataRows ?? []);
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally { setParsing(false); }
   };
 
   const handleReadFile = async () => {
-    await callParse({});
+    await callParse();
     setStep("mapping");
   };
 
-  const handleApplyMapping = async () => {
-    await callParse(override);
+  // Ağ isteği YOK — kolon eşleştirmesi, önbellekteki `dataRows` üzerinde
+  // paylaşılan `mapRow` fonksiyonu ile istemci tarafında yeniden hesaplanır.
+  const handleApplyMapping = () => {
+    if (columnMap) {
+      setPreviewRows(dataRows.map(row => mapRow(headers, row, override).row));
+    }
     setStep("preview");
   };
 
@@ -122,7 +144,12 @@ export default function SatisRaporPage() {
         headers: { "Content-Type": "application/json" , "Accept-Language": lang },
         body: JSON.stringify({ rows: previewRows }),
       });
-      const json = await res.json() as { success: boolean; count?: number; error?: string };
+      let json: { success: boolean; count?: number; error?: string };
+      try {
+        json = await res.json() as { success: boolean; count?: number; error?: string };
+      } catch {
+        throw new Error(lang === "en" ? "Server returned an invalid response. The file may be too large." : "Sunucudan geçersiz bir yanıt alındı. Dosya çok büyük olabilir.");
+      }
       if (!res.ok || !json.success) throw new Error(json.error ?? (lang === "en" ? "Save failed" : "Kayıt başarısız"));
       resetUpload();
       setSaveSuccess(true);
@@ -311,8 +338,8 @@ export default function SatisRaporPage() {
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-5)" }}>
                 <button className="btn" onClick={resetUpload}>{lang === "en" ? "← Back" : "← Geri"}</button>
-                <button className="btn btn-primary" disabled={parsing} onClick={() => void handleApplyMapping()}>
-                  {parsing ? (lang === "en" ? "Preparing Preview..." : "Önizleme Hazırlanıyor...") : (lang === "en" ? "Go to Preview →" : "Önizlemeye Geç →")}
+                <button className="btn btn-primary" onClick={handleApplyMapping}>
+                  {lang === "en" ? "Go to Preview →" : "Önizlemeye Geç →"}
                 </button>
               </div>
             </div>
