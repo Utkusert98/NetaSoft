@@ -9,6 +9,9 @@ import bcrypt from "bcryptjs";
 const profileSchema = z.object({
   name: z.string().min(2, "Ad en az 2 karakter olmalıdır"),
   pharmacistName: z.string().optional().nullable(),
+  email: z.string().email("Geçerli bir e-posta adresi giriniz").optional(),
+  currentPassword: z.string().optional(),
+  image: z.string().max(300_000, "Görsel çok büyük").optional().nullable(),
 });
 
 const passwordSchema = z.object({
@@ -31,7 +34,7 @@ export async function GET(): Promise<Response> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, pharmacistName: true, createdAt: true },
+    select: { id: true, name: true, email: true, pharmacistName: true, createdAt: true, image: true },
   });
   return apiResponse(user);
 }
@@ -65,10 +68,38 @@ export async function PUT(req: NextRequest): Promise<Response> {
   if (!parsed.success) {
     return apiError(translateZod(parsed.error.issues[0]?.message ?? "", lang), "VALIDATION_ERROR", 400);
   }
+
+  const currentUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { email: true, password: true } });
+  if (!currentUser) return apiError(m("notFound", lang), "NOT_FOUND", 404);
+
+  const data: { name: string; pharmacistName?: string | null; email?: string; image?: string | null } = {
+    name: parsed.data.name,
+    pharmacistName: parsed.data.pharmacistName,
+  };
+
+  if (parsed.data.email && parsed.data.email !== currentUser.email) {
+    if (!parsed.data.currentPassword) {
+      return apiError("E-posta değiştirmek için mevcut şifrenizi girmelisiniz", "PASSWORD_REQUIRED", 400);
+    }
+    if (!currentUser.password) return apiError(m("noPassword", lang), "NO_PASSWORD", 400);
+    const valid = await bcrypt.compare(parsed.data.currentPassword, currentUser.password);
+    if (!valid) return apiError(m("wrongPassword", lang), "WRONG_PASSWORD", 400);
+
+    const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    if (existing && existing.id !== session.user.id) {
+      return apiError("Bu e-posta zaten kullanılıyor", "EMAIL_TAKEN", 409);
+    }
+    data.email = parsed.data.email;
+  }
+
+  if (parsed.data.image !== undefined) {
+    data.image = parsed.data.image;
+  }
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
-    data: { name: parsed.data.name, pharmacistName: parsed.data.pharmacistName },
-    select: { id: true, name: true, email: true, pharmacistName: true },
+    data,
+    select: { id: true, name: true, email: true, pharmacistName: true, image: true },
   });
   return apiResponse(user);
 }

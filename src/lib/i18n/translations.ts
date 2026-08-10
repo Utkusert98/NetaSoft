@@ -17,9 +17,13 @@ export const t = {
     staffExpense: { tr: "Personel Giderleri", en: "Staff Expenses" },
     incomeExpense: { tr: "Gelir - Gider", en: "Income - Expense" },
     monthlySummary: { tr: "Aylık Özet", en: "Monthly Summary" },
+    inventory: { tr: "Stok Envanteri", en: "Inventory" },
+    salesReport: { tr: "Satış Raporu", en: "Sales Report" },
+    auditLog: { tr: "Denetim Kayıtları", en: "Audit Log" },
     settings: { tr: "Ayarlar", en: "Settings" },
     logout: { tr: "Çıkış Yap", en: "Sign Out" },
     pharmacyMgmt: { tr: "Eczane Yönetim", en: "Pharmacy Mgmt" },
+    activePharmacy: { tr: "Aktif Eczane", en: "Active Pharmacy" },
   },
 
   // ─── Common ────────────────────────────────────────────────
@@ -259,6 +263,9 @@ export const t = {
     passwordHint: { tr: "Güçlü bir şifre kullanın: en az 12 karakter, büyük/küçük harf, rakam ve özel karakter içermeli.", en: "Use a strong password: at least 12 characters with uppercase, lowercase, numbers and special characters." },
     updateBtn: { tr: "🔑 Şifreyi Güncelle", en: "🔑 Update Password" },
     registered: { tr: "Kayıt", en: "Registered" },
+    teamTab: { tr: "Ekip Yönetimi", en: "Team Management" },
+    securityTab: { tr: "Güvenlik", en: "Security" },
+    billingTab: { tr: "Faturalama", en: "Billing" },
   },
 } as const;
 

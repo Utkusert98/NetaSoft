@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
-import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
+import { getActivePharmacyId } from "@/lib/pharmacy";
+import { getLang, m } from "@/lib/i18n/api-messages";
 
 const employeeExpenseSchema = z.object({
   employeeId: z.string().min(1, "Personel seçilmelidir"),
@@ -14,18 +16,14 @@ const employeeExpenseSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const body = await req.json();
     const validated = employeeExpenseSchema.parse(body);
@@ -33,19 +31,19 @@ export async function POST(req: Request) {
     const totalAmount = validated.salaryAmount + validated.sgkAmount + validated.foodAmount + validated.transportAmount;
 
     if (totalAmount <= 0) {
-      return NextResponse.json({ error: "Toplam gider tutarı 0'dan büyük olmalıdır" }, { status: 400 });
+      return apiError("Toplam gider tutarı 0'dan büyük olmalıdır", "INVALID_TOTAL_AMOUNT", 400);
     }
 
     // Check if employee exists and belongs to pharmacy
     const employee = await prisma.employee.findFirst({
-      where: { id: validated.employeeId, pharmacyId: userRole.pharmacyId },
+      where: { id: validated.employeeId, pharmacyId },
     });
 
-    if (!employee) return NextResponse.json({ error: "Personel bulunamadı" }, { status: 404 });
+    if (!employee) return apiError("Personel bulunamadı", "EMPLOYEE_NOT_FOUND", 404);
 
     const expense = await prisma.employeeExpense.create({
       data: {
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         employeeId: validated.employeeId,
         expenseDate: new Date(validated.expenseDate),
         salaryAmount: validated.salaryAmount,
@@ -57,31 +55,36 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: expense }, { status: 201 });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "CREATE",
+      entityType: "EmployeeExpense",
+      entityId: expense.id,
+      newData: expense,
+    });
+
+    return apiResponse(expense, 201);
   } catch (error) {
-    console.error("Employee Expense Create Error:", error);
+    console.error("Employee Expense Create Error:", error instanceof Error ? error.message : error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return apiError(error.issues[0]?.message ?? m("validationError", lang), "VALIDATION_ERROR", 400);
     }
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const expenses = await prisma.employeeExpense.findMany({
-      where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
+      where: { pharmacyId, deletedAt: null },
       include: {
         employee: {
           select: { firstName: true, lastName: true },
@@ -90,8 +93,9 @@ export async function GET(req: Request) {
       orderBy: { expenseDate: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: expenses });
+    return apiResponse(expenses);
   } catch (error) {
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    console.error("Employee Expense GET Error:", error instanceof Error ? error.message : error);
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

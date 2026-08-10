@@ -344,8 +344,8 @@ export default function SgkFaturaPage() {
       if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setFormData(emptyForm);
       await fetchInvoices();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
     }
@@ -381,8 +381,8 @@ export default function SgkFaturaPage() {
       if (!res.ok) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
       setEditRecord(null);
       await fetchInvoices();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setEditSubmitting(false);
     }
@@ -396,8 +396,8 @@ export default function SgkFaturaPage() {
       if (!res.ok) throw new Error(lang === "en" ? "Delete operation failed" : "Silme işlemi başarısız");
       setDeleteId(null);
       await fetchInvoices();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setDeleteSubmitting(false);
     }
@@ -405,7 +405,7 @@ export default function SgkFaturaPage() {
 
   const fmt = (v: number) => Number(v).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 
-  const InvoiceTypeSelect = ({ value, onChange, name }: { value: string; onChange: any; name: string }) => (
+  const InvoiceTypeSelect = ({ value, onChange, name }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; name: string }) => (
     <select className="form-input" name={name} value={value} onChange={onChange} required>
       {SGK_INVOICE_TYPES.map((t, i) =>
         t.disabled ? (

@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { addMonths } from "date-fns";
-import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
+import { getLang, m } from "@/lib/i18n/api-messages";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const SGK_INVOICE_TYPES = [
   "GROUP_A",
@@ -29,43 +31,35 @@ const sgkSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getPharmacyId(userId: string) {
-  const userRole = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return userRole?.pharmacyId ?? null;
-}
-
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const invoices = await prisma.sgkInvoice.findMany({
       where: { pharmacyId, deletedAt: null },
       orderBy: { invoiceDate: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: invoices });
+    return apiResponse(invoices);
   } catch (error) {
-    console.error("SGK GET Error:", error);
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    console.error("SGK GET Error:", error instanceof Error ? error.message : error);
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const body = await req.json();
     const validated = sgkSchema.parse(body);
@@ -88,12 +82,21 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: invoice }, { status: 201 });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "CREATE",
+      entityType: "SgkInvoice",
+      entityId: invoice.id,
+      newData: invoice,
+    });
+
+    return apiResponse(invoice, 201);
   } catch (error) {
-    console.error("SGK POST Error:", error);
+    console.error("SGK POST Error:", error instanceof Error ? error.message : error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return apiError(error.issues[0]?.message ?? m("validationError", lang), "VALIDATION_ERROR", 400);
     }
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

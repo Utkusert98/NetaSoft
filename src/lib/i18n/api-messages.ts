@@ -13,6 +13,7 @@ const messages = {
   unauthorized:       { tr: "Yetkisiz erişim",                    en: "Unauthorized" },
   notFound:           { tr: "Kayıt bulunamadı",                   en: "Record not found" },
   noPharmacy:         { tr: "Eczane bulunamadı",                  en: "Pharmacy not found" },
+  forbidden:          { tr: "Bu eczaneye erişim yetkiniz yok",    en: "You do not have access to this pharmacy" },
   serverError:        { tr: "Sunucu hatası, lütfen tekrar deneyin", en: "Server error, please try again" },
   validationError:    { tr: "Geçersiz veri",                      en: "Invalid data" },
   emailExists:        { tr: "Bu e-posta adresi zaten kayıtlı",    en: "This email is already registered" },

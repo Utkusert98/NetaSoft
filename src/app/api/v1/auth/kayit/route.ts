@@ -85,7 +85,7 @@ export async function POST(request: Request): Promise<Response> {
       201
     );
   } catch (error) {
-    console.error("[REGISTER ERROR]", error);
+    console.error("[REGISTER ERROR]", error instanceof Error ? error.message : error);
     return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

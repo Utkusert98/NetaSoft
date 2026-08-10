@@ -39,6 +39,17 @@ export interface DashboardData {
   expenseBreakdown: Array<{ name: string; nameEn: string; value: number }>;
   urgentNotesCount: number;
   runway30: { projectedIncome: number; committedExpense: number };
+  dayComparison: {
+    todayDate: string;
+    compareDate: string;
+    todayPos: number;
+    todayCash: number;
+    lastMonthDayPos: number;
+    lastMonthDayCash: number;
+    posChangePct: number;
+    cashChangePct: number;
+    hasData: boolean;
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,6 +117,15 @@ const TOOLTIP_STYLE = {
   borderRadius: "8px", fontSize: "12px",
 };
 
+// ── SGK fatura tipi etiketi (TR/EN) ─────────────────────────────────────────
+function sgkTypeLabel(type: string, lang: string): string {
+  const up = type.toUpperCase().replace(/[\s-]/g, "_");
+  if (up.includes("GROUP_A") || up.includes("GRUBU_A") || up.includes("A_GRUP")) return lang === "en" ? "Group A" : "A Grubu";
+  if (up.includes("GROUP_B") || up.includes("GRUBU_B") || up.includes("B_GRUP")) return lang === "en" ? "Group B" : "B Grubu";
+  if (up.includes("GROUP_C") || up.includes("GRUBU_C") || up.includes("C_GRUP")) return lang === "en" ? "Group C" : "C Grubu";
+  return type.replace(/_/g, " ");
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function DashboardClient({ data, pharmacistName }: {
   data: DashboardData;
@@ -117,7 +137,7 @@ export default function DashboardClient({ data, pharmacistName }: {
   const c = t.common;
 
   const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome,
-          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30 } = data;
+          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30, dayComparison } = data;
 
   const platformTotal = platformIncome.reduce((s, p) => s + p.amount, 0);
   const totalIncomeAll = sgkVsCash.cashTotal + sgkVsCash.sgkTotal + platformTotal;
@@ -134,7 +154,7 @@ export default function DashboardClient({ data, pharmacistName }: {
 
   const runway30Net = runway30.projectedIncome - runway30.committedExpense;
 
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const overdueUnpaid = unpaidNotes.filter(n => new Date(n.dueDate).getTime() < now);
   const urgentUnpaid = unpaidNotes.filter(n => {
     const t = new Date(n.dueDate).getTime();
@@ -205,6 +225,37 @@ export default function DashboardClient({ data, pharmacistName }: {
           }}>
             {lang === "en" ? "View Notes →" : "Senetlere Git →"}
           </a>
+        </div>
+      )}
+
+      {/* ── Bugün vs Geçen Ayın Aynı Günü ── */}
+      {dayComparison.hasData && (
+        <div style={{
+          background: "var(--color-surface)", border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)", padding: "14px 18px", marginBottom: "var(--spacing-5)",
+          display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: "20px", flexShrink: 0 }}>📅</span>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 700 }}>
+              {lang === "en"
+                ? `Today (${new Date(dayComparison.todayDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}) vs same day last month (${new Date(dayComparison.compareDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })})`
+                : `Bugün (${new Date(dayComparison.todayDate).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}) geçen ayın aynı günüyle (${new Date(dayComparison.compareDate).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}) kıyaslandı`}
+            </p>
+            <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+              <span style={{ fontWeight: 700, color: dayComparison.posChangePct >= 0 ? GREEN : RED }}>
+                POS {dayComparison.posChangePct >= 0
+                  ? (lang === "en" ? "higher" : "yüksek")
+                  : (lang === "en" ? "lower" : "düşük")} (%{Math.abs(dayComparison.posChangePct).toFixed(0)})
+              </span>
+              {"  ·  "}
+              <span style={{ fontWeight: 700, color: dayComparison.cashChangePct >= 0 ? GREEN : RED }}>
+                {lang === "en" ? "Cash" : "Nakit"} {dayComparison.cashChangePct >= 0
+                  ? (lang === "en" ? "higher" : "yüksek")
+                  : (lang === "en" ? "lower" : "düşük")} (%{Math.abs(dayComparison.cashChangePct).toFixed(0)})
+              </span>
+            </p>
+          </div>
         </div>
       )}
 
@@ -328,7 +379,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                   border: "1px solid var(--color-border)",
                 }}>
                   <div>
-                    <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{item.invoiceType.replace(/_/g, " ")}</p>
+                    <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{sgkTypeLabel(item.invoiceType, lang)}</p>
                     <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
                       {new Date(item.expectedPaymentDate).toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")} {lang === "en" ? "est." : "tahmini"}
                     </p>
@@ -467,7 +518,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-2)" }}>
             {unpaidNotes.slice(0, 6).map((note) => {
               const due = new Date(note.dueDate);
-              const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+              const daysLeft = Math.ceil((due.getTime() - now) / 86400000);
               const urgent = daysLeft <= 7;
               return (
                 <div key={note.id} style={{

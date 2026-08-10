@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { apiError, apiResponse } from "@/lib/utils";
 import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const rowSchema = z.object({
   productGroup: z.string().default("Genel"),
@@ -21,21 +22,13 @@ const confirmSchema = z.object({
   importBatchId: z.string().optional(),
 });
 
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const role = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return role?.pharmacyId ?? null;
-}
-
 // POST /api/v1/satis  — onaylanan satışları kaydet
 export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
-    const pharmacyId = await getPharmacyId(session.user.id);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
     if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const body = await req.json();
@@ -77,7 +70,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   try {
     const session = await auth();
     if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
-    const pharmacyId = await getPharmacyId(session.user.id);
+    const pharmacyId = await getActivePharmacyId(session.user.id);
     if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { searchParams } = new URL(req.url);

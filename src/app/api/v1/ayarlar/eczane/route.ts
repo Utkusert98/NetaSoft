@@ -4,14 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { apiError, apiResponse } from "@/lib/utils";
 import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 import { z } from "zod";
-
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const role = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return role?.pharmacyId ?? null;
-}
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const schema = z.object({
   name: z.string().min(2, "Eczane adı en az 2 karakter olmalıdır"),
@@ -29,7 +22,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-  const pharmacyId = await getPharmacyId(session.user.id);
+  const pharmacyId = await getActivePharmacyId(session.user.id);
   if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
   const pharmacy = await prisma.pharmacy.findUnique({
@@ -45,7 +38,7 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-  const pharmacyId = await getPharmacyId(session.user.id);
+  const pharmacyId = await getActivePharmacyId(session.user.id);
   if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
   const body = await req.json() as unknown;

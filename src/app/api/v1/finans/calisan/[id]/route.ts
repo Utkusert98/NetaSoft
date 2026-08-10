@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
 import { getLang, m } from "@/lib/i18n/api-messages";
+import { getActivePharmacyId } from "@/lib/pharmacy";
 
 const updateSchema = z.object({
   firstName: z.string().min(2).optional(),
@@ -12,14 +14,6 @@ const updateSchema = z.object({
   startDate: z.string().datetime().optional(),
 });
 
-async function getPharmacyId(userId: string): Promise<string | null> {
-  const role = await prisma.userPharmacyRole.findFirst({
-    where: { userId },
-    select: { pharmacyId: true },
-  });
-  return role?.pharmacyId ?? null;
-}
-
 export async function DELETE(
   req: Request,
   context: { params: Promise<{ id: string }> }
@@ -27,17 +21,17 @@ export async function DELETE(
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { id } = await context.params;
 
     const record = await prisma.employee.findFirst({
       where: { id, pharmacyId },
     });
-    if (!record) return NextResponse.json({ error: "Personel bulunamadı" }, { status: 404 });
+    if (!record) return apiError("Personel bulunamadı", "EMPLOYEE_NOT_FOUND", 404);
 
     // Soft delete — çalışana bağlı giderler korunur
     await prisma.employee.update({
@@ -45,9 +39,18 @@ export async function DELETE(
       data: { deletedAt: new Date() },
     });
 
-    return NextResponse.json({ success: true });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "DELETE",
+      entityType: "Employee",
+      entityId: id,
+      oldData: record,
+    });
+
+    return apiResponse({ deleted: true });
   } catch {
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
@@ -58,14 +61,14 @@ export async function PUT(
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { id } = await context.params;
     const record = await prisma.employee.findFirst({ where: { id, pharmacyId } });
-    if (!record) return NextResponse.json({ success: false, error: m("notFound", lang), code: "NOT_FOUND" }, { status: 404 });
+    if (!record) return apiError(m("notFound", lang), "NOT_FOUND", 404);
 
     const body = await req.json();
     const validated = updateSchema.parse(body);
@@ -81,8 +84,18 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "UPDATE",
+      entityType: "Employee",
+      entityId: id,
+      oldData: record,
+      newData: updated,
+    });
+
+    return apiResponse(updated);
   } catch {
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
-import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
+import { getActivePharmacyId } from "@/lib/pharmacy";
+import { getLang, m } from "@/lib/i18n/api-messages";
 
 const fixedExpenseSchema = z.object({
   type: z.enum(["INVOICE", "ACCOUNTING", "TAX", "RENT", "OTHER"]),
@@ -12,21 +14,17 @@ const fixedExpenseSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+      return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) {
-      return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) {
+      return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
     }
 
     const body = await req.json();
@@ -34,7 +32,7 @@ export async function POST(req: Request) {
 
     const expense = await prisma.fixedExpense.create({
       data: {
-        pharmacyId: userRole.pharmacyId,
+        pharmacyId,
         type: validated.type,
         customType: validated.type === "OTHER" ? validated.customType : null,
         amount: validated.amount,
@@ -43,36 +41,41 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: expense }, { status: 201 });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "CREATE",
+      entityType: "FixedExpense",
+      entityId: expense.id,
+      newData: expense,
+    });
+
+    return apiResponse(expense, 201);
   } catch (error) {
-    console.error("Fixed Expense Create Error:", error);
+    console.error("Fixed Expense Create Error:", error instanceof Error ? error.message : error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return apiError(error.issues[0]?.message ?? m("validationError", lang), "VALIDATION_ERROR", 400);
     }
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
-    const userRole = await prisma.userPharmacyRole.findFirst({
-      where: { userId: session.user.id },
-      select: { pharmacyId: true },
-    });
-
-    if (!userRole) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    const pharmacyId = await getActivePharmacyId(session.user.id);
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const expenses = await prisma.fixedExpense.findMany({
-      where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
+      where: { pharmacyId, deletedAt: null },
       orderBy: { expenseDate: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: expenses });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiResponse(expenses);
+  } catch {
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

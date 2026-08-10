@@ -72,6 +72,11 @@ model User {
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at")
 
+  // İki Adımlı Doğrulama (2FA)
+  twoFactorEnabled    Boolean  @default(false) @map("two_factor_enabled")
+  twoFactorSecret     String?  @db.Text @map("two_factor_secret")
+  twoFactorBackupCodes String[] @default([]) @map("two_factor_backup_codes")
+
   // Zaman damgaları
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
