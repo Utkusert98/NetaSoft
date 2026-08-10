@@ -70,6 +70,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
 
     const [
       dailyRegs,
+      dailyRegs12mo,
       sgkAll,
       platformIncomes,
       fixedExpenses,
@@ -82,6 +83,12 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       prisma.dailyRegister.findMany({
         where: { pharmacyId, deletedAt: null, registerDate: { gte: startOfMonth, lte: endOfMonth } },
         select: { posAmount: true, cashAmount: true, wireAmount: true },
+      }),
+      // Last 12 months kasa (geçmiş aylar hakkında soru sorulabilmesi için)
+      prisma.dailyRegister.findMany({
+        where: { pharmacyId, deletedAt: null, registerDate: { gte: twelveMonthsAgo } },
+        select: { posAmount: true, cashAmount: true, wireAmount: true, registerDate: true },
+        orderBy: { registerDate: "desc" },
       }),
       // ALL SGK invoices - show full picture (most recent 40)
       prisma.sgkInvoice.findMany({
@@ -145,6 +152,38 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     const empExp12 = empExpenses.reduce((s, r) => s + Number(r.totalAmount), 0);
     const supplierTotal12 = supplierTransfers.reduce((s, r) => s + Number(r.amount), 0);
 
+    // Aylık kırılım (son 12 ay) — geçmiş aylar hakkında sorulan sorulara cevap verebilmek için
+    const monthKey = (d: Date | string) => {
+      const dt = new Date(d);
+      return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+    };
+    const monthlyMap = new Map<string, { cash: number; sgk: number; platform: number; fixed: number; emp: number }>();
+    const ensureMonth = (key: string) => {
+      if (!monthlyMap.has(key)) monthlyMap.set(key, { cash: 0, sgk: 0, platform: 0, fixed: 0, emp: 0 });
+      return monthlyMap.get(key)!;
+    };
+    dailyRegs12mo.forEach(r => {
+      const bucket = ensureMonth(monthKey(r.registerDate));
+      bucket.cash += Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount);
+    });
+    sgkAll.forEach(s => {
+      const bucket = ensureMonth(monthKey(s.expectedPaymentDate));
+      bucket.sgk += Number(s.amount);
+    });
+    platformIncomes.forEach(p => {
+      const bucket = ensureMonth(monthKey(p.incomeDate));
+      bucket.platform += Number(p.amount);
+    });
+    fixedExpenses.forEach(e => {
+      const bucket = ensureMonth(monthKey(e.expenseDate));
+      bucket.fixed += Number(e.amount);
+    });
+    empExpenses.forEach(e => {
+      const bucket = ensureMonth(monthKey(e.expenseDate));
+      bucket.emp += Number(e.totalAmount);
+    });
+    const monthlyKeysSorted = Array.from(monthlyMap.keys()).sort();
+
     const unpaidNotes = allNotes.filter(n => !n.isPaid);
     const paidNotes = allNotes.filter(n => n.isPaid);
     const upcomingNotes = unpaidNotes.filter(n => new Date(n.dueDate) > now);
@@ -194,6 +233,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       future: isEn ? "UPCOMING NOTES" : "GELECEK VADELİ SENETLER",
       due: isEn ? "Due" : "Vade",
       history12: isEn ? "12-MONTH TOTALS (last 12 months)" : "12 AYLIK TOPLAMLAR (son 12 ay)",
+      monthlyBreakdown: isEn ? "MONTH-BY-MONTH BREAKDOWN (use this for questions about a specific past month)" : "AYLIK KIRILIM (belirli bir geçmiş ay sorulduğunda bunu kullan)",
     };
 
     const lines: string[] = [
@@ -254,6 +294,16 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       `- ${isEn ? "Staff Expenses" : "Personel Giderleri"} (12 mo): ${fmt(empExp12)}`,
       `- ${isEn ? "Warehouse Transfers" : "Depo Havaleleri"} (12 mo): ${fmt(supplierTotal12)}`,
     );
+
+    lines.push(``, `${L.monthlyBreakdown}`);
+    monthlyKeysSorted.forEach(key => {
+      const b = monthlyMap.get(key)!;
+      const [yy, mmk] = key.split("-");
+      const label = new Date(Number(yy), Number(mmk) - 1, 1).toLocaleDateString(isEn ? "en-GB" : "tr-TR", { month: "long", year: "numeric" });
+      const income = b.cash + b.sgk + b.platform;
+      const expense = b.fixed + b.emp;
+      lines.push(`  * ${label}: ${isEn ? "Cash" : "Kasa"} ${fmt(b.cash)}, SGK ${fmt(b.sgk)}, ${isEn ? "Platform" : "Platform"} ${fmt(b.platform)}, ${isEn ? "Total Income" : "Toplam Gelir"} ${fmt(income)}, ${isEn ? "Fixed Exp" : "Sabit Gider"} ${fmt(b.fixed)}, ${isEn ? "Staff Exp" : "Personel Gideri"} ${fmt(b.emp)}, ${isEn ? "Total Expense" : "Toplam Gider"} ${fmt(expense)}, ${isEn ? "Net" : "Net"} ${fmt(income - expense)}`);
+    });
 
     if (platformIncomes.length > 0) {
       lines.push(``, `${isEn ? "PLATFORM INCOME HISTORY" : "PLATFORM GELİRLERİ GEÇMİŞİ"}`);

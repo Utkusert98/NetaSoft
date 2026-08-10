@@ -32,6 +32,14 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const startOfPrevMonth = new Date(`${py}-${pmm}-01T00:00:00.000Z`);
   const endOfPrevMonth = new Date(`${py}-${pmm}-${String(lastDayPrev).padStart(2, "0")}T23:59:59.999Z`);
 
+  // Bugün ve geçen ayın aynı günü (gün-gün kıyaslama)
+  const today = now.getUTCDate();
+  const sameDayLastMonthNum = Math.min(today, lastDayPrev);
+  const todayStart = new Date(`${y}-${mm}-${String(today).padStart(2, "0")}T00:00:00.000Z`);
+  const todayEnd = new Date(`${y}-${mm}-${String(today).padStart(2, "0")}T23:59:59.999Z`);
+  const lastMonthDayStart = new Date(`${py}-${pmm}-${String(sameDayLastMonthNum).padStart(2, "0")}T00:00:00.000Z`);
+  const lastMonthDayEnd = new Date(`${py}-${pmm}-${String(sameDayLastMonthNum).padStart(2, "0")}T23:59:59.999Z`);
+
   // ── Parallel queries ──────────────────────────────────────────────────
   const [
     currentDailyRegs,
@@ -48,6 +56,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     upcomingSgk,
     monthlyTrend,
     platformIncomeList,
+    todayRegs,
+    lastMonthDayRegs,
   ] = await Promise.all([
     // Daily register current month
     prisma.dailyRegister.findMany({
@@ -130,6 +140,16 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       where: { pharmacyId, deletedAt: null, incomeDate: { gte: startOfMonth, lte: endOfMonth } },
       _sum: { amount: true },
     }),
+    // Bugünün kasa kaydı
+    prisma.dailyRegister.findMany({
+      where: { pharmacyId, deletedAt: null, registerDate: { gte: todayStart, lte: todayEnd } },
+      select: { posAmount: true, cashAmount: true, wireAmount: true },
+    }),
+    // Geçen ayın aynı gününün kasa kaydı
+    prisma.dailyRegister.findMany({
+      where: { pharmacyId, deletedAt: null, registerDate: { gte: lastMonthDayStart, lte: lastMonthDayEnd } },
+      select: { posAmount: true, cashAmount: true, wireAmount: true },
+    }),
   ]);
 
   // ── Compute totals ────────────────────────────────────────────────────
@@ -194,6 +214,24 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     committedExpense: upcoming30Notes + (totalExpense / daysElapsed) * 30,
   };
 
+  // Bugün vs geçen ayın aynı günü
+  const todayPos = todayRegs.reduce((s: number, r: { posAmount: unknown }) => s + Number(r.posAmount), 0);
+  const todayCash = todayRegs.reduce((s: number, r: { cashAmount: unknown }) => s + Number(r.cashAmount), 0);
+  const lastMonthDayPos = lastMonthDayRegs.reduce((s: number, r: { posAmount: unknown }) => s + Number(r.posAmount), 0);
+  const lastMonthDayCash = lastMonthDayRegs.reduce((s: number, r: { cashAmount: unknown }) => s + Number(r.cashAmount), 0);
+
+  const dayComparison = {
+    todayDate: todayStart.toISOString(),
+    compareDate: lastMonthDayStart.toISOString(),
+    todayPos,
+    todayCash,
+    lastMonthDayPos,
+    lastMonthDayCash,
+    posChangePct: pct(todayPos, lastMonthDayPos),
+    cashChangePct: pct(todayCash, lastMonthDayCash),
+    hasData: todayRegs.length > 0 && lastMonthDayRegs.length > 0,
+  };
+
   return {
     summary: {
       totalIncome,
@@ -231,6 +269,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     ].filter(e => e.value > 0),
     urgentNotesCount,
     runway30,
+    dayComparison,
   };
 }
 
