@@ -24,6 +24,7 @@ import {
   parseInventoryRows,
   analyzeInventory,
   detectInventoryColumnMap,
+  isAutoMappingConfident,
   type InventoryAnalysis,
   type InventoryRow,
   type InventoryColumnMap,
@@ -73,9 +74,9 @@ const INVENTORY_FIELDS: Array<{ key: keyof InventoryRow; tr: string; en: string;
   { key: "purchaseQty", tr: "Alış Adedi", en: "Purchase Quantity",
     hintTr: "Bu dönem içinde satın alınan/girişi yapılan adet.",
     hintEn: "Quantity purchased/received during this period." },
-  { key: "salesQty", tr: "Satış Adedi", en: "Sales Quantity", required: true,
-    hintTr: "Bu dönemde SATILAN ürün adedi — küçük tam sayı (0, 3, 12...). Fiyat sütunu ile karıştırmayın.",
-    hintEn: "The quantity SOLD in this period — a small whole number (0, 3, 12...). Do not confuse with the price column." },
+  { key: "salesQty", tr: "Satış Adedi", en: "Sales Quantity",
+    hintTr: "Bu dönemde SATILAN ürün adedi — küçük tam sayı (0, 3, 12...). Çoğu stok raporunda bu sütun bulunmaz, boş bırakabilirsiniz; sistem o zaman stok değerine göre analiz yapar.",
+    hintEn: "The quantity SOLD in this period — a small whole number (0, 3, 12...). Most stock reports don't have this column — leave it blank and the system will analyze by stock value instead." },
   { key: "closingStock", tr: "Dönem Sonu Stok", en: "Closing Stock",
     hintTr: "Dönem sonunda elde kalan stok adedi.",
     hintEn: "Remaining stock quantity at the end of the period." },
@@ -226,44 +227,133 @@ function ProfitChart({ data, lang }: { data: Array<{ name: string; profit: numbe
   );
 }
 
+// Satış adedi bilgisi olmayan (stok değerleme) dosyalar için: elde mevcut
+// stoğun satış fiyatı üzerinden en değerli 10 ürünü.
+function StockValueChart({ data, lang }: { data: Array<{ name: string; stockValue: number; closingStock: number }>; lang: string }) {
+  const en = lang === "en";
+  const chartData = data.map((r) => ({
+    name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
+    deger: Math.round(r.stockValue * 100) / 100,
+    adet: r.closingStock,
+  }));
+
+  return (
+    <div style={{ height: 320 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 32, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <Tooltip
+            formatter={((_value: string | number | undefined, _name: string | number | undefined, item: { payload?: { deger: number; adet: number } }) => {
+              const p = item?.payload;
+              return [
+                `${formatCurrency(p?.deger ?? 0)} (${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units in stock" : "adet stokta"})`,
+                en ? "Stock Value" : "Stok Değeri",
+              ];
+            }) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar dataKey="deger" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Kategori bazında stok değeri dağılımı — dilim sayısı çok fazlaysa (ör. "Tanımsız"
+// gibi bir grup baskınsa) okunaklı kalması için ilk 6 kategori + "Diğer" gösterilir.
+function CategoryValuePieChart({ data, lang }: { data: Array<{ category: string; value: number }>; lang: string }) {
+  const en = lang === "en";
+  const sorted = [...data].sort((a, b) => b.value - a.value).filter((d) => d.value > 0);
+  const top = sorted.slice(0, 6);
+  const rest = sorted.slice(6).reduce((s, d) => s + d.value, 0);
+  const chartData = rest > 0 ? [...top, { category: en ? "Other" : "Diğer", value: rest }] : top;
+
+  return (
+    <div style={{ height: 300 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={3} dataKey="value" nameKey="category">
+            {chartData.map((_entry, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Stock Value" : "Stok Değeri"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend wrapperStyle={{ fontSize: "11px" }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   analysis: InventoryAnalysis;
   inventoryRows: InventoryRow[];
   lang: string;
 }) {
   const en = lang === "en";
-  const { summary } = analysis;
+  const { summary, hasSalesData } = analysis;
+  const categoryValueData = analysis.categoryBreakdown.map((c) => ({ category: c.category, value: hasSalesData ? c.revenue : c.stockValue }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
+      {!hasSalesData && (
+        <div style={{
+          padding: "12px 16px", background: "var(--color-primary-pale)", border: "1px solid var(--color-primary-light)",
+          borderRadius: "var(--radius-md)", fontSize: "13px", color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
+        }}>
+          <span style={{ fontSize: "18px", flexShrink: 0 }}>ℹ️</span>
+          <span>
+            {en
+              ? "This file has no sales-quantity column — it's a stock valuation report. The figures below show the value of your CURRENT stock, not sales performance."
+              : "Bu dosyada satış adedi sütunu yok — bir stok değerleme raporu. Aşağıdaki rakamlar satış performansını değil, ELİNİZDEKİ MEVCUT STOĞUN değerini gösterir."}
+          </span>
+        </div>
+      )}
+
       <section>
         <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
           {en ? "Inventory Summary" : "Envanter Özeti"}
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--spacing-4)" }}>
           <SummaryCard label={en ? "Total Products" : "Toplam Ürün"} value={summary.totalProducts.toLocaleString("tr-TR")} />
-          <SummaryCard
-            label={en ? "Sold Products" : "Satılan Ürün"}
-            value={summary.soldProducts.toLocaleString("tr-TR")}
-            sub={`${Math.round((summary.soldProducts / summary.totalProducts) * 100)}% ${en ? "sell rate" : "satış oranı"}`}
-            accent="success"
-          />
-          <SummaryCard
-            label={en ? "Unsold Products" : "Satılmayan Ürün"}
-            value={summary.unsoldProducts.toLocaleString("tr-TR")}
-            accent="danger"
-          />
-          <SummaryCard
-            label={en ? "Total Revenue" : "Toplam Gelir"}
-            value={formatCurrency(summary.totalRevenue)}
-            accent="primary"
-          />
-          <SummaryCard
-            label={en ? "Net Profit" : "Net Kâr"}
-            value={formatCurrency(summary.totalProfit)}
-            sub={`${summary.profitMargin.toFixed(1)}% ${en ? "profit margin" : "kâr marjı"}`}
-            accent={summary.totalProfit >= 0 ? "success" : "danger"}
-          />
+          {hasSalesData ? (
+            <>
+              <SummaryCard
+                label={en ? "Sold Products" : "Satılan Ürün"}
+                value={summary.soldProducts.toLocaleString("tr-TR")}
+                sub={`${Math.round((summary.soldProducts / summary.totalProducts) * 100)}% ${en ? "sell rate" : "satış oranı"}`}
+                accent="success"
+              />
+              <SummaryCard
+                label={en ? "Unsold Products" : "Satılmayan Ürün"}
+                value={summary.unsoldProducts.toLocaleString("tr-TR")}
+                accent="danger"
+              />
+              <SummaryCard label={en ? "Total Revenue" : "Toplam Gelir"} value={formatCurrency(summary.totalRevenue)} accent="primary" />
+              <SummaryCard
+                label={en ? "Net Profit" : "Net Kâr"}
+                value={formatCurrency(summary.totalProfit)}
+                sub={`${summary.profitMargin.toFixed(1)}% ${en ? "profit margin" : "kâr marjı"}`}
+                accent={summary.totalProfit >= 0 ? "success" : "danger"}
+              />
+            </>
+          ) : (
+            <>
+              <SummaryCard label={en ? "Total Stock Value" : "Toplam Stok Değeri"} value={formatCurrency(summary.totalStockValue)} accent="primary" />
+              <SummaryCard label={en ? "Total Stock Cost" : "Toplam Stok Maliyeti"} value={formatCurrency(summary.totalStockCost)} />
+              <SummaryCard
+                label={en ? "Potential Profit" : "Potansiyel Kâr"}
+                value={formatCurrency(summary.potentialProfit)}
+                sub={`${summary.potentialMargin.toFixed(1)}% ${en ? "potential margin" : "potansiyel marj"}`}
+                accent={summary.potentialProfit >= 0 ? "success" : "danger"}
+              />
+            </>
+          )}
           <SummaryCard
             label={en ? "Profitable Products" : "Kârlı Ürün"}
             value={`${summary.profitableCount} / ${summary.totalProducts}`}
@@ -275,26 +365,33 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-6)" }}>
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            {en ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün"}
+            {hasSalesData ? (en ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün") : (en ? "Top 10 Products by Stock Value" : "Stok Değerine Göre En Değerli 10 Ürün")}
           </h3>
-          {analysis.topSellers.length > 0
-            ? <TopSellersChart data={analysis.topSellers} lang={lang} />
-            : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No sales data found" : "Satış verisi bulunamadı"}</p>
+          {hasSalesData
+            ? (analysis.topSellers.length > 0
+                ? <TopSellersChart data={analysis.topSellers} lang={lang} />
+                : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No sales data found" : "Satış verisi bulunamadı"}</p>)
+            : (analysis.topByStockValue.length > 0
+                ? <StockValueChart data={analysis.topByStockValue} lang={lang} />
+                : <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{en ? "No stock value data found" : "Stok değeri verisi bulunamadı"}</p>)
           }
         </section>
 
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            {en ? "Sales Distribution" : "Satış Dağılımı"}
+            {hasSalesData ? (en ? "Sales Distribution" : "Satış Dağılımı") : (en ? "Stock Value by Category" : "Kategori Bazında Stok Değeri")}
           </h3>
-          <SoldUnsoldPieChart sold={summary.soldProducts} unsold={summary.unsoldProducts} lang={lang} />
+          {hasSalesData
+            ? <SoldUnsoldPieChart sold={summary.soldProducts} unsold={summary.unsoldProducts} lang={lang} />
+            : <CategoryValuePieChart data={categoryValueData} lang={lang} />
+          }
         </section>
       </div>
 
       {analysis.profitByProduct.length > 0 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            {en ? "Top 10 Most Profitable Products" : "En Kârlı 10 Ürün"}
+            {hasSalesData ? (en ? "Top 10 Most Profitable Products" : "En Kârlı 10 Ürün") : (en ? "Top 10 Highest Potential Profit" : "En Yüksek Potansiyel Kârlı 10 Ürün")}
           </h3>
           <ProfitChart data={analysis.profitByProduct} lang={lang} />
         </section>
@@ -303,22 +400,26 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
       {analysis.categoryBreakdown.length > 1 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
-            {en ? "Revenue by Category" : "Kategori Bazında Gelir"}
+            {hasSalesData ? (en ? "Revenue by Category" : "Kategori Bazında Gelir") : (en ? "Stock Value & Cost by Category" : "Kategori Bazında Stok Değeri ve Maliyeti")}
           </h3>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analysis.categoryBreakdown} margin={{ left: 8, right: 16, top: 8, bottom: 40 }}>
+              <BarChart data={hasSalesData ? analysis.categoryBreakdown : analysis.categoryBreakdown.map(c => ({ category: c.category, revenue: c.stockValue, profit: c.stockCost }))} margin={{ left: 8, right: 16, top: 8, bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--color-text)" }} angle={-30} textAnchor="end" />
                 <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
                 <Tooltip
                   formatter={((value: string | number | undefined, name?: string | number) => {
                     const v = Number(value ?? 0);
-                    return String(name) === "revenue" ? [formatCurrency(v), en ? "Revenue" : "Gelir"] : [formatCurrency(v), en ? "Profit" : "Kâr"];
+                    if (hasSalesData) return String(name) === "revenue" ? [formatCurrency(v), en ? "Revenue" : "Gelir"] : [formatCurrency(v), en ? "Profit" : "Kâr"];
+                    return String(name) === "revenue" ? [formatCurrency(v), en ? "Stock Value" : "Stok Değeri"] : [formatCurrency(v), en ? "Stock Cost" : "Stok Maliyeti"];
                   }) as AnyFormatter}
                   contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
                 />
-                <Legend formatter={(v) => v === "revenue" ? (en ? "Revenue" : "Gelir") : (en ? "Profit" : "Kâr")} />
+                <Legend formatter={(v) => {
+                  if (hasSalesData) return v === "revenue" ? (en ? "Revenue" : "Gelir") : (en ? "Profit" : "Kâr");
+                  return v === "revenue" ? (en ? "Stock Value" : "Stok Değeri") : (en ? "Stock Cost" : "Stok Maliyeti");
+                }} />
                 <Bar dataKey="revenue" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="profit" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -327,7 +428,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
         </section>
       )}
 
-      {analysis.unsoldProducts.length > 0 && (
+      {hasSalesData && analysis.unsoldProducts.length > 0 && (
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
             <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700 }}>
@@ -380,38 +481,55 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
               <tr>
                 <th scope="col">{en ? "Product Name" : "Ürün Adı"}</th>
                 <th scope="col">{en ? "Barcode" : "Barkod"}</th>
-                <th scope="col">{en ? "Units Sold" : "Satış Adedi"}</th>
+                {hasSalesData && <th scope="col">{en ? "Units Sold" : "Satış Adedi"}</th>}
                 <th scope="col">{en ? "Remaining Stock" : "Kalan Stok"}</th>
                 <th scope="col">{en ? "Purchase Price" : "Alış Fiyatı"}</th>
                 <th scope="col">{en ? "Sale Price" : "Satış Fiyatı"}</th>
-                <th scope="col">{en ? "Profit/Unit" : "Kâr/Ürün"}</th>
-                <th scope="col">{en ? "Total Profit" : "Toplam Kâr"}</th>
+                {hasSalesData ? (
+                  <>
+                    <th scope="col">{en ? "Profit/Unit" : "Kâr/Ürün"}</th>
+                    <th scope="col">{en ? "Total Profit" : "Toplam Kâr"}</th>
+                  </>
+                ) : (
+                  <th scope="col">{en ? "Stock Value" : "Stok Değeri"}</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {inventoryRows.map((row, i) => {
                 const unitProfit = row.salePrice - row.purchasePrice;
                 const totalProfit = row.salesQty * unitProfit;
+                const stockValue = row.closingStock * row.salePrice;
                 return (
                   <tr key={i}>
                     <td style={{ fontWeight: 500 }}>{row.name}</td>
                     <td style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{row.barcode || "—"}</td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: row.salesQty > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>
-                        {row.salesQty.toLocaleString("tr-TR")}
-                      </span>
-                    </td>
+                    {hasSalesData && (
+                      <td>
+                        <span style={{ fontWeight: 600, color: row.salesQty > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>
+                          {row.salesQty.toLocaleString("tr-TR")}
+                        </span>
+                      </td>
+                    )}
                     <td>{row.closingStock.toLocaleString("tr-TR")}</td>
                     <td>{row.purchasePrice > 0 ? formatCurrency(row.purchasePrice) : "—"}</td>
                     <td>{row.salePrice > 0 ? formatCurrency(row.salePrice) : "—"}</td>
-                    <td style={{ color: unitProfit >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-                      {row.salePrice > 0 && row.purchasePrice > 0 ? formatCurrency(unitProfit) : "—"}
-                    </td>
-                    <td style={{ fontWeight: 600, color: totalProfit >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-                      {row.salesQty > 0 && row.salePrice > 0 && row.purchasePrice > 0
-                        ? formatCurrency(totalProfit)
-                        : "—"}
-                    </td>
+                    {hasSalesData ? (
+                      <>
+                        <td style={{ color: unitProfit >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                          {row.salePrice > 0 && row.purchasePrice > 0 ? formatCurrency(unitProfit) : "—"}
+                        </td>
+                        <td style={{ fontWeight: 600, color: totalProfit >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                          {row.salesQty > 0 && row.salePrice > 0 && row.purchasePrice > 0
+                            ? formatCurrency(totalProfit)
+                            : "—"}
+                        </td>
+                      </>
+                    ) : (
+                      <td style={{ fontWeight: 600 }}>
+                        {stockValue > 0 ? formatCurrency(stockValue) : "—"}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -469,16 +587,8 @@ export default function EnvanterPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string>("");
 
-  const handleConfirm = async (rows: ParsedRow[], headers: string[]): Promise<void> => {
-    const validRows = rows.filter((r) => r.isValid);
-    setMappingData({ headers, rows: validRows });
-    setColumnOverride(detectInventoryColumnMap(headers));
-    setPhase("mapping");
-  };
-
-  const handleCreateAnalysis = (): void => {
-    if (!mappingData) return;
-    const parsed = parseInventoryRows(mappingData.headers, mappingData.rows, columnOverride);
+  const runAnalysis = (headers: string[], rows: ParsedRow[], override: Partial<InventoryColumnMap>): void => {
+    const parsed = parseInventoryRows(headers, rows, override);
     const result = analyzeInventory(parsed);
     setInventoryRows(parsed);
     setAnalysis(result);
@@ -486,6 +596,26 @@ export default function EnvanterPage() {
     setSaveState("idle");
     setSaveMessage("");
     setPhase("analysis");
+  };
+
+  // Temel alanlar (ad + fiyat + stok/adet) otomatik ve güvenilir şekilde bulunduysa
+  // kullanıcıdan manuel kolon eşleştirmesi istenmez — doğrudan analiz gösterilir.
+  // Eşleştirme her zaman "Sütunları Düzenle" ile analiz ekranından tekrar açılabilir.
+  const handleConfirm = async (rows: ParsedRow[], headers: string[]): Promise<void> => {
+    const validRows = rows.filter((r) => r.isValid);
+    const detected = detectInventoryColumnMap(headers);
+    setMappingData({ headers, rows: validRows });
+    setColumnOverride(detected);
+    if (isAutoMappingConfident(detected)) {
+      runAnalysis(headers, validRows, detected);
+    } else {
+      setPhase("mapping");
+    }
+  };
+
+  const handleCreateAnalysis = (): void => {
+    if (!mappingData) return;
+    runAnalysis(mappingData.headers, mappingData.rows, columnOverride);
   };
 
   const handleBackToUpload = (): void => {
@@ -787,6 +917,11 @@ export default function EnvanterPage() {
                   ? (en ? "Saved" : "Kaydedildi")
                   : (en ? "Save" : "Kaydet")}
             </button>
+            {mappingData && (
+              <button className="btn btn-secondary" onClick={() => setPhase("mapping")} title={en ? "Fix a column if the automatic mapping got something wrong" : "Otomatik eşleştirme bir şeyi yanlış aldıysa düzeltin"}>
+                {en ? "Edit Columns" : "Sütunları Düzenle"}
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={handleReset}>
               {en ? "Upload New Report" : "Yeni Rapor Yükle"}
             </button>
