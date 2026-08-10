@@ -39,6 +39,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user.password) return null;
 
         const isValid = await bcrypt.compare(password, user.password);
+        // TODO: twoFactorEnabled kullanıcılar için authorize() sonrası ikinci adım (OTP doğrulama)
+        // akışı ayrı bir UI değişikliği gerektirir — şu an sadece ayarlar sayfasından 2FA
+        // açılıp/kapatılabiliyor, login akışına entegre değil.
         if (!isValid) return null;
 
         // Son giriş zamanı güncelle

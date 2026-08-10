@@ -263,6 +263,9 @@ export const t = {
     passwordHint: { tr: "Güçlü bir şifre kullanın: en az 12 karakter, büyük/küçük harf, rakam ve özel karakter içermeli.", en: "Use a strong password: at least 12 characters with uppercase, lowercase, numbers and special characters." },
     updateBtn: { tr: "🔑 Şifreyi Güncelle", en: "🔑 Update Password" },
     registered: { tr: "Kayıt", en: "Registered" },
+    teamTab: { tr: "Ekip Yönetimi", en: "Team Management" },
+    securityTab: { tr: "Güvenlik", en: "Security" },
+    billingTab: { tr: "Faturalama", en: "Billing" },
   },
 } as const;
 

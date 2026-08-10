@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTheme, type Theme } from "@/lib/hooks/useTheme";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
+import { getInitials } from "@/lib/utils";
 
 interface PharmacyData {
   id: string; name: string; taxNumber: string | null; licenseNumber: string | null;
@@ -12,10 +13,14 @@ interface PharmacyData {
 }
 
 interface UserData {
-  id: string; name: string | null; email: string; pharmacistName: string | null; createdAt: string;
+  id: string; name: string | null; email: string; pharmacistName: string | null; createdAt: string; image?: string | null;
 }
 
-type Tab = "eczane" | "profil" | "sifre" | "tema" | "dil";
+interface TeamMember {
+  userId: string; name: string | null; email: string; role: string; isActive: boolean;
+}
+
+type Tab = "eczane" | "profil" | "sifre" | "ekip" | "guvenlik" | "faturalama" | "tema" | "dil";
 
 function SuccessBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
   return (
@@ -171,6 +176,361 @@ function LangPicker() {
   );
 }
 
+const ROLE_LABELS: Record<string, { tr: string; en: string }> = {
+  OWNER: { tr: "Sahip", en: "Owner" },
+  ADMIN: { tr: "Yönetici", en: "Admin" },
+  ACCOUNTANT: { tr: "Muhasebeci", en: "Accountant" },
+  VIEWER: { tr: "İzleyici", en: "Viewer" },
+};
+
+function TeamPanel({ currentUserEmail, lang }: { currentUserEmail: string | undefined; lang: "tr" | "en" }) {
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteForm, setInviteForm] = useState({ email: "", role: "VIEWER" });
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const [localSuccess, setLocalSuccess] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/v1/ayarlar/ekip", { headers: { "Accept-Language": lang } });
+    const json = await res.json() as { success: boolean; data?: TeamMember[] };
+    if (json.success && json.data) setMembers(json.data);
+    setLoading(false);
+  }, [lang]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const me = members.find(m => m.email === currentUserEmail);
+  const canManage = me?.role === "OWNER" || me?.role === "ADMIN";
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch("/api/v1/ayarlar/ekip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify(inviteForm),
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      setLocalSuccess(lang === "en" ? "Team member added." : "Ekip üyesi eklendi.");
+      setInviteForm({ email: "", role: "VIEWER" });
+      await load();
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  const handleRoleChange = async (userId: string, role: string) => {
+    setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch("/api/v1/ayarlar/ekip", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({ userId, role }),
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      await load();
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  const handleRemove = async (userId: string) => {
+    setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch(`/api/v1/ayarlar/ekip?userId=${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: { "Accept-Language": lang },
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      setLocalSuccess(lang === "en" ? "Team member removed." : "Ekip üyesi çıkarıldı.");
+      await load();
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card">
+      <div style={{ marginBottom: "var(--spacing-5)" }}>
+        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.teamTab, lang)}</h2>
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+          {lang === "en" ? "Manage who has access to this pharmacy." : "Bu eczaneye kimlerin erişebileceğini yönetin."}
+        </p>
+      </div>
+
+      {localError && <ErrorBanner msg={localError} onClose={() => setLocalError("")} />}
+      {localSuccess && <SuccessBanner msg={localSuccess} onClose={() => setLocalSuccess("")} />}
+
+      {loading ? (
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>{lang === "en" ? "Loading..." : "Yükleniyor..."}</p>
+      ) : (
+        <div style={{ overflowX: "auto", marginBottom: "var(--spacing-5)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--font-size-sm)" }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)" }}>
+                <th style={{ padding: "8px" }}>{lang === "en" ? "Name" : "Ad"}</th>
+                <th style={{ padding: "8px" }}>{lang === "en" ? "Email" : "E-posta"}</th>
+                <th style={{ padding: "8px" }}>{lang === "en" ? "Role" : "Rol"}</th>
+                <th style={{ padding: "8px" }}>{lang === "en" ? "Status" : "Durum"}</th>
+                {canManage && <th style={{ padding: "8px" }}>{lang === "en" ? "Action" : "İşlem"}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {members.map(mem => (
+                <tr key={mem.userId} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                  <td style={{ padding: "8px" }}>{mem.name ?? "—"}</td>
+                  <td style={{ padding: "8px" }}>{mem.email}</td>
+                  <td style={{ padding: "8px" }}>
+                    {canManage && mem.role !== "OWNER" ? (
+                      <select
+                        value={mem.role}
+                        disabled={busy}
+                        onChange={(e) => void handleRoleChange(mem.userId, e.target.value)}
+                        className="form-input"
+                        style={{ padding: "4px 8px", fontSize: "var(--font-size-xs)" }}
+                      >
+                        <option value="ADMIN">{ROLE_LABELS.ADMIN[lang]}</option>
+                        <option value="ACCOUNTANT">{ROLE_LABELS.ACCOUNTANT[lang]}</option>
+                        <option value="VIEWER">{ROLE_LABELS.VIEWER[lang]}</option>
+                      </select>
+                    ) : (
+                      <span style={{ padding: "2px 10px", borderRadius: "999px", background: "var(--color-primary-pale)", color: "var(--color-primary)", fontSize: "var(--font-size-xs)", fontWeight: 600 }}>
+                        {ROLE_LABELS[mem.role]?.[lang] ?? mem.role}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: "8px" }}>
+                    {mem.isActive ? (lang === "en" ? "Active" : "Aktif") : (lang === "en" ? "Inactive" : "Pasif")}
+                  </td>
+                  {canManage && (
+                    <td style={{ padding: "8px" }}>
+                      {mem.role !== "OWNER" && (
+                        <button
+                          disabled={busy}
+                          onClick={() => void handleRemove(mem.userId)}
+                          className="btn"
+                          style={{ padding: "4px 10px", fontSize: "var(--font-size-xs)", color: "var(--color-danger)", border: "1px solid var(--color-danger)", background: "transparent" }}
+                        >
+                          {lang === "en" ? "Remove" : "Çıkar"}
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {canManage && (
+        <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "var(--spacing-5)" }}>
+          <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-3)", fontSize: "var(--font-size-sm)" }}>
+            {lang === "en" ? "Add Team Member" : "Ekip Üyesi Ekle"}
+          </h3>
+          <form onSubmit={(e) => void handleInvite(e)} style={{ display: "flex", gap: "var(--spacing-3)", alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div className="form-group" style={{ flex: 1, minWidth: 200 }}>
+              <label className="form-label">{lang === "en" ? "Email" : "E-posta"}</label>
+              <input type="email" value={inviteForm.email} onChange={(e) => setInviteForm(prev => ({ ...prev, email: e.target.value }))} className="form-input" placeholder="ornek@mail.com" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{lang === "en" ? "Role" : "Rol"}</label>
+              <select value={inviteForm.role} onChange={(e) => setInviteForm(prev => ({ ...prev, role: e.target.value }))} className="form-input">
+                <option value="VIEWER">{ROLE_LABELS.VIEWER[lang]}</option>
+                <option value="ACCOUNTANT">{ROLE_LABELS.ACCOUNTANT[lang]}</option>
+                <option value="ADMIN">{ROLE_LABELS.ADMIN[lang]}</option>
+              </select>
+            </div>
+            <button type="submit" disabled={busy} className="btn btn-primary">
+              {lang === "en" ? "Add" : "Ekle"}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SecurityPanel({ lang }: { lang: "tr" | "en" }) {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState<"idle" | "setup" | "confirmed">("idle");
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [code, setCode] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [disablePassword, setDisablePassword] = useState("");
+  const [showDisableForm, setShowDisableForm] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const [localSuccess, setLocalSuccess] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/v1/ayarlar/guvenlik", { headers: { "Accept-Language": lang } });
+    const json = await res.json() as { success: boolean; data?: { twoFactorEnabled: boolean } };
+    if (json.success && json.data) setEnabled(json.data.twoFactorEnabled);
+    setLoading(false);
+  }, [lang]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const startSetup = async () => {
+    setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch("/api/v1/ayarlar/guvenlik", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const json = await res.json() as { success: boolean; error?: string; data?: { qrCodeDataUrl: string; secret: string } };
+      if (!json.success || !json.data) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      setQrCodeDataUrl(json.data.qrCodeDataUrl);
+      setSecret(json.data.secret);
+      setStep("setup");
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  const confirmSetup = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch("/api/v1/ayarlar/guvenlik", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({ action: "confirm", code }),
+      });
+      const json = await res.json() as { success: boolean; error?: string; data?: { backupCodes: string[] } };
+      if (!json.success || !json.data) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      setBackupCodes(json.data.backupCodes);
+      setStep("confirmed");
+      setEnabled(true);
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  const disable2fa = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setLocalError(""); setLocalSuccess("");
+    try {
+      const res = await fetch("/api/v1/ayarlar/guvenlik", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({ action: "disable", currentPassword: disablePassword }),
+      });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (!json.success) throw new Error(json.error ?? (lang === "en" ? "An error occurred" : "Hata oluştu"));
+      setEnabled(false);
+      setShowDisableForm(false);
+      setDisablePassword("");
+      setStep("idle");
+      setLocalSuccess(lang === "en" ? "Two-factor authentication disabled." : "İki adımlı doğrulama devre dışı bırakıldı.");
+    } catch (err) { setLocalError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Hata oluştu")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card">
+      <div style={{ marginBottom: "var(--spacing-5)" }}>
+        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.securityTab, lang)}</h2>
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+          {lang === "en" ? "Add an extra layer of security to your account with two-factor authentication." : "İki adımlı doğrulama ile hesabınıza ekstra bir güvenlik katmanı ekleyin."}
+        </p>
+      </div>
+
+      {localError && <ErrorBanner msg={localError} onClose={() => setLocalError("")} />}
+      {localSuccess && <SuccessBanner msg={localSuccess} onClose={() => setLocalSuccess("")} />}
+
+      {loading ? (
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>{lang === "en" ? "Loading..." : "Yükleniyor..."}</p>
+      ) : (
+        <>
+          {!enabled && step === "idle" && (
+            <div>
+              <p style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-4)" }}>
+                {lang === "en" ? "Two-factor authentication is currently disabled." : "İki adımlı doğrulama şu anda devre dışı."}
+              </p>
+              <button onClick={() => void startSetup()} disabled={busy} className="btn btn-primary">
+                {lang === "en" ? "Enable" : "Etkinleştir"}
+              </button>
+            </div>
+          )}
+
+          {step === "setup" && (
+            <form onSubmit={(e) => void confirmSetup(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+              <p style={{ fontSize: "var(--font-size-sm)" }}>
+                {lang === "en" ? "Scan the QR code with an authenticator app (Google Authenticator, Authy...) or enter the secret manually." : "QR kodunu bir doğrulayıcı uygulama (Google Authenticator, Authy vb.) ile tarayın veya gizli anahtarı manuel girin."}
+              </p>
+              {qrCodeDataUrl && <img src={qrCodeDataUrl} alt="2FA QR" style={{ width: 180, height: 180 }} />}
+              <div style={{ fontFamily: "monospace", fontSize: "var(--font-size-sm)", background: "var(--color-bg)", padding: "8px 12px", borderRadius: "var(--radius-md)", wordBreak: "break-all" }}>
+                {secret}
+              </div>
+              <Field label={lang === "en" ? "6-Digit Code" : "6 Haneli Kod"} name="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
+              <button type="submit" disabled={busy} className="btn btn-primary" style={{ alignSelf: "flex-start" }}>
+                {lang === "en" ? "Confirm" : "Onayla"}
+              </button>
+            </form>
+          )}
+
+          {step === "confirmed" && backupCodes.length > 0 && (
+            <div>
+              <p style={{ fontWeight: 700, marginBottom: "var(--spacing-2)" }}>
+                {lang === "en" ? "Two-factor authentication is now active." : "İki adımlı doğrulama artık aktif."}
+              </p>
+              <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-danger)", marginBottom: "var(--spacing-3)" }}>
+                {lang === "en" ? "Save these codes somewhere safe, they will not be shown again." : "Bu kodları güvenli bir yerde saklayın, tekrar gösterilmeyecek."}
+              </p>
+              <div style={{ fontFamily: "monospace", fontSize: "var(--font-size-sm)", background: "var(--color-bg)", padding: "12px 16px", borderRadius: "var(--radius-md)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                {backupCodes.map(c => <span key={c}>{c}</span>)}
+              </div>
+            </div>
+          )}
+
+          {enabled && step !== "confirmed" && (
+            <div>
+              <p style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-4)", color: "#4e7c3f", fontWeight: 600 }}>
+                {lang === "en" ? "Two-factor authentication is active." : "İki adımlı doğrulama aktif."}
+              </p>
+              {!showDisableForm ? (
+                <button onClick={() => setShowDisableForm(true)} className="btn" style={{ border: "1px solid var(--color-danger)", color: "var(--color-danger)", background: "transparent" }}>
+                  {lang === "en" ? "Disable" : "Devre Dışı Bırak"}
+                </button>
+              ) : (
+                <form onSubmit={(e) => void disable2fa(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)", maxWidth: 320 }}>
+                  <Field label={tx(t.settings.currentPassword, lang)} name="disablePassword" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" />
+                  <button type="submit" disabled={busy} className="btn btn-primary" style={{ alignSelf: "flex-start" }}>
+                    {lang === "en" ? "Confirm Disable" : "Devre Dışı Bırakmayı Onayla"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BillingPanel({ lang }: { lang: "tr" | "en" }) {
+  return (
+    <div className="card">
+      <div style={{ marginBottom: "var(--spacing-5)" }}>
+        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.billingTab, lang)}</h2>
+      </div>
+      <p style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-2)" }}>
+        <strong>{lang === "en" ? "Current Plan:" : "Mevcut Plan:"}</strong> {lang === "en" ? "Standard" : "Standart"}
+      </p>
+      <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)" }}>
+        {lang === "en" ? "Billing and subscription management will be available soon." : "Faturalama ve abonelik yönetimi yakında kullanıma sunulacaktır."}
+      </p>
+      <button disabled className="btn" style={{ opacity: 0.5, cursor: "not-allowed" }}>
+        {lang === "en" ? "Manage Plan (Coming Soon)" : "Planı Yönet (Yakında)"}
+      </button>
+    </div>
+  );
+}
+
 export default function AyarlarPage() {
   const { lang } = useLangContext();
   const [tab, setTab] = useState<Tab>("eczane");
@@ -184,7 +544,7 @@ export default function AyarlarPage() {
 
   // Profil
   const [user, setUser] = useState<UserData | null>(null);
-  const [profileForm, setProfileForm] = useState({ name: "", pharmacistName: "" });
+  const [profileForm, setProfileForm] = useState({ name: "", pharmacistName: "", email: "", currentPassword: "", image: "" });
 
   // Şifre
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -212,7 +572,7 @@ export default function AyarlarPage() {
     const json = await res.json() as { success: boolean; data?: UserData };
     if (json.success && json.data) {
       setUser(json.data);
-      setProfileForm({ name: json.data.name ?? "", pharmacistName: json.data.pharmacistName ?? "" });
+      setProfileForm({ name: json.data.name ?? "", pharmacistName: json.data.pharmacistName ?? "", email: json.data.email ?? "", currentPassword: "", image: json.data.image ?? "" });
     }
   }, []);
 
@@ -240,10 +600,27 @@ export default function AyarlarPage() {
     finally { setSaving(false); }
   };
 
+  const emailChanged = user !== null && profileForm.email !== user.email;
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfileForm(prev => ({ ...prev, image: typeof reader.result === "string" ? reader.result : prev.image }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError(""); setSuccess("");
     try {
-      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(profileForm) });
+      const payload: Record<string, string> = { name: profileForm.name, pharmacistName: profileForm.pharmacistName, image: profileForm.image };
+      if (emailChanged) {
+        payload.email = profileForm.email;
+        payload.currentPassword = profileForm.currentPassword;
+      }
+      const res = await fetch("/api/v1/ayarlar/profil", { method: "PUT", headers: { "Content-Type": "application/json", "Accept-Language": lang }, body: JSON.stringify(payload) });
       const json = await res.json() as { success: boolean; error?: string };
       if (!json.success) throw new Error(json.error ?? (lang === "en" ? "Save error" : "Kayıt hatası"));
       setSuccess(tx(t.settings.updateProfile, lang));
@@ -268,6 +645,9 @@ export default function AyarlarPage() {
     { key: "eczane", label: tx(t.settings.pharmacyTab, lang), icon: "🏥" },
     { key: "profil", label: tx(t.settings.profileTab, lang), icon: "👤" },
     { key: "sifre", label: tx(t.settings.passwordTab, lang), icon: "🔑" },
+    { key: "ekip", label: tx(t.settings.teamTab, lang), icon: "👥" },
+    { key: "guvenlik", label: tx(t.settings.securityTab, lang), icon: "🛡️" },
+    { key: "faturalama", label: tx(t.settings.billingTab, lang), icon: "💳" },
     { key: "tema", label: tx(t.settings.themeTab, lang), icon: "🎨" },
     { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: "🌐" },
   ];
@@ -341,15 +721,25 @@ export default function AyarlarPage() {
           {/* Avatar */}
           {user && (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4)", background: "var(--color-bg)", borderRadius: "var(--radius-lg)", marginBottom: "var(--spacing-5)" }}>
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, var(--color-primary), #9fe870)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: 800, color: "white", flexShrink: 0 }}>
-                {(user.name ?? user.email)[0].toUpperCase()}
-              </div>
-              <div>
+              {profileForm.image ? (
+                <img src={profileForm.image} alt="Avatar" style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, var(--color-primary), #9fe870)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 800, color: "white", flexShrink: 0 }}>
+                  {getInitials(user.name ?? user.email)}
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
                 <p style={{ fontWeight: 700 }}>{user.name ?? "—"}</p>
                 <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{user.email}</p>
                 <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
                   {lang === "en" ? "Registered:" : "Kayıt:"} {new Date(user.createdAt).toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR")}
                 </p>
+              </div>
+              <div>
+                <input type="file" accept="image/*" id="avatar-input" style={{ display: "none" }} onChange={handleAvatarSelect} />
+                <label htmlFor="avatar-input" className="btn" style={{ cursor: "pointer", fontSize: "var(--font-size-xs)" }}>
+                  {lang === "en" ? "Change Photo" : "Fotoğraf Değiştir"}
+                </label>
               </div>
             </div>
           )}
@@ -357,6 +747,10 @@ export default function AyarlarPage() {
           <form onSubmit={(e) => void saveProfile(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <Field label={tx(t.settings.fullName, lang)} name="name" value={profileForm.name} onChange={handleProfileChange} placeholder="Ahmet Yılmaz" />
             <Field label={tx(t.settings.pharmacistTitle, lang)} name="pharmacistName" value={profileForm.pharmacistName} onChange={handleProfileChange} placeholder="Ecz. Ahmet Yılmaz" />
+            <Field label={tx(t.settings.email, lang)} name="email" value={profileForm.email} onChange={handleProfileChange} type="email" placeholder="ornek@mail.com" />
+            {emailChanged && (
+              <Field label={tx(t.settings.currentPassword, lang)} name="currentPassword" value={profileForm.currentPassword} onChange={handleProfileChange} type="password" placeholder={lang === "en" ? "Required to change email" : "E-posta değiştirmek için gerekli"} />
+            )}
             <button type="submit" disabled={saving} className="btn btn-primary" style={{ alignSelf: "flex-start", minWidth: 160 }}>
               {saving ? tx(t.common.saving, lang) : tx(t.common.save, lang)}
             </button>
@@ -402,6 +796,15 @@ export default function AyarlarPage() {
           </form>
         </div>
       )}
+
+      {/* ── Ekip ── */}
+      {tab === "ekip" && <TeamPanel currentUserEmail={user?.email} lang={lang} />}
+
+      {/* ── Güvenlik (2FA) ── */}
+      {tab === "guvenlik" && <SecurityPanel lang={lang} />}
+
+      {/* ── Faturalama ── */}
+      {tab === "faturalama" && <BillingPanel lang={lang} />}
 
       {/* ── Tema ── */}
       {tab === "tema" && <ThemePicker />}
