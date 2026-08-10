@@ -163,9 +163,11 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
   onSliceClick: (type: "PRESCRIPTION" | "RETAIL") => void;
 }) {
   const en = lang === "en";
+  const total = prescriptionRevenue + retailRevenue;
+  const pct = (v: number) => total > 0 ? Math.round((v / total) * 100) : 0;
   const data = [
-    { name: en ? "Prescription (SGK)" : "Reçeteli (SGK)", value: prescriptionRevenue, type: "PRESCRIPTION" as const },
-    { name: en ? "Retail" : "Perakende", value: retailRevenue, type: "RETAIL" as const },
+    { name: en ? "Prescription (SGK)" : "Reçeteli (SGK)", value: prescriptionRevenue, type: "PRESCRIPTION" as const, pct: pct(prescriptionRevenue) },
+    { name: en ? "Retail" : "Perakende", value: retailRevenue, type: "RETAIL" as const, pct: pct(retailRevenue) },
   ];
   return (
     <div style={{ height: 260 }}>
@@ -179,6 +181,8 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
             outerRadius={100}
             paddingAngle={4}
             dataKey="value"
+            label={((entry: { name?: string; pct?: number }) => `${entry.name} %${entry.pct}`) as unknown as AnyFormatter}
+            labelLine={false}
             onClick={(entry: unknown) => {
               const e = entry as { type?: "PRESCRIPTION" | "RETAIL" };
               if (e?.type) onSliceClick(e.type);
@@ -190,10 +194,11 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
             ))}
           </Pie>
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Gelir"]) as AnyFormatter}
+            formatter={((value: string | number | undefined, _name: string | number | undefined, item: { payload?: { pct: number } }) =>
+              [`${formatCurrency(Number(value ?? 0))} (%${item?.payload?.pct ?? 0})`, en ? "Revenue" : "Gelir"]) as AnyFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
-          <Legend />
+          <Legend formatter={((value: string, entry: { payload?: { pct: number } }) => `${value} (%${entry?.payload?.pct ?? 0})`) as AnyFormatter} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -577,17 +582,45 @@ export default function SatisRaporPage() {
   const setOvr = (key: keyof ColumnOverride, val: string | boolean) =>
     setOverride(prev => ({ ...prev, [key]: val }));
 
-  const ColSelect = ({ fieldKey, label, hint }: { fieldKey: keyof ColumnOverride; label: string; hint?: string }) => (
-    <div className="form-group" style={{ marginBottom: 0 }}>
-      <label className="form-label">{label}</label>
-      <select className="form-input" value={effectiveMap(fieldKey)}
-        onChange={e => setOvr(fieldKey, e.target.value)}>
-        <option value="">{lang === "en" ? "— Not Selected —" : "— Seçilmedi —"}</option>
-        {headers.map(h => <option key={h} value={h}>{h}</option>)}
-      </select>
-      {hint && <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>{hint}</p>}
-    </div>
-  );
+  // Seçilen sütunun dosyadaki ilk birkaç gerçek değerini gösterir — kullanıcı
+  // "bu sütun gerçekten doğru mu" sorusunu kör tahminle değil, örnek veriye
+  // bakarak yanıtlayabilir (envanter modülündeki aynı UX iyileştirmesi).
+  const sampleValuesFor = (headerName: string): string[] => {
+    const idx = headers.indexOf(headerName);
+    if (idx < 0) return [];
+    return dataRows
+      .slice(0, 3)
+      .map(row => String(row[idx] ?? "").trim())
+      .filter(v => v !== "");
+  };
+
+  const ColSelect = ({ fieldKey, label, hint }: { fieldKey: keyof ColumnOverride; label: string; hint?: string }) => {
+    const selected = effectiveMap(fieldKey);
+    const samples = selected ? sampleValuesFor(selected) : [];
+    return (
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">{label}</label>
+        <select className="form-input" value={selected}
+          onChange={e => setOvr(fieldKey, e.target.value)}>
+          <option value="">{lang === "en" ? "— Not Selected —" : "— Seçilmedi —"}</option>
+          {headers.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        {hint && <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>{hint}</p>}
+        <div style={{ marginTop: "4px", fontSize: "11px", minHeight: "16px" }}>
+          {selected && (
+            samples.length > 0 ? (
+              <span style={{ color: "var(--color-text-muted)" }}>
+                {lang === "en" ? "Sample: " : "Örnek: "}
+                <span style={{ fontWeight: 600, color: "var(--color-text)" }}>{samples.join(" · ")}</span>
+              </span>
+            ) : (
+              <span style={{ color: "var(--color-text-muted)" }}>{lang === "en" ? "This column appears empty in the first rows." : "Bu sütun ilk satırlarda boş görünüyor."}</span>
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
@@ -613,6 +646,19 @@ export default function SatisRaporPage() {
           {lang === "en" ? "✅ Sales saved successfully. You can view them in the list." : "✅ Satışlar başarıyla kaydedildi. Listede görüntüleyebilirsiniz."}
         </div>
       )}
+
+      <div style={{
+        marginBottom: "var(--spacing-5)", padding: "12px 16px", background: "var(--color-primary-pale)",
+        border: "1px solid var(--color-primary-light)", borderRadius: "var(--radius-md)", fontSize: "13px",
+        color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
+      }}>
+        <span style={{ fontSize: "18px", flexShrink: 0 }}>ℹ️</span>
+        <span>
+          {lang === "en"
+            ? "This page is for product-level sales analysis only (which products sell, prescription vs. retail mix, trends). It does NOT feed into your Dashboard's Total Income/Expense or the Monthly Summary — those come from Kasa (POS/Cash/Wire) entries, which you enter separately. Importing sales data here will not double-count or change your Kasa totals."
+            : "Bu sayfa yalnızca ürün bazlı satış analizi içindir (hangi ürünler satılıyor, reçeteli/perakende dağılımı, trendler). Gösterge panelindeki Toplam Gelir/Gider'i veya Aylık Özet'i ETKİLEMEZ — o rakamlar ayrıca girdiğiniz Kasa (POS/Nakit/Havale) kayıtlarından gelir. Buraya satış verisi aktarmak Kasa toplamlarınızı değiştirmez veya çift saymaz."}
+        </span>
+      </div>
 
       {/* ── DOSYA İÇE AKTAR ── */}
       {tab === "upload" && (
@@ -726,11 +772,12 @@ export default function SatisRaporPage() {
           {/* ADIM 3: Önizleme */}
           {step === "preview" && previewRows.length > 0 && (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
                 {[
                   { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: previewRows.length.toLocaleString("tr-TR") },
                   { label: lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)", value: previewRows.filter(r => r.saleType === "PRESCRIPTION").length.toLocaleString("tr-TR") },
                   { label: lang === "en" ? "Retail" : "Perakende", value: previewRows.filter(r => r.saleType === "RETAIL").length.toLocaleString("tr-TR") },
+                  { label: lang === "en" ? "Avg. per Sale" : "Satış Başına Ort.", value: fmt(previewRows.length > 0 ? totalNetRevenue / previewRows.length : 0) },
                   { label: lang === "en" ? "Total Revenue" : "Toplam Ciro", value: fmt(totalNetRevenue), highlight: true },
                 ].map(c => (
                   <div key={c.label} className="card" style={{ padding: "var(--spacing-3)" }}>
@@ -739,6 +786,22 @@ export default function SatisRaporPage() {
                   </div>
                 ))}
               </div>
+
+              {columnMap && (
+                <div style={{ padding: "10px 14px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                  {lang === "en" ? "Mapped from: " : "Eşleştirilen sütunlar: "}
+                  <span style={{ color: "var(--color-text)", fontWeight: 600 }}>
+                    {`${lang === "en" ? "Name" : "Ad"}="${columnMap.name}", ${lang === "en" ? "Date" : "Tarih"}="${columnMap.date}", ${lang === "en" ? "Price" : "Fiyat"}="${columnMap.price}"`}
+                    {columnMap.priceIsNet
+                      ? ` (${lang === "en" ? "net amount, not multiplied by qty" : "net tutar, adetle çarpılmadı"})`
+                      : `, ${lang === "en" ? "Qty" : "Adet"}="${columnMap.quantity}"`}
+                  </span>
+                  {" — "}
+                  <button className="btn" style={{ padding: "2px 8px", fontSize: "11px" }} onClick={() => setStep("mapping")}>
+                    {lang === "en" ? "wrong? edit" : "yanlışsa düzelt"}
+                  </button>
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)", flexWrap: "wrap" }}>
                 <button className="btn" onClick={() => setStep("mapping")}>{lang === "en" ? "← Edit Columns" : "← Kolonları Düzenle"}</button>
@@ -861,12 +924,22 @@ export default function SatisRaporPage() {
               </div>
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Prescription / SGK" : "Reçeteli / SGK"}</div>
-                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700 }}>{fmt(summary.prescriptionRevenue)}</div>
+                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700 }}>
+                  {fmt(summary.prescriptionRevenue)}
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-muted)", marginLeft: "6px" }}>
+                    (%{summary.totalRevenue > 0 ? ((summary.prescriptionRevenue / summary.totalRevenue) * 100).toFixed(0) : 0})
+                  </span>
+                </div>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>{summary.prescriptionCount.toLocaleString("tr-TR")} {lang === "en" ? "sales" : "satış"}</div>
               </div>
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Retail / Direct" : "Perakende / Elden"}</div>
-                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700 }}>{fmt(summary.retailRevenue)}</div>
+                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700 }}>
+                  {fmt(summary.retailRevenue)}
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-muted)", marginLeft: "6px" }}>
+                    (%{summary.totalRevenue > 0 ? ((summary.retailRevenue / summary.totalRevenue) * 100).toFixed(0) : 0})
+                  </span>
+                </div>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>{summary.retailCount.toLocaleString("tr-TR")} {lang === "en" ? "sales" : "satış"}</div>
               </div>
             </div>
