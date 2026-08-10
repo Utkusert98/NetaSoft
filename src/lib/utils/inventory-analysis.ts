@@ -36,27 +36,39 @@ export interface InventoryAnalysis {
   profitByProduct: Array<{ name: string; profit: number; margin: number }>;
 }
 
+// NOT: Tüm alias'lar yeterince spesifik ifadeler olmalı. Tek kelimelik/çok genel
+// alias'lar (ör. "satış", "önce") başka bir alanın başlığıyla (ör. "Satış Fiyatı")
+// yanlışlıkla eşleşip iki farklı alanın AYNI sütunu göstermesine yol açabilir —
+// bu da örn. adet yerine fiyatın kullanılmasıyla tutarların karesi alınmış gibi
+// devasa yanlış sonuçlar üretir. Eşleştirme ayrıca aşağıda `detectColumn` içinde
+// her alan için daha önce başka bir alana atanmış başlıkları hariç tutarak
+// aynı sütunun iki alana birden atanmasını da yapısal olarak engeller.
 const COLUMN_ALIASES: Record<keyof InventoryRow, string[]> = {
-  name: ["ürün adı", "ilaç adı", "açıklama", "tanım", "malzeme adı", "ürün", "ad", "name"],
-  barcode: ["barkod", "karekod", "ilaç kodu", "ürün kodu", "kod", "barcode"],
-  category: ["kategori", "grup", "tür", "sınıf", "ana grup", "category"],
-  openingStock: ["dönem başı", "başlangıç stok", "açılış stok", "önce", "önceki stok"],
-  purchaseQty: ["alış adet", "giriş", "satın alınan", "alım", "alış miktarı", "gelen"],
-  salesQty: ["satış adet", "satış miktarı", "çıkış", "satılan", "satış", "giden", "tükenen"],
-  closingStock: ["dönem sonu", "bitiş stok", "kapanış stok", "kalan stok", "mevcut stok", "stok", "envanter"],
-  purchasePrice: ["alış fiyatı", "maliyet", "alım fiyatı", "kdv'siz", "net fiyat", "birim maliyet"],
-  salePrice: ["satış fiyatı", "perakende", "s.f.", "satış f.", "liste fiyatı", "sf"],
+  name: ["ürün adı", "ilaç adı", "malzeme adı", "stok adı", "ürün açıklaması"],
+  barcode: ["barkod", "karekod", "ilaç kodu", "ürün kodu", "stok kodu"],
+  category: ["kategori", "ürün grubu", "ana grup", "ilaç grubu", "terapötik grup"],
+  openingStock: ["dönem başı stok", "başlangıç stok", "açılış stok", "önceki dönem stok", "devir stok"],
+  purchaseQty: ["alış adedi", "alış miktarı", "giriş adedi", "satın alınan", "alım miktarı"],
+  salesQty: ["satış adedi", "satış miktarı", "çıkış adedi", "satılan adet", "satılan miktar", "tüketilen adet"],
+  closingStock: ["dönem sonu stok", "bitiş stok", "kapanış stok", "kalan stok", "mevcut stok", "güncel stok"],
+  purchasePrice: ["alış fiyatı", "alım fiyatı", "birim maliyet", "birim alış fiyatı"],
+  salePrice: ["satış fiyatı", "perakende fiyatı", "liste fiyatı", "birim satış fiyatı"],
 };
 
-function detectColumn(headers: string[], field: keyof InventoryRow): string | null {
+function detectColumn(headers: string[], field: keyof InventoryRow, claimed: Set<string>): string | null {
   const aliases = COLUMN_ALIASES[field];
   const normalized = headers.map((h) => h.toLowerCase().trim());
 
+  // 1. geçiş: tam eşleşme (en güvenilir)
   for (const alias of aliases) {
-    const idx = normalized.findIndex(
-      (h) => h === alias || h.includes(alias) || alias.includes(h),
-    );
-    if (idx !== -1) return headers[idx];
+    const idx = normalized.findIndex((h, i) => h === alias && !claimed.has(headers[i]));
+    if (idx !== -1) { claimed.add(headers[idx]); return headers[idx]; }
+  }
+  // 2. geçiş: başlık, alias ifadesini bir bütün olarak içeriyor (ters yönde değil —
+  // kısa bir alias'ın uzun bir başlığın rastgele bir parçasına denk gelmesini önler)
+  for (const alias of aliases) {
+    const idx = normalized.findIndex((h, i) => h.includes(alias) && !claimed.has(headers[i]));
+    if (idx !== -1) { claimed.add(headers[idx]); return headers[idx]; }
   }
   return null;
 }
@@ -68,21 +80,32 @@ function toNumber(value: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+export type InventoryColumnMap = Record<keyof InventoryRow, string | null>;
+
+// Başlıkları otomatik alanlara eşler. Sıralama önemlidir: her alan yalnızca daha
+// önce başka bir alana atanmamış bir başlığı alabilir (bkz. `claimed` seti),
+// böylece iki farklı alan (ör. adet ve fiyat) aynı sütuna atanamaz.
+export function detectInventoryColumnMap(headers: string[]): InventoryColumnMap {
+  const claimed = new Set<string>();
+  return {
+    name: detectColumn(headers, "name", claimed),
+    barcode: detectColumn(headers, "barcode", claimed),
+    category: detectColumn(headers, "category", claimed),
+    salePrice: detectColumn(headers, "salePrice", claimed),
+    purchasePrice: detectColumn(headers, "purchasePrice", claimed),
+    salesQty: detectColumn(headers, "salesQty", claimed),
+    purchaseQty: detectColumn(headers, "purchaseQty", claimed),
+    closingStock: detectColumn(headers, "closingStock", claimed),
+    openingStock: detectColumn(headers, "openingStock", claimed),
+  };
+}
+
 export function parseInventoryRows(
   headers: string[],
   rows: Array<{ rawData: Record<string, unknown> }>,
+  columnOverride?: Partial<InventoryColumnMap>,
 ): InventoryRow[] {
-  const colMap = {
-    name: detectColumn(headers, "name"),
-    barcode: detectColumn(headers, "barcode"),
-    category: detectColumn(headers, "category"),
-    openingStock: detectColumn(headers, "openingStock"),
-    purchaseQty: detectColumn(headers, "purchaseQty"),
-    salesQty: detectColumn(headers, "salesQty"),
-    closingStock: detectColumn(headers, "closingStock"),
-    purchasePrice: detectColumn(headers, "purchasePrice"),
-    salePrice: detectColumn(headers, "salePrice"),
-  };
+  const colMap: InventoryColumnMap = { ...detectInventoryColumnMap(headers), ...columnOverride };
 
   return rows.map((row) => {
     const get = (col: string | null): unknown => (col ? row.rawData[col] : "");

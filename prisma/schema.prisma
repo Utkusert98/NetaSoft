@@ -83,11 +83,12 @@ model User {
   deletedAt DateTime? @map("deleted_at")
 
   // İlişkiler
-  accounts      Account[]
-  sessions      Session[]
-  pharmacyRoles UserPharmacyRole[]
-  fileImports   FileImport[]
-  auditLogs     AuditLog[]
+  accounts         Account[]
+  sessions         Session[]
+  pharmacyRoles    UserPharmacyRole[]
+  fileImports      FileImport[]
+  auditLogs        AuditLog[]
+  inventoryReports InventoryReport[]
 
   @@index([email])
   @@index([deletedAt])
@@ -129,6 +130,7 @@ model Pharmacy {
   platformIncomes   PlatformIncome[]
   supplierTransfers SupplierTransfer[]
   saleRecords       SaleRecord[]
+  inventoryReports  InventoryReport[]
 
   @@index([name])
   @@index([deletedAt])
@@ -797,4 +799,32 @@ model SaleRecord {
 enum SaleType {
   PRESCRIPTION // Reçeteli / SGK
   RETAIL       // Perakende / Elden
+}
+
+// Envanter analizi anlık görüntüsü — yüklenen stok/satış raporunun onaylanmış özeti + satır verisi
+model InventoryReport {
+  id         String @id @default(cuid())
+  pharmacyId String @map("pharmacy_id")
+  userId     String @map("user_id")
+
+  fileName      String  @map("file_name")
+  totalProducts Int     @map("total_products")
+  soldProducts  Int     @map("sold_products")
+  totalRevenue  Decimal @map("total_revenue") @db.Decimal(15, 2)
+  totalCost     Decimal @map("total_cost") @db.Decimal(15, 2)
+  totalProfit   Decimal @map("total_profit") @db.Decimal(15, 2)
+  profitMargin  Decimal @map("profit_margin") @db.Decimal(6, 2)
+
+  items Json // Onaylanmış InventoryRow[] — ürün bazlı analiz satırları
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId, deletedAt])
+  @@index([pharmacyId, createdAt])
+  @@map("inventory_reports")
 }

@@ -220,6 +220,7 @@ body {
   background-color: var(--color-bg);
   line-height: 1.6;
   min-height: 100vh;
+  overflow-x: hidden; /* geniş bir bileşen sayfayı taşırsa bile sayfa genelinde yatay kaydırma açılmasın */
 }
 
 a {
@@ -272,6 +273,8 @@ h6 { font-size: var(--font-size-base); }
 
 .main-content {
   flex: 1;
+  min-width: 0; /* flex öğeleri varsayılan min-width:auto olduğundan, geniş bir tablo/grafik
+                   sayfanın tamamını viewport dışına taşırıp yatay kaydırmaya zorlayabiliyordu */
   margin-left: var(--sidebar-width);
   min-height: 100vh;
   display: flex;
@@ -280,6 +283,7 @@ h6 { font-size: var(--font-size-base); }
 
 .page-content {
   flex: 1;
+  min-width: 0;
   padding: var(--spacing-8);
   max-width: var(--content-max-width);
   width: 100%;
