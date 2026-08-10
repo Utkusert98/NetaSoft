@@ -3,7 +3,11 @@ import Groq from "groq-sdk";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { apiError } from "@/lib/utils";
+import { rateLimit } from "@/lib/utils/rate-limit";
 import { getLang, m } from "@/lib/i18n/api-messages";
+
+const AI_CHAT_RATE_LIMIT = 15;
+const AI_CHAT_RATE_WINDOW_MS = 5 * 60 * 1000;
 
 const SYSTEM_PROMPT_TR = `MUTLAK KURAL — ÇOK ÖNEMLİ: Her yanıtının %100'ü yalnızca TÜRKÇE olmalıdır. İngilizce, Arapça, Fransızca, Almanca, Çince, Japonca, Korece, Rusça veya BAŞKA HERHANGİ BİR DİLDEN tek bir kelime dahi kullanmak KESİNLİKLE YASAKTIR. Arapça harf içeren herhangi bir karakter kullanma. SADECE TÜRKÇE YAZI.
 
@@ -322,6 +326,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   const reqLang = getLang(req);
   const session = await auth();
   if (!session?.user?.id) return apiError(m("unauthorized", reqLang), "UNAUTHORIZED", 401);
+
+  const rl = rateLimit(`ai-chat:${session.user.id}`, AI_CHAT_RATE_LIMIT, AI_CHAT_RATE_WINDOW_MS);
+  if (!rl.allowed) {
+    const retryAfterSec = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return apiError(
+      reqLang === "en"
+        ? `Too many requests. Please try again in ${retryAfterSec} seconds.`
+        : `Çok fazla istek gönderildi. Lütfen ${retryAfterSec} saniye sonra tekrar deneyin.`,
+      "RATE_LIMITED",
+      429,
+    );
+  }
 
   const body = await req.json() as { messages: Array<{ role: "user" | "assistant"; content: string }>; lang?: string };
   const { messages, lang } = body;

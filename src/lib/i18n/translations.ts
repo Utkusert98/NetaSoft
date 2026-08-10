@@ -17,6 +17,8 @@ export const t = {
     staffExpense: { tr: "Personel Giderleri", en: "Staff Expenses" },
     incomeExpense: { tr: "Gelir - Gider", en: "Income - Expense" },
     monthlySummary: { tr: "Aylık Özet", en: "Monthly Summary" },
+    inventory: { tr: "Stok Envanteri", en: "Inventory" },
+    salesReport: { tr: "Satış Raporu", en: "Sales Report" },
     settings: { tr: "Ayarlar", en: "Settings" },
     logout: { tr: "Çıkış Yap", en: "Sign Out" },
     pharmacyMgmt: { tr: "Eczane Yönetim", en: "Pharmacy Mgmt" },

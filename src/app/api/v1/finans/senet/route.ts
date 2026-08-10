@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { addMonths } from "date-fns";
-import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
+import { getLang, m } from "@/lib/i18n/api-messages";
 
 const senetSchema = z.object({
   noteNumber: z.string().min(1, "Senet no gereklidir"),
@@ -16,12 +17,12 @@ const senetSchema = z.object({
   installmentCount: z.number().min(2).optional(),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+      return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
     // Get user's pharmacy
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     });
 
     if (!userRole) {
-      return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+      return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
     }
 
     const body = await req.json();
@@ -61,7 +62,16 @@ export async function POST(req: Request) {
         data: notesToCreate,
       });
 
-      return NextResponse.json({ success: true, count }, { status: 201 });
+      await logAudit({
+        userId: session.user.id,
+        pharmacyId: userRole.pharmacyId,
+        action: "CREATE",
+        entityType: "PromissoryNote",
+        entityId: groupId,
+        newData: { installmentGroupId: groupId, count, notes: notesToCreate },
+      });
+
+      return apiResponse({ count }, 201);
     } else {
       // Single note
       const note = await prisma.promissoryNote.create({
@@ -76,23 +86,32 @@ export async function POST(req: Request) {
         },
       });
 
-      return NextResponse.json({ success: true, data: note }, { status: 201 });
+      await logAudit({
+        userId: session.user.id,
+        pharmacyId: userRole.pharmacyId,
+        action: "CREATE",
+        entityType: "PromissoryNote",
+        entityId: note.id,
+        newData: note,
+      });
+
+      return apiResponse(note, 201);
     }
   } catch (error) {
-    console.error("Senet Create Error:", error);
+    console.error("Senet Create Error:", error instanceof Error ? error.message : error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return apiError(error.issues[0]?.message ?? m("validationError", lang), "VALIDATION_ERROR", 400);
     }
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+      return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
     }
 
     const userRole = await prisma.userPharmacyRole.findFirst({
@@ -100,15 +119,15 @@ export async function GET(req: Request) {
       select: { pharmacyId: true },
     });
 
-    if (!userRole) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    if (!userRole) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const notes = await prisma.promissoryNote.findMany({
       where: { pharmacyId: userRole.pharmacyId, deletedAt: null },
       orderBy: { dueDate: "asc" },
     });
 
-    return NextResponse.json({ success: true, data: notes });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiResponse(notes);
+  } catch {
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }

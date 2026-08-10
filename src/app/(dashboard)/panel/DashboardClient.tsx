@@ -154,7 +154,7 @@ export default function DashboardClient({ data, pharmacistName }: {
 
   const runway30Net = runway30.projectedIncome - runway30.committedExpense;
 
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const overdueUnpaid = unpaidNotes.filter(n => new Date(n.dueDate).getTime() < now);
   const urgentUnpaid = unpaidNotes.filter(n => {
     const t = new Date(n.dueDate).getTime();
@@ -518,7 +518,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-2)" }}>
             {unpaidNotes.slice(0, 6).map((note) => {
               const due = new Date(note.dueDate);
-              const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+              const daysLeft = Math.ceil((due.getTime() - now) / 86400000);
               const urgent = daysLeft <= 7;
               return (
                 <div key={note.id} style={{

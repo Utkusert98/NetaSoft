@@ -43,6 +43,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/raporlar/gelir-gider", labelKey: "incomeExpense", icon: "📉" },
       { href: "/raporlar/aylik", labelKey: "monthlySummary", icon: "📅" },
+      { href: "/satis/rapor", labelKey: "salesReport", icon: "🧾" },
+      { href: "/stok/envanter", labelKey: "inventory", icon: "📦" },
     ],
   },
   {
@@ -56,12 +58,14 @@ const NAV_SECTIONS: NavSection[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
   const { lang } = useLangContext();
 
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
+  // Close sidebar on route change (mobile) — render sırasında state senkronizasyonu
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   // Close on Escape key
   useEffect(() => {

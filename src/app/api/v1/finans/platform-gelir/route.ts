@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { addDays } from "date-fns";
-import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
+import { apiError, apiResponse } from "@/lib/utils";
+import { logAudit } from "@/lib/audit";
+import { getLang, m } from "@/lib/i18n/api-messages";
+import type { Prisma } from "@prisma/client";
 
 const platformSchema = z.object({
   platformName: z.string().min(1, "Platform adı gereklidir"),
@@ -12,7 +14,7 @@ const platformSchema = z.object({
   notes: z.string().optional(),
 });
 
-async function getPharmacyId(userId: string) {
+async function getPharmacyId(userId: string): Promise<string | null> {
   const userRole = await prisma.userPharmacyRole.findFirst({
     where: { userId },
     select: { pharmacyId: true },
@@ -20,21 +22,21 @@ async function getPharmacyId(userId: string) {
   return userRole?.pharmacyId ?? null;
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
-    const where: any = { pharmacyId, deletedAt: null };
+    const where: Prisma.PlatformIncomeWhereInput = { pharmacyId, deletedAt: null };
     if (status && ["PENDING", "RECEIVED", "CANCELLED"].includes(status)) {
-      where.status = status;
+      where.status = status as "PENDING" | "RECEIVED" | "CANCELLED";
     }
 
     const incomes = await prisma.platformIncome.findMany({
@@ -42,21 +44,21 @@ export async function GET(req: Request) {
       orderBy: { expectedPaymentDate: "asc" },
     });
 
-    return NextResponse.json({ success: true, data: incomes });
+    return apiResponse(incomes);
   } catch (error) {
-    console.error("Platform GET Error:", error);
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    console.error("Platform GET Error:", error instanceof Error ? error.message : error);
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const lang = getLang(req);
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ success: false, error: m("unauthorized", lang), code: "UNAUTHORIZED" }, { status: 401 });
+    if (!session?.user?.id) return apiError(m("unauthorized", lang), "UNAUTHORIZED", 401);
 
     const pharmacyId = await getPharmacyId(session.user.id);
-    if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
+    if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
     const body = await req.json();
     const validated = platformSchema.parse(body);
@@ -79,12 +81,21 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: income }, { status: 201 });
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "CREATE",
+      entityType: "PlatformIncome",
+      entityId: income.id,
+      newData: income,
+    });
+
+    return apiResponse(income, 201);
   } catch (error) {
-    console.error("Platform POST Error:", error);
+    console.error("Platform POST Error:", error instanceof Error ? error.message : error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: (error as any).errors[0].message }, { status: 400 });
+      return apiError(error.issues[0]?.message ?? m("validationError", lang), "VALIDATION_ERROR", 400);
     }
-    return NextResponse.json({ success: false, error: m("serverError", lang), code: "SERVER_ERROR" }, { status: 500 });
+    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
   }
 }
