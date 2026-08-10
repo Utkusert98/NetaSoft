@@ -5,6 +5,7 @@ import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import { mapRow, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
+import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 
 interface SaleRecord extends ParsedSaleRow { id: string }
 
@@ -122,8 +123,39 @@ export default function SatisRaporPage() {
     } finally { setParsing(false); }
   };
 
+  // CSV/Excel dosyaları tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya
+  // yüklenmez, bu yüzden platformun istek boyutu sınırına takılma riski olmaz.
+  // Yalnızca PDF (konum tabanlı, pdfjs gerektirir) sunucu üzerinden işlenir.
+  const handleReadFileClient = async () => {
+    if (!file) return;
+    setParsing(true); setParseError("");
+    try {
+      const { headers: parsedHeaders, dataRows: rawDataRows } = await parseSalesFileClient(file);
+      const nonEmptyRows = rawDataRows.filter(row => !row.every(c => !c));
+      if (!nonEmptyRows.length) throw new Error(lang === "en" ? "No sales data found in file" : "Dosyadan satış verisi okunamadı");
+
+      let map: ColumnMap | null = null;
+      const rows: ParsedSaleRow[] = nonEmptyRows.map(row => {
+        const mapped = mapRow(parsedHeaders, row, {});
+        if (!map) map = mapped.colMap;
+        return mapped.row;
+      });
+
+      setPreviewRows(rows);
+      setColumnMap(map);
+      setHeaders(parsedHeaders);
+      setDataRows(nonEmptyRows);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : (lang === "en" ? "File could not be read" : "Dosya okunamadı"));
+    } finally { setParsing(false); }
+  };
+
   const handleReadFile = async () => {
-    await callParse();
+    if (file && isClientParseable(file.name)) {
+      await handleReadFileClient();
+    } else {
+      await callParse();
+    }
     setStep("mapping");
   };
 
