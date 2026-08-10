@@ -15,9 +15,19 @@ export interface CategoryBreakdown {
   count: number;
   revenue: number;
   profit: number;
+  stockValue: number;
+  stockCost: number;
 }
 
 export interface InventoryAnalysis {
+  // Türkiye'deki eczane dışa aktarımlarının çoğu bir "stok değerleme" raporudur
+  // (o anki stok adedi + fiyat/maliyet) — dönem içi satış adedi içermez. Bu alan
+  // gerçek bir satış adedi sütunu bulunduğunda (ve en az bir satırda sıfırdan
+  // farklı bir değer taşıdığında) true olur; aksi halde satış bazlı grafikler
+  // (en çok satan, satılan/satılmayan vb.) gösterilmez, stok değeri bazlı
+  // grafikler gösterilir — bu her zaman anlamlıdır çünkü sadece stok adedi ve
+  // fiyat gerektirir.
+  hasSalesData: boolean;
   summary: {
     totalProducts: number;
     soldProducts: number;
@@ -28,12 +38,19 @@ export interface InventoryAnalysis {
     profitableCount: number;
     unprofitableCount: number;
     profitMargin: number;
+    // Stok değeri — her zaman hesaplanır (satış verisi olmasa bile anlamlıdır)
+    totalStockValue: number;
+    totalStockCost: number;
+    potentialProfit: number;
+    potentialMargin: number;
   };
   topSellers: InventoryRow[];
   unsoldProducts: InventoryRow[];
   profitableProducts: InventoryRow[];
   categoryBreakdown: CategoryBreakdown[];
   profitByProduct: Array<{ name: string; profit: number; margin: number }>;
+  // Stok değerine göre en değerli 10 ürün — satış verisi olmasa bile her zaman dolu
+  topByStockValue: Array<{ name: string; stockValue: number; closingStock: number }>;
 }
 
 // NOT: Tüm alias'lar yeterince spesifik ifadeler olmalı. Tek kelimelik/çok genel
@@ -43,15 +60,20 @@ export interface InventoryAnalysis {
 // devasa yanlış sonuçlar üretir. Eşleştirme ayrıca aşağıda `detectColumn` içinde
 // her alan için daha önce başka bir alana atanmış başlıkları hariç tutarak
 // aynı sütunun iki alana birden atanmasını da yapısal olarak engeller.
+//
+// Alias listeleri gerçek eczane dışa aktarım dosyalarından (ör. "Barkod, Ürün
+// Grubu, Ürün Adı, Stok Adet, Kdv, Satış Fiyatı, Toplam Satış Fiyatı,
+// Maliyet (Kdvsiz), Maliyet (Kdvli)...") doğrulanmıştır — bu, en yaygın stok
+// değerleme raporu biçimidir ve dönem içi "satış adedi" sütunu İÇERMEZ.
 const COLUMN_ALIASES: Record<keyof InventoryRow, string[]> = {
   name: ["ürün adı", "ilaç adı", "malzeme adı", "stok adı", "ürün açıklaması"],
   barcode: ["barkod", "karekod", "ilaç kodu", "ürün kodu", "stok kodu"],
-  category: ["kategori", "ürün grubu", "ana grup", "ilaç grubu", "terapötik grup"],
+  category: ["ürün grubu", "kategori", "ana grup", "ilaç grubu", "terapötik grup"],
   openingStock: ["dönem başı stok", "başlangıç stok", "açılış stok", "önceki dönem stok", "devir stok"],
   purchaseQty: ["alış adedi", "alış miktarı", "giriş adedi", "satın alınan", "alım miktarı"],
   salesQty: ["satış adedi", "satış miktarı", "çıkış adedi", "satılan adet", "satılan miktar", "tüketilen adet"],
-  closingStock: ["dönem sonu stok", "bitiş stok", "kapanış stok", "kalan stok", "mevcut stok", "güncel stok"],
-  purchasePrice: ["alış fiyatı", "alım fiyatı", "birim maliyet", "birim alış fiyatı"],
+  closingStock: ["stok adet", "dönem sonu stok", "bitiş stok", "kapanış stok", "kalan stok", "mevcut stok", "güncel stok"],
+  purchasePrice: ["maliyet (kdvli)", "maliyet kdvli", "maliyet (kdvsiz)", "maliyet kdvsiz", "birim maliyet", "alış fiyatı", "alım fiyatı", "birim alış fiyatı", "maliyet"],
   salePrice: ["satış fiyatı", "perakende fiyatı", "liste fiyatı", "birim satış fiyatı"],
 };
 
@@ -65,9 +87,13 @@ function detectColumn(headers: string[], field: keyof InventoryRow, claimed: Set
     if (idx !== -1) { claimed.add(headers[idx]); return headers[idx]; }
   }
   // 2. geçiş: başlık, alias ifadesini bir bütün olarak içeriyor (ters yönde değil —
-  // kısa bir alias'ın uzun bir başlığın rastgele bir parçasına denk gelmesini önler)
+  // kısa bir alias'ın uzun bir başlığın rastgele bir parçasına denk gelmesini önler).
+  // "Toplam ..." ile başlayan önceden hesaplanmış toplam sütunları burada bilerek
+  // atlanır (ör. "Toplam Satış Fiyatı" birim fiyat değil, adet×fiyat çarpımıdır) —
+  // aksi halde bu sütun yanlışlıkla birim fiyat sütunu sanılabilir.
   for (const alias of aliases) {
-    const idx = normalized.findIndex((h, i) => h.includes(alias) && !claimed.has(headers[i]));
+    const idx = normalized.findIndex((h, i) =>
+      h.includes(alias) && !h.startsWith("toplam ") && !claimed.has(headers[i]));
     if (idx !== -1) { claimed.add(headers[idx]); return headers[idx]; }
   }
   return null;
@@ -100,6 +126,14 @@ export function detectInventoryColumnMap(headers: string[]): InventoryColumnMap 
   };
 }
 
+/** En az 4 temel alan (ad + en az bir fiyat + en az bir stok/adet sütunu) otomatik bulunduysa, kullanıcıdan manuel eşleştirme istemeye gerek yoktur. */
+export function isAutoMappingConfident(colMap: InventoryColumnMap): boolean {
+  const hasName = !!colMap.name;
+  const hasPrice = !!colMap.salePrice || !!colMap.purchasePrice;
+  const hasQty = !!colMap.closingStock || !!colMap.salesQty || !!colMap.openingStock;
+  return hasName && hasPrice && hasQty;
+}
+
 export function parseInventoryRows(
   headers: string[],
   rows: Array<{ rawData: Record<string, unknown> }>,
@@ -130,19 +164,23 @@ export function parseInventoryRows(
 }
 
 export function analyzeInventory(rows: InventoryRow[]): InventoryAnalysis {
+  const hasSalesData = rows.some((r) => r.salesQty > 0);
+
   const soldProducts = rows.filter((r) => r.salesQty > 0);
   const unsoldProducts = rows.filter((r) => r.salesQty === 0);
 
-  const totalRevenue = soldProducts.reduce(
-    (sum, r) => sum + r.salesQty * r.salePrice,
-    0,
-  );
-  const totalCost = soldProducts.reduce(
-    (sum, r) => sum + r.salesQty * r.purchasePrice,
-    0,
-  );
+  const totalRevenue = soldProducts.reduce((sum, r) => sum + r.salesQty * r.salePrice, 0);
+  const totalCost = soldProducts.reduce((sum, r) => sum + r.salesQty * r.purchasePrice, 0);
   const totalProfit = totalRevenue - totalCost;
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+  // Stok değeri: elde mevcut ürünlerin satış fiyatı üzerinden toplam değeri.
+  // Bu, satış adedi olmasa bile HER ZAMAN hesaplanabilir ve anlamlıdır —
+  // "stoktaki ürünler satılırsa ne kadar gelir/kâr elde edilir" sorusuna cevap verir.
+  const totalStockValue = rows.reduce((sum, r) => sum + r.closingStock * r.salePrice, 0);
+  const totalStockCost = rows.reduce((sum, r) => sum + r.closingStock * r.purchasePrice, 0);
+  const potentialProfit = totalStockValue - totalStockCost;
+  const potentialMargin = totalStockValue > 0 ? (potentialProfit / totalStockValue) * 100 : 0;
 
   const profitableCount = rows.filter(
     (r) => r.salePrice > 0 && r.purchasePrice > 0 && r.salePrice > r.purchasePrice,
@@ -155,40 +193,60 @@ export function analyzeInventory(rows: InventoryRow[]): InventoryAnalysis {
     .sort((a, b) => b.salesQty - a.salesQty)
     .slice(0, 10);
 
+  const topByStockValue = rows
+    .map((r) => ({ name: r.name, stockValue: r.closingStock * r.salePrice, closingStock: r.closingStock }))
+    .filter((r) => r.stockValue > 0)
+    .sort((a, b) => b.stockValue - a.stockValue)
+    .slice(0, 10);
+
   const profitableProducts = rows
     .filter((r) => r.salePrice > 0 && r.purchasePrice > 0)
     .map((r) => ({
       ...r,
       unitProfit: r.salePrice - r.purchasePrice,
-      totalProfit: r.salesQty * (r.salePrice - r.purchasePrice),
+      // Satış verisi varsa gerçekleşen kâra göre, yoksa stoktaki potansiyel kâra göre sırala
+      rankProfit: hasSalesData ? r.salesQty * (r.salePrice - r.purchasePrice) : r.closingStock * (r.salePrice - r.purchasePrice),
     }))
-    .sort((a, b) => b.totalProfit - a.totalProfit)
+    .sort((a, b) => b.rankProfit - a.rankProfit)
     .slice(0, 10)
-    .map(({ unitProfit: _u, totalProfit: _t, ...r }) => r);
+    .map(({ unitProfit: _u, rankProfit: _r, ...r }) => r);
 
   const categoryMap = new Map<string, CategoryBreakdown>();
   rows.forEach((r) => {
     const cat = r.category || "Genel";
-    const existing = categoryMap.get(cat) ?? { category: cat, count: 0, revenue: 0, profit: 0 };
+    const existing = categoryMap.get(cat) ?? { category: cat, count: 0, revenue: 0, profit: 0, stockValue: 0, stockCost: 0 };
     existing.count++;
     existing.revenue += r.salesQty * r.salePrice;
     existing.profit += r.salesQty * (r.salePrice - r.purchasePrice);
+    existing.stockValue += r.closingStock * r.salePrice;
+    existing.stockCost += r.closingStock * r.purchasePrice;
     categoryMap.set(cat, existing);
   });
   const categoryBreakdown = Array.from(categoryMap.values())
-    .sort((a, b) => b.revenue - a.revenue);
+    .sort((a, b) => (hasSalesData ? b.revenue - a.revenue : b.stockValue - a.stockValue));
 
-  const profitByProduct = [...soldProducts]
-    .filter((r) => r.salePrice > 0 && r.purchasePrice > 0)
-    .map((r) => {
-      const profit = r.salesQty * (r.salePrice - r.purchasePrice);
-      const margin = r.salePrice > 0 ? ((r.salePrice - r.purchasePrice) / r.salePrice) * 100 : 0;
-      return { name: r.name, profit, margin };
-    })
-    .sort((a, b) => b.profit - a.profit)
-    .slice(0, 10);
+  const profitByProduct = hasSalesData
+    ? [...soldProducts]
+        .filter((r) => r.salePrice > 0 && r.purchasePrice > 0)
+        .map((r) => {
+          const profit = r.salesQty * (r.salePrice - r.purchasePrice);
+          const margin = r.salePrice > 0 ? ((r.salePrice - r.purchasePrice) / r.salePrice) * 100 : 0;
+          return { name: r.name, profit, margin };
+        })
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 10)
+    : rows
+        .filter((r) => r.salePrice > 0 && r.purchasePrice > 0 && r.closingStock > 0)
+        .map((r) => {
+          const profit = r.closingStock * (r.salePrice - r.purchasePrice);
+          const margin = r.salePrice > 0 ? ((r.salePrice - r.purchasePrice) / r.salePrice) * 100 : 0;
+          return { name: r.name, profit, margin };
+        })
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 10);
 
   return {
+    hasSalesData,
     summary: {
       totalProducts: rows.length,
       soldProducts: soldProducts.length,
@@ -199,11 +257,16 @@ export function analyzeInventory(rows: InventoryRow[]): InventoryAnalysis {
       profitableCount,
       unprofitableCount,
       profitMargin,
+      totalStockValue,
+      totalStockCost,
+      potentialProfit,
+      potentialMargin,
     },
     topSellers,
     unsoldProducts: unsoldProducts.slice(0, 50),
     profitableProducts,
     categoryBreakdown,
     profitByProduct,
+    topByStockValue,
   };
 }
