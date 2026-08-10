@@ -50,6 +50,12 @@ export interface DashboardData {
     cashChangePct: number;
     hasData: boolean;
   };
+  weekComparison: {
+    weekIncome: number;
+    prevWeekIncome: number;
+    changePct: number;
+    hasData: boolean;
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,7 +143,7 @@ export default function DashboardClient({ data, pharmacistName }: {
   const c = t.common;
 
   const { summary, promissoryNotes, sgkVsCash, monthlyTrend, upcomingSgk, platformIncome,
-          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30, dayComparison } = data;
+          dailyAvgCiro, cashPosSplit, expenseBreakdown, urgentNotesCount, runway30, dayComparison, weekComparison } = data;
 
   const platformTotal = platformIncome.reduce((s, p) => s + p.amount, 0);
   const totalIncomeAll = sgkVsCash.cashTotal + sgkVsCash.sgkTotal + platformTotal;
@@ -254,6 +260,29 @@ export default function DashboardClient({ data, pharmacistName }: {
                   ? (lang === "en" ? "higher" : "yüksek")
                   : (lang === "en" ? "lower" : "düşük")} (%{Math.abs(dayComparison.cashChangePct).toFixed(0)})
               </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bu Hafta vs Geçen Hafta ── */}
+      {weekComparison.hasData && (
+        <div style={{
+          background: "var(--color-surface)", border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)", padding: "14px 18px", marginBottom: "var(--spacing-5)",
+          display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: "20px", flexShrink: 0 }}>🗓️</span>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 700 }}>
+              {lang === "en" ? "This week (last 7 days) vs previous week" : "Bu hafta (son 7 gün) geçen haftayla kıyaslandı"}
+            </p>
+            <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+              <span style={{ fontWeight: 700, color: weekComparison.changePct >= 0 ? GREEN : RED }}>
+                {lang === "en" ? "Weekly income" : "Haftalık ciro"} {weekComparison.changePct >= 0 ? "▲" : "▼"} %{Math.abs(weekComparison.changePct).toFixed(0)}
+              </span>
+              {"  ·  "}
+              {formatCurrency(weekComparison.weekIncome)} {lang === "en" ? "vs" : "vs"} {formatCurrency(weekComparison.prevWeekIncome)}
             </p>
           </div>
         </div>
