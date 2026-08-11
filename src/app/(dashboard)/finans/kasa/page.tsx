@@ -1,7 +1,7 @@
 "use client";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 
@@ -245,7 +245,7 @@ export default function KasaPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "var(--spacing-8)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ "--form-list-col": "340px", gap: "var(--spacing-8)", alignItems: "start" } as CSSProperties}>
         {/* FORM */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>

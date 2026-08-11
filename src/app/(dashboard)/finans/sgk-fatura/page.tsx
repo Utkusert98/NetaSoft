@@ -457,7 +457,7 @@ export default function SgkFaturaPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "var(--spacing-8)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* FORM */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
@@ -218,7 +218,7 @@ export default function DepoHavalesiPage() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "var(--spacing-6)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ "--form-list-col": "360px", gap: "var(--spacing-6)", alignItems: "start" } as CSSProperties}>
 
         {/* Form */}
         <div className="card">
