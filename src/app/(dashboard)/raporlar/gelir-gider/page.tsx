@@ -193,7 +193,7 @@ export default function GelirGiderPage() {
           </div>
 
           {/* Gelir Kaynaklari + Gider Kalemleri */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+          <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             <ChartCard title={lang === "en" ? "Income Sources" : "Gelir Kaynakları"}>
               {incomePieData.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No income for this period." : "Bu dönemde gelir yok."}</p>
@@ -269,7 +269,7 @@ export default function GelirGiderPage() {
           </div>
 
           {/* Platform Gelirleri + Senet Özeti */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+          <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             {topPlatforms.length > 0 && (
               <ChartCard title={lang === "en" ? "Platform Revenue Comparison" : "Platform Gelirleri Karşılaştırması"}>
                 <div style={{ height: 200 }}>

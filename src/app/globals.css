@@ -324,6 +324,22 @@ h6 { font-size: var(--font-size-base); }
   width: 100%;
 }
 
+/* AI Destek sohbet sayfası — 100vh iOS Chrome/Safari'de adres çubuğu/araç
+   çubuğu arkasındaki alanı da sayar, bu yüzden sohbet giriş kutusu görünür
+   alanın altında kalabiliyordu. 100dvh gerçek görünür yüksekliği kullanır. */
+.ai-destek-main {
+  height: calc(100vh - var(--header-height));
+  height: calc(100dvh - var(--header-height));
+}
+@media (max-width: 768px) {
+  .ai-destek-main {
+    /* Mobilde sabit sidebar header'ı değil, .mobile-topbar (56px) + safe-area kullanılır */
+    height: calc(100vh - 56px - env(safe-area-inset-top));
+    height: calc(100dvh - 56px - env(safe-area-inset-top));
+    padding-bottom: max(var(--spacing-4), env(safe-area-inset-bottom));
+  }
+}
+
 /* ================================
    GRAFİKLER (Recharts)
    ================================ */
@@ -1540,6 +1556,14 @@ h6 { font-size: var(--font-size-base); }
 
   h1 { font-size: var(--font-size-2xl); }
   h2 { font-size: var(--font-size-xl); }
+
+  /* AI destek sohbet giriş kutusu: dar ekranlarda placeholder metni 3 satıra
+     sarıyor ama textarea 2 satırlık yükseklikte sabitti, bu da son satırı
+     kırpıyordu. Mobilde yüksekliği artırarak metnin tamamının görünmesini
+     sağlıyoruz. */
+  .ai-chat-input {
+    min-height: 94px;
+  }
 }
 
 /* ==========================================================================
