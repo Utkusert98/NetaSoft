@@ -578,6 +578,13 @@ export default function SatisRaporPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (tab === "history") void fetchBatches(); }, [tab]);
 
+  // "Son Yükleme" özet kartı liste/yükleme sekmelerinde de görünür olduğundan
+  // (kullanıcı ayrıca "İçe Aktarma Geçmişi" sekmesine girmeden en son yüklemeyi
+  // görebilsin diye), batches ilk açılışta bir kez de (tab "history" olmasa
+  // bile) çekilir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchBatches(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDeleteBatch = async () => {
     if (!batchDeleteTarget) return;
     setBatchDeleting(true);
@@ -980,6 +987,7 @@ export default function SatisRaporPage() {
       resetUpload();
       setSaveSuccess(true);
       await fetchRecords();
+      await fetchBatches();
       setTab("list");
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "Save failed" : "Kayıt başarısız"));
@@ -1071,6 +1079,41 @@ export default function SatisRaporPage() {
             : "Bu sayfa yalnızca ürün bazlı satış analizi içindir (hangi ürünler satılıyor, reçeteli/perakende dağılımı, trendler). Gösterge panelindeki Toplam Gelir/Gider'i veya Aylık Özet'i ETKİLEMEZ — o rakamlar ayrıca girdiğiniz Kasa (POS/Nakit/Havale) kayıtlarından gelir. Buraya satış verisi aktarmak Kasa toplamlarınızı değiştirmez veya çift saymaz."}
         </span>
       </div>
+
+      {/* Son Yükleme özeti — kullanıcı ayrıca "İçe Aktarma Geçmişi" sekmesine
+          girmeden en son yüklemenin ne zaman/kaç kayıt/hangi tarih aralığı
+          olduğunu bir bakışta görsün diye. Henüz hiç yükleme yoksa (batches
+          boş) hiçbir şey göstermez — bozuk/boş bir kart yerine sessizce geçilir. */}
+      {tab !== "history" && batches.length > 0 && (() => {
+        const last = batches[0];
+        const rangeText = last.dateRangeStart && last.dateRangeEnd
+          ? `${format(parseDateOnlyLocal(last.dateRangeStart), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })} – ${format(parseDateOnlyLocal(last.dateRangeEnd), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}`
+          : null;
+        return (
+          <div style={{
+            marginBottom: "var(--spacing-5)", padding: "12px 16px", background: "var(--color-surface)",
+            border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", fontSize: "13px",
+            color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
+          }}>
+            <span style={{ fontSize: "16px", flexShrink: 0 }}>🕒</span>
+            <span>
+              <strong>{lang === "en" ? "Last Upload: " : "Son Yükleme: "}</strong>
+              {last.importDate ? format(new Date(last.importDate), "dd MMMM yyyy, HH:mm", { locale: lang === "en" ? enUS : tr }) : "—"}
+              {" · "}
+              {last.recordCount.toLocaleString("tr-TR")} {lang === "en" ? "records" : "kayıt"}
+              {rangeText && <> {" · "}{rangeText} {lang === "en" ? "range" : "aralığı"}</>}
+            </span>
+          </div>
+        );
+      })()}
+      {tab !== "history" && batches.length === 0 && !batchesLoading && (
+        <div style={{
+          marginBottom: "var(--spacing-5)", padding: "10px 16px", color: "var(--color-text-muted)",
+          fontSize: "13px",
+        }}>
+          {lang === "en" ? "No data uploaded yet." : "Henüz veri yüklenmedi."}
+        </div>
+      )}
 
       {/* ── DOSYA İÇE AKTAR ── */}
       {tab === "upload" && (

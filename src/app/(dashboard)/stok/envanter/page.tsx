@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import {
   BarChart,
@@ -829,6 +829,35 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   );
 }
 
+// Son yükleme özeti — "Geçmiş Raporlar" sekmesine girmeden en son içe aktarılan
+// dosyanın tarihini/ürün sayısını/gelirini bir bakışta gösterir.
+function LastUploadBanner({ report, loaded, en }: {
+  report: InventoryReportSummary | null;
+  loaded: boolean;
+  en: boolean;
+}) {
+  if (!loaded || !report) return null;
+  return (
+    <div style={{
+      marginBottom: "var(--spacing-5)", padding: "12px 16px", background: "var(--color-primary-pale)",
+      border: "1px solid var(--color-primary-light)", borderRadius: "var(--radius-md)", fontSize: "13px",
+      color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
+    }}>
+      <span style={{ fontSize: "16px", flexShrink: 0 }}>📦</span>
+      <span>
+        <strong>{en ? "Last Upload: " : "Son Yükleme: "}</strong>
+        {formatDate(report.createdAt, true)}
+        {" · "}
+        {report.totalProducts.toLocaleString("tr-TR")} {en ? "products" : "ürün"}
+        {" · "}
+        {formatCurrency(Number(report.totalRevenue))} {en ? "revenue" : "gelir"}
+        {" · "}
+        <span style={{ color: "var(--color-text-muted)" }}>{report.fileName}</span>
+      </span>
+    </div>
+  );
+}
+
 function ViewTabs({ viewMode, onSelect, en }: {
   viewMode: "new" | "history";
   onSelect: (mode: "new" | "history") => void;
@@ -876,6 +905,11 @@ export default function EnvanterPage() {
   const [historyError, setHistoryError] = useState<string>("");
   const [deleteTarget, setDeleteTarget] = useState<InventoryReportSummary | null>(null);
   const [deletingReport, setDeletingReport] = useState(false);
+
+  // Son yükleme özeti — ana (geçmiş dışı) ekranda öne çıkan, küçük bir kart olarak
+  // gösterilir; kullanıcı ayrı "Geçmiş Raporlar" sekmesine girmek zorunda kalmaz.
+  const [lastReport, setLastReport] = useState<InventoryReportSummary | null>(null);
+  const [lastReportLoaded, setLastReportLoaded] = useState(false);
 
   const runAnalysis = (headers: string[], rows: ParsedRow[], override: Partial<InventoryColumnMap>): void => {
     const parsed = parseInventoryRows(headers, rows, override);
@@ -972,6 +1006,26 @@ export default function EnvanterPage() {
       setHistoryLoading(false);
     }
   };
+
+  // Son yükleme özetini sayfa ilk açıldığında bir kez çeker (tam listeyi ayrıca
+  // "Geçmiş Raporlar" sekmesi kendi fetchHistory'siyle yükler — burada gereksiz
+  // yere tekrar tam liste istemiyoruz, ama API zaten hafif bir özet listesi
+  // döndürdüğü için en yeni kaydı almak için aynı endpoint yeterli).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/stok/envanter-raporu", { headers: { "Accept-Language": lang } });
+        const data = (await res.json()) as { success: boolean; data?: InventoryReportSummary[] };
+        if (!cancelled && res.ok && data.success && data.data && data.data.length > 0) {
+          setLastReport(data.data[0]);
+        }
+      } catch { /* silent — sadece bilgilendirme amaçlı bir özet */ }
+      finally { if (!cancelled) setLastReportLoaded(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [lang]);
 
   const handleDeleteReport = async (): Promise<void> => {
     if (!deleteTarget) return;
@@ -1294,6 +1348,8 @@ export default function EnvanterPage() {
       </div>
 
       <ViewTabs viewMode={viewMode} onSelect={handleSelectTab} en={en} />
+
+      <LastUploadBanner report={lastReport} loaded={lastReportLoaded} en={en} />
 
       <div style={{
         background: "var(--color-surface)",
