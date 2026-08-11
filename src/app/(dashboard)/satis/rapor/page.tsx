@@ -9,6 +9,7 @@ import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTrend } from "@/lib/sales/aggregations";
 import { topNWithOther } from "@/lib/utils/inventory-analysis";
 import { DATE_RANGE_PRESETS, matchPreset } from "@/lib/sales/dateRanges";
+import DateRangePicker from "@/components/ui/DateRangePicker";
 import {
   BarChart,
   Bar,
@@ -1420,13 +1421,14 @@ export default function SatisRaporPage() {
                 </div>
 
                 <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "var(--spacing-3)", alignItems: "flex-end", maxWidth: "560px" }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">{lang === "en" ? "Start Date" : "Başlangıç Tarihi"}</label>
-                    <input type="date" className="form-input" value={pendingStartDate} onChange={e => setPendingStartDate(e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">{lang === "en" ? "End Date" : "Bitiş Tarihi"}</label>
-                    <input type="date" className="form-input" value={pendingEndDate} onChange={e => setPendingEndDate(e.target.value)} />
+                  <div className="form-group" style={{ marginBottom: 0, gridColumn: "span 2" }}>
+                    <label className="form-label">{lang === "en" ? "Date Range" : "Tarih Aralığı"}</label>
+                    <DateRangePicker
+                      startDate={pendingStartDate}
+                      endDate={pendingEndDate}
+                      lang={lang === "en" ? "en" : "tr"}
+                      onChange={(start, end) => { setPendingStartDate(start); setPendingEndDate(end); }}
+                    />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">{lang === "en" ? "Sale Type" : "Satış Tipi"}</label>
