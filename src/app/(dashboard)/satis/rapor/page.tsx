@@ -725,6 +725,21 @@ export default function SatisRaporPage() {
       }
 
       setSaveProgress(null);
+
+      // Kaydedilen satırların tarih aralığı, sayfanın o an gösterdiği filtre
+      // aralığının (varsayılan: içinde bulunulan ay) DIŞINDA kalabilir — bu
+      // durumda kullanıcı "önizlemede X TL gördüm, kayıttan sonra 0 / farklı
+      // bir tutar görüyorum" hissine kapılıyordu; oysa iki farklı tarih
+      // aralığı sorgulanıyordu. Kayıt tarih aralığını kapsayacak şekilde
+      // filtreyi otomatik genişletiyoruz ki kaydedilen veri hemen görünsün.
+      if (previewRows.length > 0) {
+        const days = previewRows.map(r => r.saleDate.slice(0, 10)).sort();
+        const minDay = days[0];
+        const maxDay = days[days.length - 1];
+        if (minDay < startDate) setStartDate(minDay);
+        if (maxDay > endDate) setEndDate(maxDay);
+      }
+
       resetUpload();
       setSaveSuccess(true);
       await fetchRecords();
@@ -1081,7 +1096,12 @@ export default function SatisRaporPage() {
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Total Revenue" : "Toplam Ciro"}</div>
                 <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)" }}>{fmt(summary.totalRevenue)}</div>
-                <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>{summary.totalRecords.toLocaleString("tr-TR")} {lang === "en" ? "sales" : "satış"}</div>
+                <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                  {summary.totalRecords.toLocaleString("tr-TR")} {lang === "en" ? "sales" : "satış"}
+                  {" · "}
+                  {dailyRevenueData.length.toLocaleString("tr-TR")} {lang === "en" ? "day(s) with data" : "farklı gün"}
+                  {" "}({startDate} – {endDate})
+                </div>
               </div>
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Prescription / SGK" : "Reçeteli / SGK"}</div>
