@@ -114,6 +114,23 @@ function UserMessage({ content }: { content: string }) {
   );
 }
 
+// Sohbet geçmişi sayfalar arası geçişte (route değişince bileşen unmount
+// olduğu için) kaybolmasın diye localStorage'a yazılır — sunucuya
+// gönderilmez, sadece bu tarayıcıda kalıcı olur.
+const CHAT_STORAGE_KEY = "netasoft_ai_chat_history";
+
+function loadStoredMessages(): Message[] | null {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    return parsed as Message[];
+  } catch {
+    return null;
+  }
+}
+
 export default function AiDestek() {
   const { lang } = useLangContext();
   const ui = UI_TEXT[lang];
@@ -123,6 +140,12 @@ export default function AiDestek() {
     role: "assistant",
     content: ui.welcome,
   }]);
+  // SSR ile ilk render arasında tutarlılık bozulmasın diye (localStorage
+  // sunucuda yok) geçmiş, mount SONRASI bir effect'te yüklenir — `loaded`
+  // false olduğu sürece kaydetme effect'i devreye girmez, aksi halde ilk
+  // render'daki varsayılan karşılama mesajı, henüz yüklenmemiş geçmişin
+  // üzerine yazıp onu sessizce siler.
+  const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
@@ -131,6 +154,24 @@ export default function AiDestek() {
   const followUpIndexRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const stored = loadStoredMessages();
+    // localStorage (harici bir sistem) mount sonrası okunuyor — SSR'da mevcut
+    // olmadığı için render sırasında değil, effect içinde senkronize edilir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored) setMessages(stored);
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // localStorage dolu/gizli mod vb. — sohbet devam eder, sadece kalıcı olmaz
+    }
+  }, [messages, loaded]);
 
   // Update welcome message when lang changes (React'in "render sırasında state
   // sıfırlama" deseni — effect yerine, çünkü bu bir prop değişimine tepki verir).
