@@ -797,6 +797,9 @@ model SaleRecord {
   saleType       SaleType @default(RETAIL) @map("sale_type") // PRESCRIPTION | RETAIL
   quantity       Int      @default(1)
   staffName      String?  @map("staff_name") // Personel/çalışan adı — opsiyonel, tüm dosyalarda bulunmaz
+  rawTransactionType String? @map("raw_transaction_type") // "İşlem Tipi" ham metni (ör. "P.SATIŞ (K.K.)") — saleType binary sınıflandırmasından ayrı
+  customerName   String?  @map("customer_name") // Cari Adı/Müşteri Adı/Hasta Adı — productName fallback'inden bağımsız
+  loyaltyPoints  Decimal? @map("loyalty_points") @db.Decimal(15, 2) // "Puan Tutar" (sadakat puanı) — opsiyonel
 
   importBatchId String? @map("import_batch_id") // Grup yüklemeleri eşleştirme
 

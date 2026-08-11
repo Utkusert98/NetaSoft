@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapRow, isColumnMapConfident, parseDate, isParseableDate } from "./mapRow";
+import { mapRow, isColumnMapConfident, parseDate, isParseableDate, isReturnTransaction, isGenericWalkInCustomer } from "./mapRow";
 
 describe("mapRow — sütun çakışması koruması", () => {
   // Birden fazla benzer isimli sütun içeren, gerçekçi bir zorlayıcı başlık seti:
@@ -137,5 +137,69 @@ describe("mapRow — ilgisiz sütunların ürün adı/tarih sanılması hatası 
   it("saat ekli tarih doğru ayrıştırılır, bugüne düşmez", () => {
     const { row: mapped } = mapRow(headers, row, {});
     expect(mapped.saleDate.startsWith("2026-08-10")).toBe(true);
+  });
+});
+
+describe("mapRow — rawTransactionType / customerName / loyaltyPoints (gerçek üretim dosyası)", () => {
+  const headers = ["İşlem No", "Cari Adı", "İşlem Tipi", "Tarih", "Toplam Tutar", "İskonto Tutar", "Net Tutar", "Personel", "Puan Tutar"];
+  const row = ["21159", "PERAKENDE MÜŞTERİ", "P.SATIŞ (K.K.)", "01/07/2026", "152.62", "2.62", "150.00", "KASA", "0.00"];
+
+  it("rawTransactionType ham işlem tipi metnini saklar, saleType binary sınıflandırmasını değiştirmez", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.rawTransactionType).toBe("P.SATIŞ (K.K.)");
+    expect(mapped.saleType).toBe("RETAIL");
+  });
+
+  it("customerName, productName fallback'inden bağımsız kendi başına yakalanır", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.customerName).toBe("PERAKENDE MÜŞTERİ");
+    // Bu dosyada ürün adı sütunu yok, bu yüzden Cari Adı productName fallback'i olarak da kullanılır.
+    expect(mapped.productName).toBe("PERAKENDE MÜŞTERİ");
+  });
+
+  it("loyaltyPoints '0.00' değerini 0 olarak ayrıştırır (all-zero örnek veri)", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.loyaltyPoints).toBe(0);
+  });
+
+  it("Puan Tutar > 0 olduğunda doğru ayrıştırılır", () => {
+    const rowWithPoints = ["21160", "AHMET YILMAZ", "REÇETELİ SATIŞ", "01/07/2026", "100.00", "0.00", "100.00", "KASA", "15.50"];
+    const { row: mapped } = mapRow(headers, rowWithPoints, {});
+    expect(mapped.loyaltyPoints).toBeCloseTo(15.5, 2);
+  });
+
+  it("'puan' bare alias'ı yalnızca tam eşleşmede denenir, ilgisiz sütunu yanlış yakalamaz", () => {
+    const headersNoPointsCol = ["İşlem No", "Cari Adı", "İşlem Tipi", "Tarih", "Net Tutar"];
+    const rowNoPoints = ["1", "AHMET", "P. SATIŞ", "01/07/2026", "50.00"];
+    const { row: mapped } = mapRow(headersNoPointsCol, rowNoPoints, {});
+    expect(mapped.loyaltyPoints).toBeUndefined();
+  });
+});
+
+describe("isReturnTransaction — iade/iptal tespiti", () => {
+  it("'İADE' içeren işlem tiplerini iade olarak işaretler", () => {
+    expect(isReturnTransaction("İADE")).toBe(true);
+    expect(isReturnTransaction("SATIŞ İADESİ")).toBe(true);
+    expect(isReturnTransaction("SATIŞ İPTALİ")).toBe(true);
+    expect(isReturnTransaction("RETURN")).toBe(true);
+  });
+
+  it("normal satış tiplerini iade olarak işaretlemez", () => {
+    expect(isReturnTransaction("P.SATIŞ (K.K.)")).toBe(false);
+    expect(isReturnTransaction("REÇETELİ SATIŞ")).toBe(false);
+    expect(isReturnTransaction(undefined)).toBe(false);
+    expect(isReturnTransaction("")).toBe(false);
+  });
+});
+
+describe("isGenericWalkInCustomer — anonim müşteri yer tutucusu tespiti", () => {
+  it("'PERAKENDE MÜŞTERİ' değerini genel/anonim olarak işaretler", () => {
+    expect(isGenericWalkInCustomer("PERAKENDE MÜŞTERİ")).toBe(true);
+    expect(isGenericWalkInCustomer("perakende musteri")).toBe(true);
+  });
+
+  it("gerçek müşteri adlarını genel olarak işaretlemez", () => {
+    expect(isGenericWalkInCustomer("AHMET YILMAZ")).toBe(false);
+    expect(isGenericWalkInCustomer(undefined)).toBe(false);
   });
 });
