@@ -142,7 +142,14 @@ export default function PeriodRevenueWidget({
             </div>
           )}
 
-          {(hasKasa || rxTotal > 0) && (
+          {/* Reçete tutarı bu dönem için 0 ise "Kasa + Reçete" etiketli bu kutu
+              hiç gösterilmez — aksi halde reçete verisi hiç yokken bile
+              "Kasa + Reçete" yazması, reçetenin toplama dahil edilmiş gibi
+              yanlış bir izlenim veriyordu (gerçek bir kullanıcı geri
+              bildirimiyle tespit edilen bir UX hatasıydı). Reçete tutarı
+              gerçekten 0'dan büyükse bu kutu Kasa Toplamı'nın hemen üstündeki
+              satırla zaten görünür durumdadır. */}
+          {rxTotal > 0 && (
             <div style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
               flexWrap: "wrap", gap: "8px",
