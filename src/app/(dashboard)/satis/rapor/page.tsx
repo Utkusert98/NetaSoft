@@ -230,47 +230,6 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
   );
 }
 
-function GroupRevenueChart({ data, lang, onBarClick }: {
-  data: Array<{ group: string; revenue: number }>;
-  lang: string;
-  onBarClick: (group: string) => void;
-}) {
-  const chartData = data.map(d => ({
-    name: d.group.length > 20 ? d.group.slice(0, 18) + "…" : d.group,
-    fullName: d.group,
-    revenue: d.revenue,
-  }));
-  return (
-    <div style={{ height: 320 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 32, top: 8, bottom: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
-          <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
-          <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
-          <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), lang === "en" ? "Revenue" : "Gelir"]) as ChartFormatter}
-            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
-          />
-          <Bar
-            dataKey="revenue"
-            fill={CHART_COLORS[0]}
-            radius={[0, 4, 4, 0]}
-            style={{ cursor: "pointer" }}
-            onClick={(entry: unknown) => {
-              const e = entry as { fullName?: string };
-              if (e?.fullName) onBarClick(e.fullName);
-            }}
-          >
-            {chartData.map((_entry, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 function TopProductsChart({ data, lang, onBarClick }: {
   data: Array<{ name: string; quantity: number; revenue: number }>;
   lang: string;
@@ -680,15 +639,6 @@ export default function SatisRaporPage() {
 
   // #6 Haftanın Günlerine Göre Perakende Satış Yoğunluğu — SADECE perakende.
   const dayOfWeekRetailData = useMemo(() => aggregateByDayOfWeek(records, lang === "en" ? "en" : "tr", "RETAIL"), [records, lang]);
-
-  const groupRevenueData = useMemo(() => {
-    if (!summary) return [];
-    const sorted = Object.entries(summary.byGroup).sort(([, a], [, b]) => b - a);
-    const top = sorted.slice(0, 10).map(([group, revenue]) => ({ group, revenue }));
-    const restTotal = sorted.slice(10).reduce((s, [, v]) => s + v, 0);
-    if (restTotal > 0) top.push({ group: lang === "en" ? "Other" : "Diğer", revenue: restTotal });
-    return top;
-  }, [summary, lang]);
 
   const topProductsData = useMemo(() => {
     const byProduct = new Map<string, { quantity: number; revenue: number }>();
@@ -1607,35 +1557,6 @@ export default function SatisRaporPage() {
                   />
                 </section>
               </div>
-
-              {groupRevenueData.length > 0 && (
-                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
-                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Revenue by Product Group" : "Ürün Grubu Bazında Gelir"}</h3>
-                  {Object.keys(summary.byGroup).length <= 1 ? (
-                    <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
-                      {lang === "en"
-                        ? "This file has no product group/category information, so a category breakdown cannot be shown."
-                        : "Bu dosyada ürün grubu/kategori bilgisi yok, kategori dağılımı gösterilemiyor."}
-                    </div>
-                  ) : (
-                  <GroupRevenueChart
-                    data={groupRevenueData}
-                    lang={lang}
-                    onBarClick={(group) => {
-                      const isOtherBucket = group === (lang === "en" ? "Other" : "Diğer") && !(group in summary.byGroup);
-                      const topGroupNames = new Set(groupRevenueData.slice(0, -1).map(g => g.group));
-                      const filtered = isOtherBucket
-                        ? records.filter(r => !topGroupNames.has(r.productGroup))
-                        : records.filter(r => r.productGroup === group);
-                      setDrillDown({
-                        title: lang === "en" ? `${group} — ${filtered.length} sales` : `${group} — ${filtered.length} satış`,
-                        records: filtered,
-                      });
-                    }}
-                  />
-                  )}
-                </section>
-              )}
 
               {topProductsData.length > 0 && (
                 <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
