@@ -8,7 +8,7 @@ import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type 
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTrend } from "@/lib/sales/aggregations";
 import { topNWithOther } from "@/lib/utils/inventory-analysis";
-import { DATE_RANGE_PRESETS, matchPreset } from "@/lib/sales/dateRanges";
+import { DATE_RANGE_PRESETS, matchPreset, saleRowsDateSpan } from "@/lib/sales/dateRanges";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import {
   BarChart,
@@ -895,19 +895,40 @@ export default function SatisRaporPage() {
     return distinctDates.size === 1;
   };
 
+  // Dosya ayrıştırıldığı anda (kaydetmeden ÖNCE, önizleme aşamasında) tarih
+  // aralığı filtresi dosyanın gerçek min/max `saleDate` aralığına göre
+  // ayarlanır — kullanıcı önizlemede gördüğü tutarların, kaydettikten sonra
+  // gösterilen (varsayılan "bu ay" gibi eski bir aralıkla sorgulanan) tutarla
+  // tutarsız görünmesi sorununu önler. `saleRowsDateSpan`, kayıt SONRASI
+  // aynı amaçla `handleConfirm` içinde de kullanılan tek, paylaşılan (DRY)
+  // saf fonksiyondur — burada `fetchRecords()` TETİKLENMEZ, yalnızca
+  // gösterilen filtre state'i (pending + uygulanmış) güncellenir; asıl veri
+  // çekme kayıt sonrası veya kullanıcının Filtrele/preset etkileşimiyle olur.
+  const applyDateSpanFromRows = (rows: ParsedSaleRow[]) => {
+    const span = saleRowsDateSpan(rows.filter(r => !r.dateInvalid));
+    if (!span) return;
+    setPendingStartDate(span.start);
+    setPendingEndDate(span.end);
+    setStartDate(span.start);
+    setEndDate(span.end);
+  };
+
   const handleReadFile = async () => {
     const result = file && isClientParseable(file.name)
       ? await handleReadFileClient()
       : await callParse();
     const confident = !!result?.map && isColumnMapConfident(result.map) && !looksLikeDateFallback(result.rows);
     setStep(confident ? "preview" : "mapping");
+    if (result?.rows.length) applyDateSpanFromRows(result.rows);
   };
 
   // Ağ isteği YOK — kolon eşleştirmesi, önbellekteki `dataRows` üzerinde
   // paylaşılan `mapRow` fonksiyonu ile istemci tarafında yeniden hesaplanır.
   const handleApplyMapping = () => {
     if (columnMap) {
-      setPreviewRows(dataRows.map(row => mapRow(headers, row, override).row));
+      const rows = dataRows.map(row => mapRow(headers, row, override).row);
+      setPreviewRows(rows);
+      applyDateSpanFromRows(rows);
     }
     setStep("preview");
   };
@@ -976,12 +997,10 @@ export default function SatisRaporPage() {
       // bir tutar görüyorum" hissine kapılıyordu; oysa iki farklı tarih
       // aralığı sorgulanıyordu. Kayıt tarih aralığını kapsayacak şekilde
       // filtreyi otomatik genişletiyoruz ki kaydedilen veri hemen görünsün.
-      if (rowsToSave.length > 0) {
-        const days = rowsToSave.map(r => r.saleDate.slice(0, 10)).sort();
-        const minDay = days[0];
-        const maxDay = days[days.length - 1];
-        if (minDay < startDate) { setStartDate(minDay); setPendingStartDate(minDay); }
-        if (maxDay > endDate) { setEndDate(maxDay); setPendingEndDate(maxDay); }
+      const savedSpan = saleRowsDateSpan(rowsToSave);
+      if (savedSpan) {
+        if (savedSpan.start < startDate) { setStartDate(savedSpan.start); setPendingStartDate(savedSpan.start); }
+        if (savedSpan.end > endDate) { setEndDate(savedSpan.end); setPendingEndDate(savedSpan.end); }
       }
 
       setLastSaveExcludedCount(excludedCount);

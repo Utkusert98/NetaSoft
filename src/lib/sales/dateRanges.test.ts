@@ -8,6 +8,7 @@ import {
   last30DaysRange,
   thisYearRange,
   matchPreset,
+  saleRowsDateSpan,
 } from "./dateRanges";
 
 describe("todayRange", () => {
@@ -84,5 +85,29 @@ describe("matchPreset", () => {
   it("özel/manuel bir aralık hiçbir preset ile eşleşmezse null döndürür", () => {
     const now = new Date(2026, 7, 11);
     expect(matchPreset("2026-08-03", "2026-08-09", now)).toBeNull();
+  });
+});
+
+describe("saleRowsDateSpan", () => {
+  it("satırların saleDate alanlarından en küçük/en büyük tarihi döndürür", () => {
+    const rows = [
+      { saleDate: "2026-07-15T00:00:00.000Z" },
+      { saleDate: "2026-07-03T00:00:00.000Z" },
+      { saleDate: "2026-07-28T00:00:00.000Z" },
+    ];
+    expect(saleRowsDateSpan(rows)).toEqual({ start: "2026-07-03", end: "2026-07-28" });
+  });
+
+  it("düz YYYY-MM-DD biçimindeki tarihlerle de çalışır", () => {
+    const rows = [{ saleDate: "2026-01-05" }, { saleDate: "2026-01-01" }];
+    expect(saleRowsDateSpan(rows)).toEqual({ start: "2026-01-01", end: "2026-01-05" });
+  });
+
+  it("boş dizi için null döndürür", () => {
+    expect(saleRowsDateSpan([])).toBeNull();
+  });
+
+  it("tek satırlı dizide start ve end aynı olur", () => {
+    expect(saleRowsDateSpan([{ saleDate: "2026-03-10T12:00:00.000Z" }])).toEqual({ start: "2026-03-10", end: "2026-03-10" });
   });
 });
