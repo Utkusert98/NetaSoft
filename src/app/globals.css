@@ -1502,3 +1502,204 @@ h6 { font-size: var(--font-size-base); }
   h1 { font-size: var(--font-size-2xl); }
   h2 { font-size: var(--font-size-xl); }
 }
+
+/* ==========================================================================
+   Date Range Picker — özel (custom) tarih aralığı seçici. Tarayıcının native
+   <input type="date"> takvim popup'ı cross-browser restyle edilemediği için
+   sıfırdan inşa edildi (bkz. src/components/ui/DateRangePicker.tsx).
+   ========================================================================== */
+
+.drp-root {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.drp-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
+  text-align: left;
+}
+
+.drp-trigger:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.drp-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-pale);
+}
+
+.drp-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.drp-trigger-icon { flex-shrink: 0; font-size: 14px; }
+.drp-trigger-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drp-trigger-chevron { flex-shrink: 0; font-size: 10px; color: var(--color-text-muted); }
+
+.drp-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-3);
+}
+
+.drp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-2);
+}
+
+.drp-header-label {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.drp-nav-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background var(--transition-fast, 0.15s);
+}
+
+.drp-nav-btn:hover {
+  background: var(--color-primary-pale);
+  border-color: var(--color-primary);
+}
+
+.drp-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.drp-weekday {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 4px 0;
+}
+
+.drp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.drp-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s);
+}
+
+.drp-day:hover {
+  background: var(--color-primary-pale);
+}
+
+.drp-day-outside {
+  color: var(--color-text-placeholder);
+}
+
+.drp-day-today {
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
+  font-weight: 700;
+}
+
+.drp-day-in-range {
+  background: var(--color-primary-pale);
+  border-radius: 0;
+}
+
+.drp-day-edge {
+  background: var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+}
+
+.drp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.drp-footer-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.drp-close-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+/* Mobil (≤480px, 390px genişlik dahil): popover viewport dışına taşmasın diye
+   tetikleyicinin altında tam genişlikte, sabit konumlu bir kart olarak açılır. */
+@media (max-width: 480px) {
+  .drp-popover {
+    position: fixed;
+    left: var(--spacing-3);
+    right: var(--spacing-3);
+    bottom: var(--spacing-3);
+    top: auto;
+    width: auto;
+    max-width: none;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
