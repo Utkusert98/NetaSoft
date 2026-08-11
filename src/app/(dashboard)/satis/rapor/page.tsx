@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
@@ -23,10 +23,8 @@ import {
   Line,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import type { ChartFormatter } from "@/lib/utils/chartTypes";
 
-// recharts v3 Tooltip formatter tipi intersection kullanıyor — any cast gerekli
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyFormatter = (...args: any[]) => any;
 
 const CHART_COLORS = ["#4e7c3f", "#6aaa58", "#9ec97a", "#f5a623", "#e74c3c", "#3498db", "#9b59b6", "#1abc9c"];
 const PIE_COLORS = ["#4e7c3f", "#1565c0"];
@@ -148,7 +146,7 @@ function DailyRevenueChart({ data, lang, onPointClick }: {
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Ciro"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Ciro"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Line
@@ -194,7 +192,7 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
             outerRadius={100}
             paddingAngle={4}
             dataKey="value"
-            label={((entry: { name?: string; pct?: number }) => `${entry.name} %${entry.pct}`) as unknown as AnyFormatter}
+            label={((entry: { name?: string; pct?: number }) => `${entry.name} %${entry.pct}`) as unknown as ChartFormatter}
             labelLine={false}
             onClick={(entry: unknown) => {
               const e = entry as { type?: "PRESCRIPTION" | "RETAIL" };
@@ -208,10 +206,10 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
           </Pie>
           <Tooltip
             formatter={((value: string | number | undefined, _name: string | number | undefined, item: { payload?: { pct: number } }) =>
-              [`${formatCurrency(Number(value ?? 0))} (%${item?.payload?.pct ?? 0})`, en ? "Revenue" : "Gelir"]) as AnyFormatter}
+              [`${formatCurrency(Number(value ?? 0))} (%${item?.payload?.pct ?? 0})`, en ? "Revenue" : "Gelir"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
-          <Legend formatter={((value: string, entry: { payload?: { pct: number } }) => `${value} (%${entry?.payload?.pct ?? 0})`) as AnyFormatter} />
+          <Legend formatter={((value: string, entry: { payload?: { pct: number } }) => `${value} (%${entry?.payload?.pct ?? 0})`) as ChartFormatter} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -236,7 +234,7 @@ function GroupRevenueChart({ data, lang, onBarClick }: {
           <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
           <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), lang === "en" ? "Revenue" : "Gelir"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), lang === "en" ? "Revenue" : "Gelir"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -285,7 +283,7 @@ function TopProductsChart({ data, lang, onBarClick }: {
                 `${formatCurrency(p?.gelir ?? 0)} (${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units" : "adet"})`,
                 en ? "Revenue" : "Gelir",
               ];
-            }) as AnyFormatter}
+            }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -352,7 +350,7 @@ function DayOfWeekChart({ data, lang }: {
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Avg. Revenue" : "Ort. Ciro"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Avg. Revenue" : "Ort. Ciro"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar dataKey="avgRevenue" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
@@ -379,7 +377,7 @@ function TrendChart({ data, lang }: {
             formatter={((value: string | number | undefined, name: string | number | undefined) => {
               if (name === "avgDiscountRate") return [`%${Number(value ?? 0).toFixed(1)}`, en ? "Avg. Discount Rate" : "Ort. İskonto Oranı"];
               return [formatCurrency(Number(value ?? 0)), en ? "Avg. Ticket" : "Ort. Fiş Tutarı"];
-            }) as AnyFormatter}
+            }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Legend formatter={(value: string) => value === "avgDiscountRate" ? (en ? "Avg. Discount Rate" : "Ort. İskonto Oranı") : (en ? "Avg. Ticket" : "Ort. Fiş Tutarı")} />
@@ -526,7 +524,7 @@ export default function SatisRaporPage() {
   const [sgkInvoicedThisMonth, setSgkInvoicedThisMonth] = useState<number | null>(null);
   const [sgkLoading, setSgkLoading] = useState(false);
 
-  const fetchSgkComparison = useCallback(async () => {
+  const fetchSgkComparison = async () => {
     setSgkLoading(true);
     try {
       const res = await fetch("/api/v1/finans/sgk-fatura", { headers: { "Accept-Language": lang } });
@@ -543,9 +541,11 @@ export default function SatisRaporPage() {
       }
     } catch { /* silent — bilgilendirme amaçlı, hata sessizce yutulur */ }
     finally { setSgkLoading(false); }
-  }, [lang, startDate]);
+  };
 
-  useEffect(() => { void fetchSgkComparison(); }, [fetchSgkComparison]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchSgkComparison(); }, [lang, startDate]);
 
   const prescriptionRevenueThisPeriod = summary?.prescriptionRevenue ?? 0;
   const sgkDiffPct = sgkInvoicedThisMonth && sgkInvoicedThisMonth > 0
@@ -553,7 +553,7 @@ export default function SatisRaporPage() {
     : null;
   const sgkDiffIsWarning = sgkDiffPct !== null && sgkDiffPct > 10;
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = async () => {
     setListLoading(true);
     try {
       const p = new URLSearchParams({ start: startDate, end: endDate });
@@ -568,9 +568,11 @@ export default function SatisRaporPage() {
       }
       if (json.success && json.data) { setRecords(json.data.records); setSummary(json.data.summary); }
     } catch { /* silent */ } finally { setListLoading(false); }
-  }, [startDate, endDate, filterType]);
+  };
 
-  useEffect(() => { void fetchRecords(); }, [fetchRecords]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchRecords(); }, [startDate, endDate, filterType]);
 
   const resetUpload = () => {
     setFile(null); setStep("select"); setParseError("");

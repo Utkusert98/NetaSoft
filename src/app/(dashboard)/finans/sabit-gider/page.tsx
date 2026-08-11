@@ -38,8 +38,6 @@ export default function SabitGiderPage() {
     notes: "",
   });
 
-  useEffect(() => { fetchExpenses(); }, []);
-
   const fetchExpenses = async () => {
     try {
       const res = await fetch("/api/v1/finans/sabit-gider", { headers: { "Accept-Language": lang } });
@@ -48,6 +46,12 @@ export default function SabitGiderPage() {
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+
+  // Mount üzerinde tek seferlik async veri çekimi — setState çağrısı fetch tamamlandıktan
+  // sonra (await sonrası) gerçekleşir, senkron değildir; bu yüzden kural burada
+  // yanlış pozitif üretir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchExpenses(); }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

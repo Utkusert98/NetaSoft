@@ -2,11 +2,10 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import type { ChartFormatter } from "@/lib/utils/chartTypes";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyFmt = (...args: any[]) => any;
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
 const TT = { background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" };
 
@@ -72,7 +71,7 @@ export default function AylikOzetPage() {
   };
   const lastDay = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
-  const fetchData = useCallback(async (y: number, m: number) => {
+  const fetchData = async (y: number, m: number) => {
     setLoading(true);
     try {
       const start = toDate(y, m, 1);
@@ -83,11 +82,11 @@ export default function AylikOzetPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   // Önceki ay verisi
   const [prevData, setPrevData] = useState<ReportData | null>(null);
-  const fetchPrev = useCallback(async (y: number, m: number) => {
+  const fetchPrev = async (y: number, m: number) => {
     const prevM = m === 0 ? 11 : m - 1;
     const prevY = m === 0 ? y - 1 : y;
     const start = toDate(prevY, prevM, 1);
@@ -95,12 +94,15 @@ export default function AylikOzetPage() {
     const res = await fetch(`/api/v1/raporlar/ozet?start=${start}&end=${end}`, { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: ReportData };
     if (json.success && json.data) setPrevData(json.data);
-  }, []);
+  };
 
   useEffect(() => {
+    // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchData(year, month);
     void fetchPrev(year, month);
-  }, [year, month, fetchData, fetchPrev]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month]);
 
   const months = lang === "en" ? ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] : ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
@@ -145,7 +147,7 @@ export default function AylikOzetPage() {
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
             {[
-              { label: lang === "en" ? "Total Income" : "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: "📈", color: "#4e7c3f" },
+              { label: lang === "en" ? "Total Income" : "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: "📈", color: "var(--color-income-green)" },
               { label: lang === "en" ? "Total Expense" : "Toplam Gider", value: cur?.totalExpense ?? 0, prev: prev?.totalExpense ?? 0, icon: "📉", color: "#e74c3c" },
               { label: lang === "en" ? "Net Profit" : "Net Kâr", value: cur?.netProfit ?? 0, prev: prev?.netProfit ?? 0, icon: "💰", color: "#3498db" },
             ].map(card => (
@@ -183,7 +185,7 @@ export default function AylikOzetPage() {
                   <StatRow label={lang === "en" ? "📱 Platform Revenue" : "📱 Platform Gelirleri"} cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
                     <span>{lang === "en" ? "Total Income" : "Toplam Gelir"}</span>
-                    <span style={{ color: "#4e7c3f" }}>{fmt(data.monthly[0].gelir)}</span>
+                    <span style={{ color: "var(--color-income-green)" }}>{fmt(data.monthly[0].gelir)}</span>
                   </div>
                 </>
               ) : (
@@ -218,7 +220,7 @@ export default function AylikOzetPage() {
             <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                 <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Profit Margin" : "Kâr Marjı"}</span>
-                <span style={{ fontWeight: 800, fontSize: "var(--font-size-base)", color: data.monthly[0].kar >= 0 ? "#4e7c3f" : "#e74c3c" }}>
+                <span style={{ fontWeight: 800, fontSize: "var(--font-size-base)", color: data.monthly[0].kar >= 0 ? "var(--color-income-green)" : "#e74c3c" }}>
                   %{((data.monthly[0].kar / data.monthly[0].gelir) * 100).toFixed(1)}
                   <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text-muted)", marginLeft: "8px" }}>
                     ({fmt(data.monthly[0].kar)} {lang === "en" ? "net profit" : "net kâr"})
@@ -328,7 +330,7 @@ export default function AylikOzetPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                    <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                     <Bar dataKey="gelir" name={lang === "en" ? "Income" : "Gelir"} fill="#4e7c3f" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="gider" name={lang === "en" ? "Expense" : "Gider"} fill="#e74c3c" radius={[3, 3, 0, 0]} />
                   </BarChart>

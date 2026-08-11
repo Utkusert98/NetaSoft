@@ -6,17 +6,23 @@ export type Lang = "tr" | "en";
 
 const STORAGE_KEY = "netasoft-lang";
 
+function getInitialLang(): Lang {
+  if (typeof window === "undefined") return "tr";
+  try {
+    return (localStorage.getItem(STORAGE_KEY) as Lang) ?? "tr";
+  } catch {
+    return "tr";
+  }
+}
+
 export function useLang() {
-  const [lang, setLangState] = useState<Lang>("tr");
+  const [lang, setLangState] = useState<Lang>(getInitialLang);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    try {
-      const saved = (localStorage.getItem(STORAGE_KEY) as Lang) ?? "tr";
-      setLangState(saved);
-    } catch {
-      setLangState("tr");
-    }
+    // Hydration'ın tamamlandığını işaretlemek için gereklidir; sunucu/istemci
+    // ilk render uyumsuzluğunu önlemek amacıyla senkron bir alternatifi yoktur.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

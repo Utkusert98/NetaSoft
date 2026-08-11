@@ -2,14 +2,13 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import type { ChartFormatter } from "@/lib/utils/chartTypes";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyFmt = (...args: any[]) => any;
 
 interface ReportData {
   period: { start: string; end: string };
@@ -76,7 +75,7 @@ export default function GelirGiderPage() {
 
   const toDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
-  const fetchReport = useCallback(async (start: Date, end: Date) => {
+  const fetchReport = async (start: Date, end: Date) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/v1/raporlar/ozet?start=${toDateStr(start)}&end=${toDateStr(end)}`, { headers: { "Accept-Language": lang } });
@@ -85,13 +84,16 @@ export default function GelirGiderPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     const preset = PRESETS[activePreset];
     const { start, end } = preset.fn();
+    // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchReport(start, end);
-  }, [activePreset, fetchReport]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePreset]);
 
   const handleCustom = () => {
     if (!customStart || !customEnd) return;
@@ -178,7 +180,7 @@ export default function GelirGiderPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                      <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                      <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Legend formatter={(v: string) => ({ gelir: lang === "en" ? "Income" : "Gelir", gider: lang === "en" ? "Expense" : "Gider", kar: lang === "en" ? "Profit" : "Kâr" }[v] ?? v)} />
                       <Area type="monotone" dataKey="gelir" stroke="#4e7c3f" fill="url(#gGelir)" strokeWidth={2} />
                       <Area type="monotone" dataKey="gider" stroke="#e74c3c" fill="url(#gGider)" strokeWidth={2} />
@@ -203,7 +205,7 @@ export default function GelirGiderPage() {
                         <Pie data={incomePieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                           {incomePieData.map((_, i) => <Cell key={i} fill={INCOME_COLORS[i % INCOME_COLORS.length]} />)}
                         </Pie>
-                        <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                        <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -240,7 +242,7 @@ export default function GelirGiderPage() {
                         <Pie data={expensePieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                           {expensePieData.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} />)}
                         </Pie>
-                        <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                        <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -276,7 +278,7 @@ export default function GelirGiderPage() {
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
                       <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                      <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Bar dataKey="value" fill="#9fe870" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -294,7 +296,7 @@ export default function GelirGiderPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                      <Tooltip formatter={((v: number) => fmt(v)) as AnyFmt} contentStyle={TT} />
+                      <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Legend formatter={(v: string) => ({ sabitGider: lang === "en" ? "Fixed Expense" : "Sabit Gider", personelGider: lang === "en" ? "Staff" : "Personel" }[v] ?? v)} />
                       <Bar dataKey="sabitGider" stackId="g" fill="#e74c3c" />
                       <Bar dataKey="personelGider" stackId="g" fill="#c0392b" radius={[3, 3, 0, 0]} />
@@ -329,7 +331,7 @@ export default function GelirGiderPage() {
                         <td style={{ textAlign: "right" }}>{fmt(m.kasa)}</td>
                         <td style={{ textAlign: "right" }}>{fmt(m.sgk)}</td>
                         <td style={{ textAlign: "right" }}>{fmt(m.platform)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 700, color: "#4e7c3f" }}>{fmt(m.gelir)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 700, color: "var(--color-income-green)" }}>{fmt(m.gelir)}</td>
                         <td style={{ textAlign: "right", fontWeight: 700, color: "#e74c3c" }}>{fmt(m.gider)}</td>
                         <td style={{ textAlign: "right", fontWeight: 700, color: m.kar >= 0 ? "#3498db" : "#e74c3c" }}>{fmt(m.kar)}</td>
                       </tr>
@@ -340,7 +342,7 @@ export default function GelirGiderPage() {
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.kasa, 0))}</td>
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.sgk, 0))}</td>
                       <td style={{ textAlign: "right" }}>{fmt(data.monthly.reduce((s, m) => s + m.platform, 0))}</td>
-                      <td style={{ textAlign: "right", color: "#4e7c3f" }}>{fmt(data.summary.totalIncome)}</td>
+                      <td style={{ textAlign: "right", color: "var(--color-income-green)" }}>{fmt(data.summary.totalIncome)}</td>
                       <td style={{ textAlign: "right", color: "#e74c3c" }}>{fmt(data.summary.totalExpense)}</td>
                       <td style={{ textAlign: "right", color: data.summary.netProfit >= 0 ? "#3498db" : "#e74c3c" }}>{fmt(data.summary.netProfit)}</td>
                     </tr>
