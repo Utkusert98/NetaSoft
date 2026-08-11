@@ -8,6 +8,7 @@ import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type 
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTrend } from "@/lib/sales/aggregations";
 import { topNWithOther } from "@/lib/utils/inventory-analysis";
+import { DATE_RANGE_PRESETS, matchPreset } from "@/lib/sales/dateRanges";
 import {
   BarChart,
   Bar,
@@ -772,6 +773,23 @@ export default function SatisRaporPage() {
     void fetchRecordsWith(pendingStartDate, pendingEndDate, pendingFilterType);
   };
 
+  // Hazır aralık ("preset") butonları: manuel tarih seçiminin aksine, bir
+  // preset'e tıklamak pending değerleri günceller VE aynı anda uygulamayı
+  // (fetch) tetikler — kullanıcı ayrıca "Filtrele"ye basmak zorunda kalmaz.
+  const handlePresetClick = (start: string, end: string) => {
+    setPendingStartDate(start);
+    setPendingEndDate(end);
+    setStartDate(start);
+    setEndDate(end);
+    void fetchRecordsWith(start, end, pendingFilterType);
+  };
+
+  // Uygulanmış (applied) aralığın hangi preset'e karşılık geldiği — eşleşen
+  // preset varsa o buton "aktif" görünür; manuel/özel bir aralıksa hiçbiri
+  // vurgulanmaz.
+  const activePresetKey = useMemo(() => matchPreset(startDate, endDate), [startDate, endDate]);
+  const pendingDiffersFromApplied = pendingStartDate !== startDate || pendingEndDate !== endDate;
+
   const resetUpload = () => {
     setFile(null); setStep("select"); setParseError("");
     setPreviewRows([]); setColumnMap(null); setHeaders([]); setDataRows([]);
@@ -1255,28 +1273,77 @@ export default function SatisRaporPage() {
       {/* ── SATIŞ LİSTESİ ── */}
       {tab === "list" && (
         <div>
-          <div className="card" style={{ marginBottom: "var(--spacing-5)", display: "flex", gap: "var(--spacing-4)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", gap: "var(--spacing-4)", flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{lang === "en" ? "Start Date" : "Başlangıç"}</label>
-                <input type="date" className="form-input" value={pendingStartDate} onChange={e => setPendingStartDate(e.target.value)} style={{ width: "160px" }} />
+          <div className="card" style={{ marginBottom: "var(--spacing-5)" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-4)", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: "1 1 480px", minWidth: 0 }}>
+                {/* Hazır aralık ("preset") butonları */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "var(--spacing-3)" }}>
+                  {DATE_RANGE_PRESETS.map(preset => {
+                    const isActive = activePresetKey === preset.key;
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        onClick={() => { const r = preset.range(); handlePresetClick(r.start, r.end); }}
+                        disabled={listLoading}
+                        style={{
+                          padding: "5px 12px",
+                          fontSize: "12.5px",
+                          fontWeight: 600,
+                          borderRadius: "var(--radius-full)",
+                          border: `1px solid ${isActive ? "var(--color-primary)" : "var(--color-border)"}`,
+                          background: isActive ? "var(--color-primary)" : "var(--color-surface)",
+                          color: isActive ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
+                          cursor: listLoading ? "not-allowed" : "pointer",
+                          opacity: listLoading ? 0.6 : 1,
+                          whiteSpace: "nowrap",
+                          transition: "all var(--transition-fast, 0.15s)",
+                        }}
+                      >
+                        {lang === "en" ? preset.labelEn : preset.labelTr}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "var(--spacing-3)", alignItems: "flex-end", maxWidth: "560px" }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">{lang === "en" ? "Start Date" : "Başlangıç Tarihi"}</label>
+                    <input type="date" className="form-input" value={pendingStartDate} onChange={e => setPendingStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">{lang === "en" ? "End Date" : "Bitiş Tarihi"}</label>
+                    <input type="date" className="form-input" value={pendingEndDate} onChange={e => setPendingEndDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">{lang === "en" ? "Sale Type" : "Satış Tipi"}</label>
+                    <select className="form-input" value={pendingFilterType} onChange={e => setPendingFilterType(e.target.value as "" | "PRESCRIPTION" | "RETAIL")}>
+                      <option value="">{lang === "en" ? "All" : "Tümü"}</option>
+                      <option value="PRESCRIPTION">{lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)"}</option>
+                      <option value="RETAIL">{lang === "en" ? "Retail (Direct)" : "Perakende (Elden)"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", marginTop: "var(--spacing-3)", flexWrap: "wrap" }}>
+                  <button className="btn btn-primary" onClick={handleApplyFilters} disabled={listLoading}>
+                    {listLoading ? (lang === "en" ? "Loading..." : "Yükleniyor...") : (lang === "en" ? "Filter" : "Filtrele")}
+                  </button>
+                  <span style={{ fontSize: "12.5px", color: "var(--color-text-muted)" }}>
+                    {lang === "en" ? "Showing: " : "Gösterilen: "}
+                    <strong style={{ color: "var(--color-text)", fontWeight: 600 }}>
+                      {format(parseDateOnlyLocal(startDate), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}
+                      {" – "}
+                      {format(parseDateOnlyLocal(endDate), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}
+                    </strong>
+                    {pendingDiffersFromApplied && (
+                      <span style={{ color: "var(--color-warning)", marginLeft: "8px" }}>
+                        {lang === "en" ? "· Unapplied changes — press Filter" : "· Uygulanmamış değişiklik — Filtrele'ye basın"}
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{lang === "en" ? "End Date" : "Bitiş"}</label>
-                <input type="date" className="form-input" value={pendingEndDate} onChange={e => setPendingEndDate(e.target.value)} style={{ width: "160px" }} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{lang === "en" ? "Sale Type" : "Satış Tipi"}</label>
-                <select className="form-input" value={pendingFilterType} onChange={e => setPendingFilterType(e.target.value as "" | "PRESCRIPTION" | "RETAIL")} style={{ width: "160px" }}>
-                  <option value="">{lang === "en" ? "All" : "Tümü"}</option>
-                  <option value="PRESCRIPTION">{lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)"}</option>
-                  <option value="RETAIL">{lang === "en" ? "Retail (Direct)" : "Perakende (Elden)"}</option>
-                </select>
-              </div>
-              <button className="btn btn-primary" onClick={handleApplyFilters} disabled={listLoading}>
-                {listLoading ? (lang === "en" ? "Loading..." : "Yükleniyor...") : (lang === "en" ? "Filter" : "Filtrele")}
-              </button>
-            </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button className="btn" onClick={() => { setTab("upload"); setStep("select"); }}
                 style={{ border: "1px solid var(--color-primary)", color: "var(--color-primary)", fontWeight: 600, fontSize: "13px" }}>
@@ -1288,6 +1355,7 @@ export default function SatisRaporPage() {
                   {clearingAll ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "🗑 Clear All Records" : "🗑 Tüm Kayıtları Temizle")}
                 </button>
               )}
+            </div>
             </div>
           </div>
 
