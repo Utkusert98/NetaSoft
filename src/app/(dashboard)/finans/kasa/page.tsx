@@ -41,13 +41,6 @@ export default function KasaPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  // Reçeteli Satış (Satış Raporu) — SADECE bilgilendirme amaçlı. SGK Fatura,
-  // gerçek faturalanabilir reçeteli gelirin TEK doğruluk kaynağı olmaya devam
-  // eder; bu değer Kasa'nın resmi POS/Nakit/Havale toplamına HİÇBİR ŞEKİLDE
-  // yazılmaz veya karışmaz — yalnızca günün yanında ek bir bağlam satırı olarak
-  // gösterilir. Gün → net gelir eşlemesi (YYYY-MM-DD anahtarlı).
-  const [rxByDay, setRxByDay] = useState<Record<string, number>>({});
-
   const fetchRecords = async () => {
     try {
       const res = await fetch("/api/v1/finans/kasa", { headers: { "Accept-Language": lang } });
@@ -63,44 +56,6 @@ export default function KasaPage() {
   // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void fetchRecords(); }, [lang]);
-
-  // Görünür tarih aralığındaki (tüm kasa kayıtları + o an formda seçili tarih)
-  // günler için Satış Raporu'ndaki reçeteli net geliri TEK bir istekte toplu
-  // çeker, gün bazında gruplar — satır başına ayrı fetch YAPILMAZ (verim).
-  const fetchRxForRange = async (start: string, end: string): Promise<void> => {
-    try {
-      const p = new URLSearchParams({ start, end, type: "PRESCRIPTION" });
-      const res = await fetch(`/api/v1/satis?${p}`, { headers: { "Accept-Language": lang } });
-      const json = await res.json() as { success: boolean; data?: { records: Array<{ saleDate: string; netRevenue: number }> } };
-      if (json.success && json.data) {
-        const byDay: Record<string, number> = {};
-        for (const r of json.data.records) {
-          const day = String(r.saleDate).slice(0, 10);
-          byDay[day] = (byDay[day] ?? 0) + Number(r.netRevenue);
-        }
-        setRxByDay(prev => ({ ...prev, ...byDay }));
-      }
-    } catch { /* silent — sadece bilgilendirme amaçlı bir ek bağlam, kritik değil */ }
-  };
-
-  useEffect(() => {
-    if (records.length === 0) return;
-    const dates = records.map(r => r.registerDate.slice(0, 10));
-    const start = dates.reduce((a, b) => (a < b ? a : b));
-    const end = dates.reduce((a, b) => (a > b ? a : b));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchRxForRange(start, end);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records]);
-
-  // "Yeni Kasa Girişi" formunda seçili tarih için de (Z-raporu girilirken
-  // görülebilsin diye) ayrıca çekilir — kayıtlar aralığı dışında kalabilir
-  // (ör. bugün henüz kasa kaydı yoksa).
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (formData.registerDate) void fetchRxForRange(formData.registerDate, formData.registerDate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.registerDate]);
 
   const calcTotal = (d: typeof emptyForm | Register) =>
     [Number(d.posAmount) || 0, Number(d.cashAmount) || 0, Number(d.wireAmount) || 0].reduce((a, b) => a + b, 0);
@@ -242,8 +197,6 @@ export default function KasaPage() {
   const renderKasaRows = (rows: Register[]) =>
     rows.map(rec => {
       const total = Number(rec.posAmount) + Number(rec.cashAmount) + Number(rec.wireAmount);
-      const dayKey = rec.registerDate.slice(0, 10);
-      const rxRevenue = rxByDay[dayKey];
       return (
         <tr key={rec.id}>
           <td style={{ fontWeight: 600 }}>
@@ -254,12 +207,6 @@ export default function KasaPage() {
           <td style={{ textAlign: "right" }}>{fmt(Number(rec.wireAmount))}</td>
           <td style={{ textAlign: "right" }}>
             <div style={{ fontWeight: 700, color: "var(--color-primary)" }}>{fmt(total)}</div>
-            {rxRevenue !== undefined && rxRevenue > 0 && (
-              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 400, marginTop: "2px", whiteSpace: "nowrap" }}
-                title={lang === "en" ? "Informational only — not part of the official register total. SGK Invoice remains the source of truth for invoiced prescription revenue." : "Sadece bilgilendirme amaçlıdır — resmi kasa toplamının parçası değildir. Faturalanan reçeteli gelirin doğruluk kaynağı SGK Fatura'dır."}>
-                ℹ️ {lang === "en" ? "Prescription Sales (Sales Report): " : "Reçeteli Satış (Satış Raporu): "}{fmt(rxRevenue)}
-              </div>
-            )}
           </td>
           <td style={{ color: "var(--color-text-muted)", fontSize: "13px", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {rec.notes || "—"}
@@ -333,14 +280,6 @@ export default function KasaPage() {
                 {calcTotal(formData).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
               </span>
             </div>
-
-            {rxByDay[formData.registerDate] !== undefined && rxByDay[formData.registerDate] > 0 && (
-              <div style={{ fontSize: "12px", color: "var(--color-text-muted)", padding: "0 2px" }}
-                title={lang === "en" ? "Informational only — not part of the official register total. SGK Invoice remains the source of truth for invoiced prescription revenue." : "Sadece bilgilendirme amaçlıdır — resmi kasa toplamının parçası değildir. Faturalanan reçeteli gelirin doğruluk kaynağı SGK Fatura'dır."}>
-                ℹ️ {lang === "en" ? "Prescription Sales for this date (Sales Report): " : "Bu tarih için Reçeteli Satış (Satış Raporu): "}
-                <strong style={{ color: "var(--color-text)", fontWeight: 600 }}>{fmt(rxByDay[formData.registerDate])}</strong>
-              </div>
-            )}
 
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
