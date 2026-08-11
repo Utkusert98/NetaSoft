@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
+import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTrend } from "@/lib/sales/aggregations";
 import {
   BarChart,
   Bar,
@@ -307,6 +308,89 @@ function TopProductsChart({ data, lang, onBarClick }: {
   );
 }
 
+function StaffPerformanceTable({ data, lang }: {
+  data: Array<{ staffName: string; totalRevenue: number; saleCount: number; prescriptionPct: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+        <thead>
+          <tr>
+            <th>{en ? "Staff" : "Personel"}</th>
+            <th>{en ? "Total Revenue" : "Toplam Ciro"}</th>
+            <th>{en ? "Sale Count" : "Satış Sayısı"}</th>
+            <th>{en ? "Prescription %" : "Reçeteli %"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(row => (
+            <tr key={row.staffName}>
+              <td style={{ fontWeight: 600 }}>{row.staffName}</td>
+              <td style={{ fontWeight: 700 }}>{formatCurrency(row.totalRevenue)}</td>
+              <td>{row.saleCount.toLocaleString("tr-TR")}</td>
+              <td>%{row.prescriptionPct.toFixed(0)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DayOfWeekChart({ data, lang }: {
+  data: Array<{ label: string; avgRevenue: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ height: 260 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Avg. Revenue" : "Ort. Ciro"]) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar dataKey="avgRevenue" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TrendChart({ data, lang }: {
+  data: Array<{ label: string; avgTicket: number; avgDiscountRate: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ height: 280 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `%${v.toFixed(0)}`} />
+          <Tooltip
+            formatter={((value: string | number | undefined, name: string | number | undefined) => {
+              if (name === "avgDiscountRate") return [`%${Number(value ?? 0).toFixed(1)}`, en ? "Avg. Discount Rate" : "Ort. İskonto Oranı"];
+              return [formatCurrency(Number(value ?? 0)), en ? "Avg. Ticket" : "Ort. Fiş Tutarı"];
+            }) as AnyFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend formatter={(value: string) => value === "avgDiscountRate" ? (en ? "Avg. Discount Rate" : "Ort. İskonto Oranı") : (en ? "Avg. Ticket" : "Ort. Fiş Tutarı")} />
+          <Line yAxisId="left" type="monotone" dataKey="avgTicket" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
+          <Line yAxisId="right" type="monotone" dataKey="avgDiscountRate" stroke={CHART_COLORS[4]} strokeWidth={2} dot={{ r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export default function SatisRaporPage() {
   const { lang } = useLangContext();
   const [tab, setTab] = useState<"upload" | "list">("list");
@@ -375,6 +459,49 @@ export default function SatisRaporPage() {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
   }, [records]);
+
+  // Personel bazlı performans — dosyada personel sütunu varsa hesaplanır.
+  const staffPerformanceData = useMemo(() => aggregateByStaff(records), [records]);
+  const hasStaffColumn = useMemo(() => hasStaffData(records), [records]);
+
+  // Haftanın günü bazında yoğunluk (saat bilgisi verilerde saklanmadığı için
+  // gerçek saatlik yoğunluk yerine dürüst bir vekil metrik olarak kullanılıyor).
+  const dayOfWeekData = useMemo(() => aggregateByDayOfWeek(records, lang === "en" ? "en" : "tr"), [records, lang]);
+
+  // Ortalama fiş tutarı ve iskonto oranı trendi (haftalık/aylık, veri aralığına göre).
+  const periodTrendData = useMemo(() => aggregatePeriodTrend(records), [records]);
+
+  // SGK Fatura karşılaştırması — SADECE bilgilendirme amaçlı, salt okunur.
+  // Kasa/Panel/SGK Fatura toplamlarına HİÇBİR ŞEKİLDE yazılmaz veya beslenmez.
+  const [sgkInvoicedThisMonth, setSgkInvoicedThisMonth] = useState<number | null>(null);
+  const [sgkLoading, setSgkLoading] = useState(false);
+
+  const fetchSgkComparison = useCallback(async () => {
+    setSgkLoading(true);
+    try {
+      const res = await fetch("/api/v1/finans/sgk-fatura", { headers: { "Accept-Language": lang } });
+      const json = await res.json() as { success: boolean; data?: Array<{ invoiceDate: string; amount: string | number }> };
+      if (json.success && json.data) {
+        // Seçili dönemin (startDate..endDate) ayına denk düşen faturaları topla —
+        // sayfadaki filtre tarih aralığı aynı ayı kapsıyorsa o aya göre, değilse
+        // aralığın başlangıç ayına göre karşılaştırma yapılır.
+        const monthKey = startDate.slice(0, 7);
+        const total = json.data
+          .filter(inv => String(inv.invoiceDate).slice(0, 7) === monthKey)
+          .reduce((s, inv) => s + Number(inv.amount), 0);
+        setSgkInvoicedThisMonth(total);
+      }
+    } catch { /* silent — bilgilendirme amaçlı, hata sessizce yutulur */ }
+    finally { setSgkLoading(false); }
+  }, [lang, startDate]);
+
+  useEffect(() => { void fetchSgkComparison(); }, [fetchSgkComparison]);
+
+  const prescriptionRevenueThisPeriod = summary?.prescriptionRevenue ?? 0;
+  const sgkDiffPct = sgkInvoicedThisMonth && sgkInvoicedThisMonth > 0
+    ? Math.abs(prescriptionRevenueThisPeriod - sgkInvoicedThisMonth) / sgkInvoicedThisMonth * 100
+    : null;
+  const sgkDiffIsWarning = sgkDiffPct !== null && sgkDiffPct > 10;
 
   const fetchRecords = useCallback(async () => {
     setListLoading(true);
@@ -770,6 +897,8 @@ export default function SatisRaporPage() {
                 <ColSelect fieldKey="group" label={lang === "en" ? "Product Group Column" : "Ürün Grubu Kolonu"} />
                 <ColSelect fieldKey="type" label={lang === "en" ? "Sale Type Column" : "Satış Tipi Kolonu"}
                   hint={lang === "en" ? "Distinguishes Prescription/SGK from Retail/Direct" : "Reçeteli/SGK veya Perakende/Elden ayrımı"} />
+                <ColSelect fieldKey="staff" label={lang === "en" ? "Staff Column (optional)" : "Personel Kolonu (opsiyonel)"}
+                  hint={lang === "en" ? "Only if your file has a staff/employee column" : "Dosyanızda personel/çalışan sütunu varsa"} />
               </div>
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-5)" }}>
@@ -957,6 +1086,45 @@ export default function SatisRaporPage() {
             </div>
           )}
 
+          {summary && summary.prescriptionRevenue > 0 && (
+            <div className="card" style={{
+              marginBottom: "var(--spacing-5)", padding: "var(--spacing-4)",
+              border: `1px solid ${sgkDiffIsWarning ? "#fed7aa" : "var(--color-border)"}`,
+              background: sgkDiffIsWarning ? "#fff7ed" : "var(--color-surface)",
+            }}>
+              <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>
+                {lang === "en" ? "Prescription vs. SGK Invoice Cross-Check" : "Reçete / SGK Fatura Karşılaştırması"}
+              </h3>
+              <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-4)" }}>
+                <div>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                    {lang === "en" ? "This Month Prescription Sales (Sales Report)" : "Bu Ay Reçeteli Satış (Satış Raporu)"}
+                  </div>
+                  <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>{formatCurrency(prescriptionRevenueThisPeriod)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                    {lang === "en" ? "This Month Invoiced to SGK" : "Bu Ay SGK Faturalandı"}
+                  </div>
+                  <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>
+                    {sgkLoading ? "…" : sgkInvoicedThisMonth !== null ? formatCurrency(sgkInvoicedThisMonth) : (lang === "en" ? "No data" : "Veri yok")}
+                  </div>
+                </div>
+              </div>
+              {sgkDiffPct !== null && (
+                <div style={{ marginTop: "var(--spacing-3)", fontSize: "13px", fontWeight: 600, color: sgkDiffIsWarning ? "#b45309" : "var(--color-text-muted)" }}>
+                  {sgkDiffIsWarning ? "⚠ " : "ℹ "}
+                  {lang === "en" ? `Difference: %${sgkDiffPct.toFixed(1)}` : `Fark: %${sgkDiffPct.toFixed(1)}`}
+                </div>
+              )}
+              <p style={{ marginTop: "var(--spacing-2)", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                {lang === "en"
+                  ? "This comparison is for information only and does not affect your official revenue calculation."
+                  : "Bu karşılaştırma yalnızca bilgilendirme amaçlıdır, resmi ciro hesaplamanızı etkilemez."}
+              </p>
+            </div>
+          )}
+
           {records.length > 0 && summary && (
             <div style={{ marginBottom: "var(--spacing-5)" }}>
               <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
@@ -1035,6 +1203,42 @@ export default function SatisRaporPage() {
                   />
                 </section>
               )}
+
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Staff Performance" : "Personel Bazlı Performans"}</h3>
+                {hasStaffColumn ? (
+                  <StaffPerformanceTable data={staffPerformanceData} lang={lang} />
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en"
+                      ? "No staff column found in imported files. Import a file with a 'Personel' column to see this breakdown."
+                      : "İçe aktarılan dosyalarda personel sütunu bulunamadı. Bu dökümü görmek için 'Personel' sütunu içeren bir dosya yükleyin."}
+                  </div>
+                )}
+              </section>
+
+              <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Day-of-Week Density" : "Haftanın Günü Bazında Yoğunluk"}</h3>
+                  <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                    {lang === "en"
+                      ? "Hourly detail is not available (uploaded files don't retain time-of-day) — average revenue per day of week is shown instead."
+                      : "Saatlik detay mevcut değil (yüklenen dosyalar gün içi saat bilgisini saklamıyor) — bunun yerine haftanın günü bazında ortalama ciro gösteriliyor."}
+                  </p>
+                  <DayOfWeekChart data={dayOfWeekData} lang={lang} />
+                </section>
+
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Avg. Ticket & Discount Rate Trend" : "Ortalama Fiş Tutarı ve İskonto Oranı Trendi"}</h3>
+                  {periodTrendData.length > 0 ? (
+                    <TrendChart data={periodTrendData} lang={lang} />
+                  ) : (
+                    <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                      {lang === "en" ? "Not enough data for this period." : "Bu dönem için yeterli veri yok."}
+                    </div>
+                  )}
+                </section>
+              </div>
             </div>
           )}
 

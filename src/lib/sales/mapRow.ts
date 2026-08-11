@@ -16,6 +16,9 @@ export interface ParsedSaleRow {
   saleType: "PRESCRIPTION" | "RETAIL";
   quantity: number;
   netRevenue: number;
+  /** Bazı POS dosyalarında bulunan personel/çalışan adı sütunu — opsiyonel,
+   *  tüm dosyalarda bulunmaz. */
+  staffName?: string;
 }
 
 export interface ColumnMap {
@@ -26,6 +29,7 @@ export interface ColumnMap {
   date: string;
   group: string;
   type: string;
+  staff: string;
   priceIsNet: boolean;
 }
 
@@ -37,6 +41,7 @@ export interface ColumnOverride {
   date?: string;
   group?: string;
   type?: string;
+  staff?: string;
   priceIsNet?: boolean;
 }
 
@@ -225,6 +230,8 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "islem tipi", "recete", "prescription"], ["tip", "type"]);
   const discIdx  = gi(override.discount, ["iskonto tutari", "iskonto tutar", "indirim tutari", "discount amount"], ["iskonto", "discount", "indirim", "ind."]);
   const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
+  // Personel/çalışan sütunu — bilgi amaçlı, tüm dosyalarda bulunmaz.
+  const staffIdx = gi(override.staff,    ["personel", "calisan", "satis personeli", "staff", "employee"], ["personel", "calisan"]);
 
   const priceNum = parseNum(gv(priceIdx));
   const qtyNum = Math.max(1, Math.round(parseNum(gv(qtyIdx)) || 1));
@@ -269,6 +276,7 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
       saleType:       parseSaleType(String(gv(typeIdx) ?? "")),
       quantity:       finalQty,
       netRevenue,
+      staffName:      staffIdx >= 0 ? (String(gv(staffIdx) ?? "").trim() || undefined) : undefined,
     },
     colMap: {
       price:      gh(priceIdx),
@@ -278,6 +286,7 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
       date:       gh(dateIdx),
       group:      gh(groupIdx),
       type:       gh(typeIdx),
+      staff:      gh(staffIdx),
       priceIsNet,
     },
   };
