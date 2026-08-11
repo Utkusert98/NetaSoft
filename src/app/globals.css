@@ -1355,6 +1355,7 @@ h6 { font-size: var(--font-size-base); }
 .responsive-grid-1-1 { grid-template-columns: 1fr 1fr; }
 .responsive-grid-1-1-1 { grid-template-columns: 1fr 1fr 1fr; }
 .responsive-grid-3-cols { grid-template-columns: repeat(3, 1fr); }
+.responsive-grid-4-cols { grid-template-columns: repeat(4, 1fr); }
 .responsive-grid-5-cols { grid-template-columns: repeat(5, 1fr); }
 .responsive-grid-sidebar { grid-template-columns: 220px 1fr; }
 
@@ -1469,6 +1470,7 @@ h6 { font-size: var(--font-size-base); }
   .responsive-grid-sidebar {
     grid-template-columns: 1fr !important;
   }
+  .responsive-grid-4-cols,
   .responsive-grid-5-cols {
     grid-template-columns: repeat(2, 1fr) !important;
   }

@@ -358,8 +358,8 @@ export default function DepoHavalesiPage() {
 
       {/* Edit Modal */}
       {editTransfer && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="card" style={{ width: "440px", padding: "var(--spacing-6)" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "440px", padding: "var(--spacing-6)" }}>
             <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
               {lang === "en" ? "Edit Transfer" : "Havaleyi Düzenle"}
             </h3>
@@ -395,8 +395,8 @@ export default function DepoHavalesiPage() {
 
       {/* Delete Modal */}
       {deleteId && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="card" style={{ width: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
               {lang === "en" ? "Delete Transfer" : "Havaleyi Sil"}

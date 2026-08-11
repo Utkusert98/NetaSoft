@@ -510,8 +510,8 @@ export default function SenetPage() {
 
       {/* Edit Modal */}
       {editNote && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="card" style={{ width: "460px", padding: "var(--spacing-6)" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "460px", padding: "var(--spacing-6)" }}>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "var(--spacing-5)" }}>
               {lang === "en" ? "Edit Note" : "Senet Düzenle"}
             </h3>
@@ -546,8 +546,8 @@ export default function SenetPage() {
 
       {/* Delete Confirm Modal */}
       {deleteId && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="card" style={{ width: "400px", padding: "var(--spacing-6)", textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "400px", padding: "var(--spacing-6)", textAlign: "center" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗑️</div>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "8px" }}>
               {lang === "en" ? "Delete Note" : "Senedi Sil"}
