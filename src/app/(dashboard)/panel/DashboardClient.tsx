@@ -9,7 +9,6 @@ import { formatCurrency } from "@/lib/utils";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
-import DailyRevenueWidget from "@/components/ui/DailyRevenueWidget";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface DashboardData {
@@ -340,11 +339,6 @@ export default function DashboardClient({ data, pharmacistName }: {
           </div>
         </div>
       )}
-
-      {/* ── Bugünkü Ciro ── */}
-      <div style={{ marginBottom: "var(--spacing-5)" }}>
-        <DailyRevenueWidget />
-      </div>
 
       {/* ── Bu Ay vs Geçen Ay ── */}
       <div style={{ marginBottom: "var(--spacing-5)" }}>
