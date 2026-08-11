@@ -603,6 +603,8 @@ export default function SatisRaporPage() {
   const [saving, setSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showInvalidDateDetail, setShowInvalidDateDetail] = useState(false);
+  const [lastSaveExcludedCount, setLastSaveExcludedCount] = useState(0);
 
   // List state
   const now = new Date();
@@ -908,13 +910,31 @@ export default function SatisRaporPage() {
   // importBatchId ile ardışık olarak gönderiliyor.
   const SAVE_CHUNK_SIZE = 1000;
 
+  // Tarihi ayrıştırılamayan (dateInvalid) satırlar KAYDEDİLMEZ — mapRow.ts'de
+  // `isParseableDate` false döndüğünde parseDate sessizce BUGÜNE düşer; bu tek
+  // satırlık sessiz veri bozulması, dosyanın geri kalanı tamamen doğru
+  // ayrıştırılsa bile "bugünün ayında" hayalet bir kayıt olarak görünürdü
+  // (gerçek, tekrarlayan bir üretim hatasının kök nedeni). Bu yüzden bu
+  // satırlar önizlemede ayrıca gösterilir ama KAYDETME'ye dahil edilmez.
+  const invalidDateRows = previewRows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.dateInvalid);
+  const validPreviewRows = previewRows.filter(r => !r.dateInvalid);
+
   const handleConfirm = async () => {
     setSaving(true); setParseError(""); setSaveProgress(null);
     try {
+      const rowsToSave = previewRows.filter(r => !r.dateInvalid);
+      const excludedCount = previewRows.length - rowsToSave.length;
+      if (rowsToSave.length === 0) {
+        throw new Error(lang === "en"
+          ? `None of the ${excludedCount} rows in this file have a parseable date — nothing was saved. Please check your source file.`
+          : `Bu dosyadaki ${excludedCount} satırın hiçbirinde tarih ayrıştırılamadı — hiçbir şey kaydedilmedi. Lütfen kaynak dosyanızı kontrol edin.`);
+      }
       const batchId = `batch_${Date.now()}`;
       const chunks: ParsedSaleRow[][] = [];
-      for (let i = 0; i < previewRows.length; i += SAVE_CHUNK_SIZE) {
-        chunks.push(previewRows.slice(i, i + SAVE_CHUNK_SIZE));
+      for (let i = 0; i < rowsToSave.length; i += SAVE_CHUNK_SIZE) {
+        chunks.push(rowsToSave.slice(i, i + SAVE_CHUNK_SIZE));
       }
 
       let savedCount = 0;
@@ -948,14 +968,15 @@ export default function SatisRaporPage() {
       // bir tutar görüyorum" hissine kapılıyordu; oysa iki farklı tarih
       // aralığı sorgulanıyordu. Kayıt tarih aralığını kapsayacak şekilde
       // filtreyi otomatik genişletiyoruz ki kaydedilen veri hemen görünsün.
-      if (previewRows.length > 0) {
-        const days = previewRows.map(r => r.saleDate.slice(0, 10)).sort();
+      if (rowsToSave.length > 0) {
+        const days = rowsToSave.map(r => r.saleDate.slice(0, 10)).sort();
         const minDay = days[0];
         const maxDay = days[days.length - 1];
         if (minDay < startDate) { setStartDate(minDay); setPendingStartDate(minDay); }
         if (maxDay > endDate) { setEndDate(maxDay); setPendingEndDate(maxDay); }
       }
 
+      setLastSaveExcludedCount(excludedCount);
       resetUpload();
       setSaveSuccess(true);
       await fetchRecords();
@@ -984,7 +1005,7 @@ export default function SatisRaporPage() {
     } catch { /* silent */ } finally { setClearingAll(false); }
   };
 
-  const totalNetRevenue = previewRows.reduce((s, r) => s + r.netRevenue, 0);
+  const totalNetRevenue = validPreviewRows.reduce((s, r) => s + r.netRevenue, 0);
 
   const effectiveMap = (key: keyof ColumnOverride): string => {
     const ovr = override[key];
@@ -1028,6 +1049,13 @@ export default function SatisRaporPage() {
       {saveSuccess && (
         <div style={{ marginBottom: "var(--spacing-4)", padding: "12px 16px", background: "#e8f5e9", color: "#2e7d32", borderRadius: "var(--radius-md)", fontWeight: 600, fontSize: "14px" }}>
           {lang === "en" ? "✅ Sales saved successfully. You can view them in the list." : "✅ Satışlar başarıyla kaydedildi. Listede görüntüleyebilirsiniz."}
+          {lastSaveExcludedCount > 0 && (
+            <div style={{ marginTop: "6px", fontWeight: 600, color: "#b45309" }}>
+              {lang === "en"
+                ? `⚠ ${lastSaveExcludedCount} row(s) had an unparseable date and were NOT saved (check your source file).`
+                : `⚠ ${lastSaveExcludedCount} satırda tarih ayrıştırılamadığı için bu satırlar kaydedilmedi (dosyanızı kontrol edin).`}
+            </div>
+          )}
         </div>
       )}
 
@@ -1168,10 +1196,10 @@ export default function SatisRaporPage() {
             <div>
               <div className="responsive-grid responsive-grid-5-cols" style={{ gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
                 {[
-                  { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: previewRows.length.toLocaleString("tr-TR") },
-                  { label: lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)", value: previewRows.filter(r => r.saleType === "PRESCRIPTION").length.toLocaleString("tr-TR") },
-                  { label: lang === "en" ? "Retail" : "Perakende", value: previewRows.filter(r => r.saleType === "RETAIL").length.toLocaleString("tr-TR") },
-                  { label: lang === "en" ? "Avg. per Sale" : "Satış Başına Ort.", value: fmt(previewRows.length > 0 ? totalNetRevenue / previewRows.length : 0) },
+                  { label: lang === "en" ? "Records to Save" : "Kaydedilecek Kayıt", value: validPreviewRows.length.toLocaleString("tr-TR") },
+                  { label: lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)", value: validPreviewRows.filter(r => r.saleType === "PRESCRIPTION").length.toLocaleString("tr-TR") },
+                  { label: lang === "en" ? "Retail" : "Perakende", value: validPreviewRows.filter(r => r.saleType === "RETAIL").length.toLocaleString("tr-TR") },
+                  { label: lang === "en" ? "Avg. per Sale" : "Satış Başına Ort.", value: fmt(validPreviewRows.length > 0 ? totalNetRevenue / validPreviewRows.length : 0) },
                   { label: lang === "en" ? "Total Revenue" : "Toplam Ciro", value: fmt(totalNetRevenue), highlight: true },
                 ].map(c => (
                   <div key={c.label} className="card" style={{ padding: "var(--spacing-3)" }}>
@@ -1180,6 +1208,48 @@ export default function SatisRaporPage() {
                   </div>
                 ))}
               </div>
+
+              {invalidDateRows.length > 0 && (
+                <div style={{ padding: "12px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", fontSize: "13px" }}>
+                  <p style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }}>
+                    ⚠ {lang === "en"
+                      ? `${invalidDateRows.length} row(s) have an unparseable date and will NOT be saved`
+                      : `${invalidDateRows.length} satırda tarih ayrıştırılamadı, bu satırlar kaydedilMEyecek`}
+                  </p>
+                  <p style={{ color: "#92400e", marginBottom: "6px" }}>
+                    {lang === "en"
+                      ? "These rows are excluded from the save to avoid silently dating them to today. Fix the source file and re-upload if needed."
+                      : "Bu satırlar, sessizce bugünün tarihine kaydedilmesini önlemek için kayıttan hariç tutulur. Gerekirse kaynak dosyanızı düzeltip tekrar yükleyin."}
+                  </p>
+                  <button className="btn" style={{ padding: "2px 8px", fontSize: "11px" }} onClick={() => setShowInvalidDateDetail(v => !v)}>
+                    {showInvalidDateDetail
+                      ? (lang === "en" ? "Hide details" : "Detayı gizle")
+                      : (lang === "en" ? "Show details" : "Detayı göster")}
+                  </button>
+                  {showInvalidDateDetail && (
+                    <div style={{ marginTop: "8px", maxHeight: "180px", overflowY: "auto", border: "1px solid #fed7aa", borderRadius: "var(--radius-sm)" }}>
+                      <table className="table" style={{ width: "100%", fontSize: "12px" }}>
+                        <thead>
+                          <tr>
+                            <th>{lang === "en" ? "Row #" : "Satır #"}</th>
+                            <th>{lang === "en" ? "Product Name" : "Ürün Adı"}</th>
+                            <th>{lang === "en" ? "Raw Date Value" : "Ham Tarih Değeri"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invalidDateRows.map(({ r, i }) => (
+                            <tr key={i}>
+                              <td>{i + 1}</td>
+                              <td>{r.productName}</td>
+                              <td>{r.rawDateValue?.trim() ? `"${r.rawDateValue}"` : (lang === "en" ? "(empty)" : "(boş)")}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {columnMap && (
                 <div style={{ padding: "10px 14px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", fontSize: "12px", color: "var(--color-text-muted)" }}>
@@ -1199,7 +1269,7 @@ export default function SatisRaporPage() {
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)", flexWrap: "wrap" }}>
                 <button className="btn" onClick={() => setStep("mapping")}>{lang === "en" ? "← Edit Columns" : "← Kolonları Düzenle"}</button>
-                <button className="btn btn-primary" disabled={saving} onClick={() => void handleConfirm()} style={{ minWidth: "240px" }}>
+                <button className="btn btn-primary" disabled={saving || validPreviewRows.length === 0} onClick={() => void handleConfirm()} style={{ minWidth: "240px" }}>
                   {saving
                     ? (saveProgress
                         ? (lang === "en"
@@ -1207,8 +1277,8 @@ export default function SatisRaporPage() {
                             : `Kaydediliyor... (${saveProgress.done}/${saveProgress.total})`)
                         : (lang === "en" ? "Saving..." : "Kaydediliyor..."))
                     : (lang === "en"
-                        ? `Confirm & Save ${previewRows.length.toLocaleString("en-US")} Sales`
-                        : `${previewRows.length.toLocaleString("tr-TR")} Satışı Onayla ve Kaydet`)}
+                        ? `Confirm & Save ${validPreviewRows.length.toLocaleString("en-US")} Sales`
+                        : `${validPreviewRows.length.toLocaleString("tr-TR")} Satışı Onayla ve Kaydet`)}
                 </button>
               </div>
 

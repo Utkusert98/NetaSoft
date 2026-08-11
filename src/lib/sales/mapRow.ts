@@ -28,6 +28,15 @@ export interface ParsedSaleRow {
   customerName?: string;
   /** "Puan Tutar" (sadakat puanı) sütunundaki tutar — opsiyonel. */
   loyaltyPoints?: number;
+  /** Tarih sütunundaki HAM (ayrıştırılmamış) değer — `dateInvalid` true olduğunda
+   *  kullanıcıya "hangi satır/hangi ham değer" bilgisini göstermek için saklanır. */
+  rawDateValue?: string;
+  /** true ise bu satırın tarih değeri ayrıştırılamadı (`isParseableDate` false döndü) —
+   *  `saleDate` bu durumda `parseDate`'in sessiz bugüne-düşme fallback'ini içerir ve
+   *  ASLA veritabanına kaydedilmemelidir; çağıran taraf bu satırı kayıttan HARİÇ
+   *  tutmalı ve kullanıcıya bildirmelidir (gerçek bir üretim hatasının kök nedeni —
+   *  bkz. isParseableDate). */
+  dateInvalid?: boolean;
 }
 
 export interface ColumnMap {
@@ -304,11 +313,13 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
     netRevenue   = finalPrice * finalQty - finalDiscount;
   }
 
+  const rawDateVal = String(gv(dateIdx) ?? "");
+
   return {
     row: {
       productGroup:   String(gv(groupIdx) ?? "").trim() || "Genel",
       productName:    String(gv(nameIdx) ?? "").trim() || "Bilinmiyor",
-      saleDate:       parseDate(String(gv(dateIdx) ?? "")),
+      saleDate:       parseDate(rawDateVal),
       price:          finalPrice,
       discountAmount: finalDiscount,
       saleType:       parseSaleType(String(gv(typeIdx) ?? "")),
@@ -318,6 +329,8 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
       rawTransactionType: typeIdx >= 0 ? (String(gv(typeIdx) ?? "").trim() || undefined) : undefined,
       customerName:   customerIdx >= 0 ? (String(gv(customerIdx) ?? "").trim() || undefined) : undefined,
       loyaltyPoints:  loyaltyIdx >= 0 ? parseNum(gv(loyaltyIdx)) : undefined,
+      rawDateValue:   rawDateVal,
+      dateInvalid:    !isParseableDate(rawDateVal),
     },
     colMap: {
       price:      gh(priceIdx),

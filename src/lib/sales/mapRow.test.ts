@@ -192,6 +192,56 @@ describe("isReturnTransaction — iade/iptal tespiti", () => {
   });
 });
 
+describe("mapRow — tek satırlık bozuk tarih, sessizce bugüne düşmez ve işaretlenir (gerçek üretim hatası regresyonu)", () => {
+  // Gerçek, tekrarlayan üretim hatası: 1500+ satırlık bir dosyada TEK bir satırın
+  // tarih hücresi boş/bozuk/birleştirilmiş olduğunda, eskiden bu satır sessizce
+  // BUGÜNÜN tarihine düşüyor ve rakamı ait olmadığı bir aya (ör. Ağustos) hayalet
+  // bir "1 satış" olarak sızdırıyordu. `looksLikeDateFallback` sayfa kontrolü
+  // yalnızca TÜM/ÇOĞU satır aynı tarihe yığıldığında (>=5 satır, tek distinct tarih)
+  // devreye girer — 5 iyi satır arasındaki TEK bozuk satırı YAKALAMAZ. Bu test,
+  // mapRow'un artık her satırı `dateInvalid` ile ayrı ayrı işaretlediğini ve
+  // sağlam satırların normal şekilde ayrıştırılmaya devam ettiğini doğrular.
+  const headers = ["Tarih", "Ürün Adı", "Fiyat", "Adet"];
+  const goodRows: unknown[][] = [
+    ["01.07.2026", "PAROL 500 MG", "45.90", "2"],
+    ["05.07.2026", "AUGMENTIN 1G", "120.00", "1"],
+    ["12.07.2026", "NUROFEN 400", "38.50", "3"],
+    ["18.07.2026", "VOLTAREN JEL", "95.00", "1"],
+    ["27.07.2026", "OZEMPIC 1MG", "1250.00", "1"],
+  ];
+  const badRow = ["", "PARASETAMOL 500MG", "12.00", "1"]; // boş/bozuk tarih hücresi
+
+  it("iyi satırların 5'i de dateInvalid=false ile Temmuz'a doğru ayrıştırılır", () => {
+    const results = goodRows.map(r => mapRow(headers, r, {}).row);
+    for (const r of results) {
+      expect(r.dateInvalid).toBe(false);
+      expect(r.saleDate.slice(0, 7)).toBe("2026-07");
+    }
+  });
+
+  it("bozuk tarihli TEK satır dateInvalid=true olarak işaretlenir (sessizce bugüne düşmez sayılmaz)", () => {
+    const { row: mapped } = mapRow(headers, badRow, {});
+    expect(mapped.dateInvalid).toBe(true);
+    expect(mapped.rawDateValue).toBe("");
+    // parseDate hâlâ dahili olarak bugüne düşer (geriye dönük uyumluluk için saleDate
+    // dolu kalır) — ama çağıran taraf (satis/rapor sayfası) dateInvalid=true olan
+    // satırları KAYDETMEDEN önce filtrelemekle yükümlüdür (bkz. page.tsx validPreviewRows).
+    expect(mapped.saleDate).toBeTruthy();
+  });
+
+  it("karışık 6 satırlık (5 iyi + 1 bozuk) bir dosyada looksLikeDateFallback'in kaçırdığı senaryoda bile, dateInvalid filtrelemesi bozuk satırı doğru şekilde dışlar", () => {
+    const allRows = [...goodRows, badRow].map(r => mapRow(headers, r, {}).row);
+    const valid = allRows.filter(r => !r.dateInvalid);
+    const invalid = allRows.filter(r => r.dateInvalid);
+    expect(valid.length).toBe(5);
+    expect(invalid.length).toBe(1);
+    expect(invalid[0].productName).toBe("PARASETAMOL 500MG");
+    // Sağlam satırların hiçbiri bugünün tarihine (test ortamının çalıştığı gün)
+    // yanlışlıkla düşmemiştir — hepsi Temmuz 2026'dadır.
+    for (const r of valid) expect(r.saleDate.slice(0, 7)).toBe("2026-07");
+  });
+});
+
 describe("isGenericWalkInCustomer — anonim müşteri yer tutucusu tespiti", () => {
   it("'PERAKENDE MÜŞTERİ' değerini genel/anonim olarak işaretler", () => {
     expect(isGenericWalkInCustomer("PERAKENDE MÜŞTERİ")).toBe(true);
