@@ -10,7 +10,7 @@ import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTr
 import { topNWithOther } from "@/lib/utils/inventory-analysis";
 import { DATE_RANGE_PRESETS, matchPreset, saleRowsDateSpan } from "@/lib/sales/dateRanges";
 import DateRangePicker from "@/components/ui/DateRangePicker";
-import DailyRevenueWidget from "@/components/ui/DailyRevenueWidget";
+import PeriodRevenueWidget from "@/components/ui/PeriodRevenueWidget";
 import {
   BarChart,
   Bar,
@@ -1026,7 +1026,11 @@ export default function SatisRaporPage() {
       </div>
 
       <div style={{ marginBottom: "var(--spacing-5)" }}>
-        <DailyRevenueWidget title={lang === "en" ? "Today's Revenue (Register + Prescription)" : "Bugünkü Ciro (Kasa + Reçete)"} />
+        <PeriodRevenueWidget
+          startDate={startDate}
+          endDate={endDate}
+          title={lang === "en" ? "Period Revenue (Register + Prescription)" : "Dönemsel Ciro (Kasa + Reçete)"}
+        />
       </div>
 
       {saveSuccess && (

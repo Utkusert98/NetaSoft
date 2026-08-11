@@ -5,6 +5,7 @@ import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
+import PeriodRevenueWidget from "@/components/ui/PeriodRevenueWidget";
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
 const TT = { background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" };
@@ -144,6 +145,15 @@ export default function AylikOzetPage() {
         <div style={{ textAlign: "center", padding: "80px" }}><div className="spinner" style={{ margin: "0 auto" }} /></div>
       ) : (
         <>
+          {/* Dönemsel Ciro (Kasa + Reçete) */}
+          <div style={{ marginBottom: "var(--spacing-5)" }}>
+            <PeriodRevenueWidget
+              startDate={toDate(year, month, 1)}
+              endDate={toDate(year, month, lastDay(year, month))}
+              title={lang === "en" ? `${months[month]} ${year} Revenue (Register + Prescription)` : `${months[month]} ${year} Ciro (Kasa + Reçete)`}
+            />
+          </div>
+
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
             {[

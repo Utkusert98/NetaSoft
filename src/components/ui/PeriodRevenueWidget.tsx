@@ -15,29 +15,28 @@ type SatisRecord = {
   netRevenue: number;
 };
 
-const todayStr = (): string => new Date().toISOString().split("T")[0];
-
 const fmt = (v: number): string =>
   v.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 
 /**
- * Bugünkü Ciro Widget'ı — Kasa'nın (POS+Nakit+Havale) resmi toplamını ve
- * Satış Raporu'ndaki reçeteli net geliri aynı gün için bir araya getirip
- * gösterir. SADECE bilgilendirme amaçlıdır: burada gösterilen "Toplam
- * Günlük Ciro (tahmini)" hiçbir resmi hesaplamayı (Kasa toplamı, Gösterge
- * Paneli'ndeki Toplam Gelir, SGK Fatura tutarları) BESLEMEZ veya değiştirmez.
- * Faturalanabilir/tahsil edilebilir reçeteli gelirin tek doğruluk kaynağı
- * SGK Fatura olmaya devam eder.
+ * Dönemsel Ciro Widget'ı — Kasa'nın (POS+Nakit+Havale) resmi toplamını ve
+ * Satış Raporu'ndaki reçeteli net geliri seçilen tarih aralığı için bir
+ * araya getirip gösterir. SADECE bilgilendirme amaçlıdır: burada gösterilen
+ * "Toplam Ciro (Kasa + Reçete)" hiçbir resmi hesaplamayı (Kasa toplamı,
+ * Gösterge Paneli'ndeki Toplam Gelir, SGK Fatura tutarları) BESLEMEZ veya
+ * değiştirmez. Faturalanabilir/tahsil edilebilir reçeteli gelirin tek
+ * doğruluk kaynağı SGK Fatura olmaya devam eder.
  */
-export default function DailyRevenueWidget({
-  date,
+export default function PeriodRevenueWidget({
+  startDate,
+  endDate,
   title,
 }: {
-  date?: string;
+  startDate: string;
+  endDate: string;
   title?: string;
 }): React.JSX.Element {
   const { lang } = useLangContext();
-  const targetDate = date ?? todayStr();
 
   const [loading, setLoading] = useState(true);
   const [kasaTotal, setKasaTotal] = useState<number | null>(null);
@@ -51,7 +50,7 @@ export default function DailyRevenueWidget({
       try {
         const [kasaRes, satisRes] = await Promise.all([
           fetch("/api/v1/finans/kasa", { headers: { "Accept-Language": lang } }),
-          fetch(`/api/v1/satis?${new URLSearchParams({ start: targetDate, end: targetDate, type: "PRESCRIPTION" })}`, {
+          fetch(`/api/v1/satis?${new URLSearchParams({ start: startDate, end: endDate, type: "PRESCRIPTION" })}`, {
             headers: { "Accept-Language": lang },
           }),
         ]);
@@ -62,9 +61,12 @@ export default function DailyRevenueWidget({
         if (cancelled) return;
 
         if (kasaJson.success && kasaJson.data) {
-          const todays = kasaJson.data.filter(r => r.registerDate.slice(0, 10) === targetDate);
-          if (todays.length > 0) {
-            const total = todays.reduce(
+          const inRange = kasaJson.data.filter(r => {
+            const d = r.registerDate.slice(0, 10);
+            return d >= startDate && d <= endDate;
+          });
+          if (inRange.length > 0) {
+            const total = inRange.reduce(
               (sum, r) => sum + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount),
               0
             );
@@ -94,9 +96,9 @@ export default function DailyRevenueWidget({
 
     void load();
     return () => { cancelled = true; };
-  }, [targetDate, lang]);
+  }, [startDate, endDate, lang]);
 
-  const heading = title ?? (lang === "en" ? "Today's Revenue" : "Bugünkü Ciro");
+  const heading = title ?? (lang === "en" ? "Period Revenue" : "Dönemsel Ciro");
   const hasKasa = kasaTotal !== null;
   const combinedTotal = (kasaTotal ?? 0) + rxTotal;
 
@@ -117,12 +119,12 @@ export default function DailyRevenueWidget({
             flexWrap: "wrap", gap: "8px",
           }}>
             <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-              {lang === "en" ? "Register (POS+Cash+Wire)" : "Kasa (POS+Nakit+Havale)"}
+              {lang === "en" ? "Register Total (period) (POS+Cash+Wire)" : "Kasa Toplamı (dönem) (POS+Nakit+Havale)"}
             </span>
             <span style={{ fontWeight: 700, fontSize: "15px" }}>
               {hasKasa ? fmt(kasaTotal!) : (
                 <span style={{ fontWeight: 400, fontSize: "13px", color: "var(--color-text-muted)" }}>
-                  {lang === "en" ? "No register entry for today yet" : "Bugün için henüz kasa girişi yapılmadı"}
+                  {lang === "en" ? "No register entry for the selected period yet" : "Seçili dönem için henüz kasa girişi yok"}
                 </span>
               )}
             </span>
@@ -149,7 +151,7 @@ export default function DailyRevenueWidget({
               marginTop: "4px",
             }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-on-primary-light)" }}>
-                {lang === "en" ? "Total Daily Revenue (est.)" : "Toplam Günlük Ciro (tahmini)"}
+                {lang === "en" ? "Total Revenue (Register + Prescription)" : "Toplam Ciro (Kasa + Reçete)"}
               </span>
               <span style={{ fontWeight: 800, fontSize: "17px", color: "var(--color-on-primary-light)" }}>
                 {fmt(combinedTotal)}
