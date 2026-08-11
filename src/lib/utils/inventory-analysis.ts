@@ -79,7 +79,12 @@ const COLUMN_ALIASES: Record<keyof InventoryRow, string[]> = {
 
 function detectColumn(headers: string[], field: keyof InventoryRow, claimed: Set<string>): string | null {
   const aliases = COLUMN_ALIASES[field];
-  const normalized = headers.map((h) => h.toLowerCase().trim());
+  // ÖNEMLİ: JS'in .toLowerCase()'i Türkçe büyük noktalı "İ" (U+0130) harfini
+  // düz "i" değil, üzerinde ayrı bir birleşik nokta işaretiyle üretir — bu da
+  // "İlaç Kodu", "İlaç Grubu" gibi İ ile başlayan başlıkların alias'larla hiç
+  // eşleşmemesine (sessizce) yol açıyordu. toLowerCase()'den ÖNCE İ'yi düz
+  // "i"ye çevirmek bunu çözer.
+  const normalized = headers.map((h) => h.replace(/İ/g, "i").toLowerCase().trim());
 
   // 1. geçiş: tam eşleşme (en güvenilir)
   for (const alias of aliases) {

@@ -54,6 +54,45 @@ describe("mapRow — net tutar modu", () => {
   });
 });
 
+describe("mapRow — net tutar + ayrı iskonto tutarı sütunu (gerçek üretim hatası)", () => {
+  // Gerçek hata: "Toplam Tutar / İskonto Tutar / Net Tutar" üçlüsü olan dosyalarda
+  // Net Tutar zaten iskonto düşülmüş nihai tutardır. Eskiden İskonto Tutar ayrıca
+  // netRevenue'dan bir kez daha düşülüyordu — ciro olduğundan az hesaplanıyordu.
+  const headers = ["İşlem No", "Cari Adı", "İşlem Tipi", "Tarih", "Toplam Tutar", "İskonto Tutar", "Net Tutar", "Personel"];
+  const row = ["21159", "PERAKENDE MÜŞTERİ", "P. SATIŞ", "01/07/2026", "152.62", "2.62", "150.00", "KASA"];
+
+  it("iskonto çift sayılmaz, netRevenue = Net Tutar sütunundaki değerdir", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.netRevenue).toBeCloseTo(150, 2);
+    expect(mapped.price).toBeCloseTo(150, 2);
+  });
+});
+
+describe("mapRow — ürün adı sütunu olmayan, işlem/fiş bazlı dosya (gerçek üretim dosyası)", () => {
+  // Gerçek bir hata: bazı POS/eczane yazılımları ürün kırılımı olmayan, işlem
+  // bazlı bir özet dosyası verir (İşlem No, Cari Adı, İşlem Tipi, Tarih, Net
+  // Tutar). Ürün adı sütunu hiç yoktur; eskiden bu yüzden isColumnMapConfident
+  // false dönüyor ve kullanıcıya gereksiz yere manuel kolon eşleştirmesi
+  // soruluyordu. Ayrıca "İşlem Tipi"/"İskonto Tutar" gibi büyük noktalı "İ" ile
+  // başlayan başlıklar, JS'in Türkçe olmayan toLowerCase() davranışı yüzünden
+  // hiç eşleşmiyordu (ayrı bir kök neden, aynı dosyada ortaya çıktı).
+  const headers = ["İşlem No", "Cari Adı", "İşlem Tipi", "Tarih", "Toplam Tutar", "İskonto Tutar", "Net Tutar", "Personel", "Puan Tutar"];
+  const row = ["21149", "NAZİK YERŞEN", "REÇETELİ SATIŞ", "01/07/2026", "24010.08", "0.00", "24010.08", "Havan Soft", "0.00"];
+
+  it("kolon eşleştirmesi manuel müdahale olmadan güvenilir sayılır", () => {
+    const { colMap } = mapRow(headers, row, {});
+    expect(colMap.type).toBe("İşlem Tipi");
+    expect(colMap.price).toBe("Net Tutar");
+    expect(isColumnMapConfident(colMap)).toBe(true);
+  });
+
+  it("'İşlem Tipi' sütunu doğru bulunur ve reçeteli satış doğru sınıflandırılır", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.saleType).toBe("PRESCRIPTION");
+    expect(mapped.netRevenue).toBeCloseTo(24010.08, 2);
+  });
+});
+
 describe("parseDate — tarih+saat ve gerçek üretim hatası senaryosu", () => {
   it("saat eki olan tarihleri doğru ayrıştırır (önceden bugüne düşüyordu)", () => {
     const iso = parseDate("10.08.2026 14:23:00");
