@@ -235,7 +235,10 @@ body {
   color: var(--color-text);
   background-color: var(--color-bg);
   line-height: 1.6;
-  min-height: 100vh;
+  min-height: 100vh; /* iOS Safari 100vh fallback için önce yazılır */
+  min-height: 100dvh; /* WebKit'te adres çubuğu görünürken 100vh en büyük olası
+                          viewport'u ölçtüğünden içerik görünür alanın altına
+                          taşabiliyordu; 100dvh gerçek görünür yüksekliği kullanır */
   overflow-x: hidden; /* geniş bir bileşen sayfayı taşırsa bile sayfa genelinde yatay kaydırma açılmasın */
 }
 
@@ -284,7 +287,8 @@ h6 { font-size: var(--font-size-base); }
 
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  min-height: 100vh; /* iOS Safari fallback */
+  min-height: 100dvh;
 }
 
 .main-content {
@@ -292,7 +296,8 @@ h6 { font-size: var(--font-size-base); }
   min-width: 0; /* flex öğeleri varsayılan min-width:auto olduğundan, geniş bir tablo/grafik
                    sayfanın tamamını viewport dışına taşırıp yatay kaydırmaya zorlayabiliyordu */
   margin-left: var(--sidebar-width);
-  min-height: 100vh;
+  min-height: 100vh; /* iOS Safari fallback */
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -483,6 +488,11 @@ h6 { font-size: var(--font-size-base); }
   outline: none;
   position: relative;
   overflow: hidden;
+  /* iOS Safari, -webkit-appearance sıfırlanmadan <button>'lara ağır native
+     stil (gölge/köşe) uygular — Chromium'da bu ihtiyaç yok, bu yüzden önceki
+     testlerde fark edilmedi. */
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .btn:focus-visible {
@@ -622,6 +632,10 @@ h6 { font-size: var(--font-size-base); }
   outline: none;
   transition: all var(--transition-fast);
   line-height: 1.5;
+  /* iOS Safari input/select/textarea'ya ağır native stil (yuvarlak köşe,
+     gölge, farklı buton chrome'u) uygular; sıfırlamadan tutarsız görünür. */
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .form-input:hover {
@@ -651,6 +665,16 @@ h6 { font-size: var(--font-size-base); }
 [data-theme="dark"] .form-input {
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+/* select.form-input: appearance:none native ok butonunu kaldırdığı için
+   yerine tutarlı bir custom ok ikonu eklenir (aksi halde iOS Safari'de
+   dropdown olduğu belli olmayan düz bir kutu görünür). */
+select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23808080' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-4) center;
+  padding-right: calc(var(--spacing-4) * 2 + 12px);
 }
 
 .form-input.error {
@@ -712,6 +736,7 @@ h6 { font-size: var(--font-size-base); }
 .table-container {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
@@ -764,6 +789,7 @@ h6 { font-size: var(--font-size-base); }
 .table-wrapper {
   max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .card .table-wrapper {
@@ -813,6 +839,11 @@ h6 { font-size: var(--font-size-base); }
   z-index: 100;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Ekran kenarına tam yaslı fixed panel: iPhone'da landscape çentik/ev
+     tuşu şeridi alanına içerik gizlenmesin diye safe-area padding'i */
+  padding-left: env(safe-area-inset-left);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .sidebar-logo {
@@ -976,7 +1007,8 @@ h6 { font-size: var(--font-size-base); }
    ================================ */
 
 .auth-page {
-  min-height: 100vh;
+  min-height: 100vh; /* iOS Safari fallback */
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr 1fr;
   background: var(--color-bg);
@@ -1220,6 +1252,7 @@ h6 { font-size: var(--font-size-base); }
   overflow-x: auto;
   max-height: 480px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .import-row-error {
@@ -1769,5 +1802,6 @@ h6 { font-size: var(--font-size-base); }
     max-width: none;
     max-height: 80vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

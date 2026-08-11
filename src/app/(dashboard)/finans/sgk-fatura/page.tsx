@@ -687,7 +687,7 @@ export default function SgkFaturaPage() {
       {/* EDIT MODAL */}
       {editRecord && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
-          <div className="card" style={{ width: "100%", maxWidth: "480px", maxHeight: "90vh", overflowY: "auto" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "480px", maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
               {lang === "en" ? "Edit SGK Invoice" : "SGK Faturasını Düzenle"}
             </h3>

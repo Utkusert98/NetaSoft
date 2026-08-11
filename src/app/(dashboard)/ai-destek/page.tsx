@@ -357,7 +357,7 @@ export default function AiDestek() {
 
       {/* Chat area */}
       <div style={{
-        flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
+        flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
         padding: "var(--spacing-5)", background: "var(--color-bg)",
         borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",
         marginBottom: "var(--spacing-4)",
