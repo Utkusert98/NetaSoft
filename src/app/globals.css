@@ -448,7 +448,11 @@ h6 { font-size: var(--font-size-base); }
 /* Primary Button */
 .btn-primary {
   background: var(--color-primary);
-  color: white;
+  /* --color-text-inverse tema ile birlikte değişir: açık temada beyaz (koyu
+     yeşil zemin üzerinde), koyu temada neredeyse siyah (parlak limon yeşili
+     zemin üzerinde). Sabit "white" kullanmak koyu modda limon yeşili zemin
+     üzerinde beyaz metnin neredeyse görünmez olmasına yol açıyordu. */
+  color: var(--color-text-inverse);
   border-color: var(--color-primary);
 }
 

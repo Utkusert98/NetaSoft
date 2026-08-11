@@ -39,7 +39,11 @@ export function NetaSoftLogoFull({
   size = 36,
   variant = "default",
 }: LogoProps) {
-  const textColor = variant === "white" ? "white" : "#163300";
+  // "default" varyant, arka planı temaya göre değişen auth panelinde
+  // kullanılıyor (açık temada beyaz, koyu temada koyu gri). Sabit koyu yeşil
+  // (#163300) kullanmak koyu modda metnin neredeyse görünmez olmasına yol
+  // açıyordu; bunun yerine temayla birlikte değişen --color-text kullanılır.
+  const textColor = variant === "white" ? "white" : "var(--color-text)";
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
