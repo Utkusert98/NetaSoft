@@ -25,6 +25,8 @@ import {
   analyzeInventory,
   detectInventoryColumnMap,
   isAutoMappingConfident,
+  truncateLabel,
+  topNWithOther,
   type InventoryAnalysis,
   type InventoryRow,
   type InventoryColumnMap,
@@ -126,7 +128,7 @@ function TopSellersChart({ data, lang, onProductClick }: { data: InventoryRow[];
   // aynı doğrusal eksende gösterilirse gelir çubukları adet çubuklarını görünmez kılar.
   // Bu yüzden tek bir "adet" ekseni kullanılır; gelir bilgisi tooltip'te ayrıca gösterilir.
   const chartData = data.map((r) => ({
-    name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
+    name: truncateLabel(r.name, 20),
     fullName: r.name,
     adet: r.salesQty,
     gelir: r.salesQty * r.salePrice,
@@ -207,7 +209,7 @@ function SoldUnsoldPieChart({ sold, unsold, lang }: { sold: number; unsold: numb
 function ProfitChart({ data, lang, onProductClick }: { data: Array<{ name: string; profit: number; margin: number }>; lang: string; onProductClick?: (name: string) => void }) {
   const en = lang === "en";
   const chartData = data.map((r) => ({
-    name: r.name.length > 16 ? r.name.slice(0, 14) + "…" : r.name,
+    name: truncateLabel(r.name, 16),
     fullName: r.name,
     kar: Math.round(r.profit * 100) / 100,
     marj: Math.round(r.margin * 10) / 10,
@@ -249,7 +251,7 @@ function ProfitChart({ data, lang, onProductClick }: { data: Array<{ name: strin
 function StockValueChart({ data, lang, onProductClick }: { data: Array<{ name: string; stockValue: number; closingStock: number }>; lang: string; onProductClick?: (name: string) => void }) {
   const en = lang === "en";
   const chartData = data.map((r) => ({
-    name: r.name.length > 20 ? r.name.slice(0, 18) + "…" : r.name,
+    name: truncateLabel(r.name, 20),
     fullName: r.name,
     deger: Math.round(r.stockValue * 100) / 100,
     adet: r.closingStock,
@@ -291,12 +293,16 @@ function StockValueChart({ data, lang, onProductClick }: { data: Array<{ name: s
 // gibi bir grup baskınsa) okunaklı kalması için ilk 6 kategori + "Diğer" gösterilir.
 function CategoryValuePieChart({ data, lang, onCategoryClick }: { data: Array<{ category: string; value: number }>; lang: string; onCategoryClick?: (category: string, isOther: boolean, otherCategories: string[]) => void }) {
   const en = lang === "en";
-  const sorted = [...data].sort((a, b) => b.value - a.value).filter((d) => d.value > 0);
-  const top = sorted.slice(0, 6);
-  const rest = sorted.slice(6);
-  const restSum = rest.reduce((s, d) => s + d.value, 0);
-  const chartData = restSum > 0 ? [...top, { category: en ? "Other" : "Diğer", value: restSum }] : top;
-  const otherCategories = rest.map((d) => d.category);
+  const positive = data.filter((d) => d.value > 0);
+  const { top, otherLabels, otherSum } = topNWithOther(positive, "category", "value", 6);
+  const otherLabel = en ? "Other" : "Diğer";
+  // "category" alanı tıklama/filtreleme için orijinal ismi korur; "label" alanı
+  // yalnızca legend/eksende gösterilen kısaltılmış metindir.
+  const chartData = otherSum > 0
+    ? [...top.map((t) => ({ category: t.category, label: truncateLabel(t.category, 18), value: t.value })), { category: otherLabel, label: otherLabel, value: otherSum }]
+    : top.map((t) => ({ category: t.category, label: truncateLabel(t.category, 18), value: t.value }));
+  const restSum = otherSum;
+  const otherCategories = otherLabels;
 
   return (
     <div style={{ height: 300 }}>
@@ -310,7 +316,7 @@ function CategoryValuePieChart({ data, lang, onCategoryClick }: { data: Array<{ 
             outerRadius={95}
             paddingAngle={3}
             dataKey="value"
-            nameKey="category"
+            nameKey="label"
             cursor={onCategoryClick ? "pointer" : undefined}
             onClick={(entry: { payload?: { category?: string } }) => {
               const category = entry?.payload?.category;
@@ -586,7 +592,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
         </div>
       </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-6)" }}>
+      <div className="responsive-grid responsive-grid-2-1" style={{ gap: "var(--spacing-6)" }}>
         <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
           <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>
             {hasSalesData ? (en ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün") : (en ? "Top 10 Products by Stock Value" : "Stok Değerine Göre En Değerli 10 Ürün")}
@@ -1071,8 +1077,8 @@ export default function EnvanterPage() {
                     .filter((v) => v !== "")
                 : [];
               return (
-                <div key={f.key} style={{
-                  display: "grid", gridTemplateColumns: "220px 1fr", gap: "var(--spacing-4)",
+                <div key={f.key} className="responsive-grid responsive-grid-sidebar" style={{
+                  gap: "var(--spacing-4)",
                   alignItems: "start", padding: "var(--spacing-3) 0",
                   borderBottom: "1px solid var(--color-border)",
                 }}>

@@ -99,6 +99,35 @@ function detectColumn(headers: string[], field: keyof InventoryRow, claimed: Set
   return null;
 }
 
+/**
+ * Uzun ürün/kategori adlarını grafik eksenlerinde okunaklı kalması için kısaltır.
+ * Örn. "PARASETAMOL 500 MG 20 TABLET KUTUSU" (20 karakter) → "PARASETAMOL 500 MG…"
+ */
+export function truncateLabel(name: string, maxLen: number): string {
+  if (name.length <= maxLen) return name;
+  return name.slice(0, Math.max(0, maxLen - 1)) + "…";
+}
+
+/**
+ * Bir liste çok fazla dilim/çubuk içeriyorsa (ör. onlarca kategori) grafik
+ * okunaksız hale gelir. Bu fonksiyon değere göre sıralar, ilk N kalemi bırakır
+ * ve kalanları tek bir "Diğer" toplamı altında birleştirir — pasta ve çubuk
+ * grafiklerde tutarlı bir kırpma davranışı sağlar.
+ */
+export function topNWithOther<T extends Record<string, unknown>>(
+  items: T[],
+  labelKey: keyof T,
+  valueKey: keyof T,
+  n: number,
+): { top: T[]; otherLabels: string[]; otherSum: number } {
+  const sorted = [...items].sort((a, b) => Number(b[valueKey]) - Number(a[valueKey]));
+  const top = sorted.slice(0, n);
+  const rest = sorted.slice(n);
+  const otherSum = rest.reduce((s, d) => s + Number(d[valueKey]), 0);
+  const otherLabels = rest.map((d) => String(d[labelKey]));
+  return { top, otherLabels, otherSum };
+}
+
 function toNumber(value: unknown): number {
   if (typeof value === "number") return isNaN(value) ? 0 : value;
   const str = String(value ?? "").replace(/[,\s]/g, ".").replace(/[^0-9.-]/g, "");

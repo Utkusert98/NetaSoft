@@ -45,6 +45,18 @@ interface SaleSummary {
 const fmt = (v: number) => v.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const toDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
+// `saleDate` sunucuda/DB'de HER ZAMAN UTC gece yarısı (T00:00:00.000Z) olarak
+// saklanır (bkz. mapRow.ts::parseDate). `new Date(isoString)` ile ayrıştırıp
+// ardından date-fns `format()` (yerel saat bileşenlerini okur) kullanmak,
+// tarayıcının yerel saat dilimi UTC'den GERİ ise (ör. Amerika) günün BİR ÖNCEKİ
+// güne kaymasına yol açar — grafik/tarih etiketleri gerçek satış gününden farklı
+// gösterilir. Bu fonksiyon "YYYY-MM-DD" kısmını doğrudan YEREL bir Date'e
+// (saat dilimi belirsizliği olmadan) çevirerek bu kaymayı önler.
+const parseDateOnlyLocal = (isoOrDateOnly: string): Date => {
+  const [y, m, d] = isoOrDateOnly.slice(0, 10).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
 const badge = (t: string, lang: string) => ({
   PRESCRIPTION: { bg: "#e8f5e9", color: "#2e7d32", label: lang === "en" ? "Prescription" : "Reçeteli" },
   RETAIL: { bg: "#e3f2fd", color: "#1565c0", label: lang === "en" ? "Retail" : "Perakende" },
@@ -89,7 +101,7 @@ function DrillDownModal({ title, records, lang, onClose }: {
                 const b = badge(r.saleType, lang);
                 return (
                   <tr key={r.id}>
-                    <td style={{ whiteSpace: "nowrap" }}>{format(new Date(r.saleDate), "dd MMM yyyy", { locale: en ? enUS : tr })}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{format(parseDateOnlyLocal(r.saleDate), "dd MMM yyyy", { locale: en ? enUS : tr })}</td>
                     <td style={{ fontWeight: 500 }}>{r.productName}</td>
                     <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{r.productGroup}</td>
                     <td>{r.quantity}</td>
@@ -336,7 +348,7 @@ export default function SatisRaporPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, revenue]) => ({
         date,
-        label: format(new Date(date), "dd MMM", { locale: lang === "en" ? enUS : tr }),
+        label: format(parseDateOnlyLocal(date), "dd MMM", { locale: lang === "en" ? enUS : tr }),
         revenue,
       }));
   }, [records, lang]);
@@ -737,7 +749,7 @@ export default function SatisRaporPage() {
                 </div>
               )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4)" }}>
+              <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-4)" }}>
                 <ColSelect fieldKey="price" label={lang === "en" ? "Price Column *" : "Fiyat Kolonu *"}
                   hint={lang === "en" ? "'Unit Price' = qty × price calculated · 'Amount/Net Amount' = already total" : "'Birim Fiyat' = adet × fiyat hesaplanır · 'Tutar/Net Tutar' = zaten toplam"} />
 
@@ -772,7 +784,7 @@ export default function SatisRaporPage() {
           {/* ADIM 3: Önizleme */}
           {step === "preview" && previewRows.length > 0 && (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+              <div className="responsive-grid responsive-grid-5-cols" style={{ gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
                 {[
                   { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: previewRows.length.toLocaleString("tr-TR") },
                   { label: lang === "en" ? "Prescription (SGK)" : "Reçeteli (SGK)", value: previewRows.filter(r => r.saleType === "PRESCRIPTION").length.toLocaleString("tr-TR") },
@@ -916,7 +928,7 @@ export default function SatisRaporPage() {
           </div>
 
           {summary && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--spacing-4)", marginBottom: "var(--spacing-5)" }}>
+            <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-5)" }}>
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Total Revenue" : "Toplam Ciro"}</div>
                 <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)" }}>{fmt(summary.totalRevenue)}</div>
@@ -951,7 +963,7 @@ export default function SatisRaporPage() {
                 {lang === "en" ? "Click a bar/point/slice for details" : "Detay için bir çubuğa/noktaya/dilime tıklayın"}
               </p>
 
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+              <div className="responsive-grid responsive-grid-2-1" style={{ gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
                 <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
                   <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Daily Revenue Trend" : "Günlük Ciro Trendi"}</h3>
                   <DailyRevenueChart
@@ -959,7 +971,7 @@ export default function SatisRaporPage() {
                     lang={lang}
                     onPointClick={(date) => {
                       const dayRecords = records.filter(r => r.saleDate.split("T")[0] === date);
-                      const label = format(new Date(date), "dd MMMM yyyy", { locale: lang === "en" ? enUS : tr });
+                      const label = format(parseDateOnlyLocal(date), "dd MMMM yyyy", { locale: lang === "en" ? enUS : tr });
                       setDrillDown({
                         title: lang === "en" ? `${label} — ${dayRecords.length} sales` : `${label} — ${dayRecords.length} satış`,
                         records: dayRecords,
@@ -1060,7 +1072,7 @@ export default function SatisRaporPage() {
                       const b = badge(r.saleType, lang);
                       return (
                         <tr key={r.id}>
-                          <td style={{ whiteSpace: "nowrap" }}>{format(new Date(r.saleDate), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}</td>
+                          <td style={{ whiteSpace: "nowrap" }}>{format(parseDateOnlyLocal(r.saleDate), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}</td>
                           <td style={{ fontWeight: 500 }}>{r.productName}</td>
                           <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{r.productGroup}</td>
                           <td>{r.quantity}</td>
@@ -1088,8 +1100,8 @@ export default function SatisRaporPage() {
       )}
 
       {deleteId && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="card" style={{ width: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{lang === "en" ? "Delete Sales Record" : "Satış Kaydını Sil"}</h3>
             <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>{lang === "en" ? "Are you sure you want to delete this sales record?" : "Bu satış kaydını silmek istediğinizden emin misiniz?"}</p>

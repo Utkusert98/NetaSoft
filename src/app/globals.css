@@ -1326,6 +1326,18 @@ h6 { font-size: var(--font-size-base); }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-4); }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-4); }
 
+/* Dashboard/rapor sayfalarında satır içi (inline style) grid-template-columns
+   kullanan bölümler için ortak, mobilde tek sütuna düşen grid sınıfları.
+   Inline style media query ile ezilemediğinden bu sınıflar kullanılır. */
+.responsive-grid { display: grid; min-width: 0; }
+.responsive-grid > * { min-width: 0; }
+.responsive-grid-2-1 { grid-template-columns: 2fr 1fr; }
+.responsive-grid-1-1 { grid-template-columns: 1fr 1fr; }
+.responsive-grid-1-1-1 { grid-template-columns: 1fr 1fr 1fr; }
+.responsive-grid-3-cols { grid-template-columns: repeat(3, 1fr); }
+.responsive-grid-5-cols { grid-template-columns: repeat(5, 1fr); }
+.responsive-grid-sidebar { grid-template-columns: 220px 1fr; }
+
 .w-full { width: 100%; }
 
 /* Amount formatting */
@@ -1426,6 +1438,18 @@ h6 { font-size: var(--font-size-base); }
 
   /* Stat cards: 2 columns on mobile */
   .grid-4.stat-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Inline-style tabanlı dashboard/rapor grid'leri tek sütuna düşsün */
+  .responsive-grid-2-1,
+  .responsive-grid-1-1,
+  .responsive-grid-1-1-1,
+  .responsive-grid-3-cols,
+  .responsive-grid-sidebar {
+    grid-template-columns: 1fr !important;
+  }
+  .responsive-grid-5-cols {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 
   /* Auth logo smaller */
   .auth-logo img { width: 70px !important; height: 70px !important; }
