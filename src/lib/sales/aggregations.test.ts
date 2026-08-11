@@ -64,6 +64,16 @@ describe("aggregateByDayOfWeek", () => {
     expect(monday.totalRevenue).toBe(400);
     expect(monday.avgRevenue).toBe(200); // 2 farklı gün üzerinden ortalama
   });
+
+  it("saleTypeFilter='RETAIL' verildiğinde yalnızca perakende satışları toplulaştırır", () => {
+    const result = aggregateByDayOfWeek([
+      row({ saleDate: "2026-08-10T00:00:00.000Z", netRevenue: 100, saleType: "RETAIL" }),
+      row({ saleDate: "2026-08-10T00:00:00.000Z", netRevenue: 500, saleType: "PRESCRIPTION" }),
+    ], "tr", "RETAIL");
+    const monday = result.find(d => d.label === "Pazartesi")!;
+    expect(monday.totalRevenue).toBe(100);
+    expect(monday.saleCount).toBe(1);
+  });
 });
 
 describe("discountRate", () => {

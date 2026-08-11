@@ -16,6 +16,9 @@ const rowSchema = z.object({
   saleType: z.enum(["PRESCRIPTION", "RETAIL"]).default("RETAIL"),
   quantity: z.number().int().min(1).default(1),
   staffName: z.string().optional(),
+  rawTransactionType: z.string().optional(),
+  customerName: z.string().optional(),
+  loyaltyPoints: z.number().optional(),
 });
 
 const confirmSchema = z.object({
@@ -48,6 +51,9 @@ export async function POST(req: Request): Promise<Response> {
       saleType: r.saleType,
       quantity: r.quantity,
       staffName: r.staffName ?? null,
+      rawTransactionType: r.rawTransactionType ?? null,
+      customerName: r.customerName ?? null,
+      loyaltyPoints: r.loyaltyPoints ?? null,
       importBatchId: batchId,
     }));
 
@@ -131,6 +137,9 @@ export async function GET(req: NextRequest): Promise<Response> {
         saleType: r.saleType,
         quantity: r.quantity,
         staffName: r.staffName ?? undefined,
+        rawTransactionType: r.rawTransactionType ?? undefined,
+        customerName: r.customerName ?? undefined,
+        loyaltyPoints: r.loyaltyPoints !== null && r.loyaltyPoints !== undefined ? Number(r.loyaltyPoints) : undefined,
       })),
       summary: {
         totalRecords: records.length,

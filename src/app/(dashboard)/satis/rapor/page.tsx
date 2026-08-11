@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
-import { mapRow, isColumnMapConfident, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
+import { mapRow, isColumnMapConfident, isReturnTransaction, isGenericWalkInCustomer, type ParsedSaleRow, type ColumnMap, type ColumnOverride } from "@/lib/sales/mapRow";
 import { parseSalesFileClient, isClientParseable } from "@/lib/sales/parseFile";
 import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, aggregatePeriodTrend } from "@/lib/sales/aggregations";
+import { topNWithOther } from "@/lib/utils/inventory-analysis";
 import {
   BarChart,
   Bar,
@@ -21,6 +22,8 @@ import {
   Legend,
   LineChart,
   Line,
+  ScatterChart,
+  Scatter,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
@@ -133,7 +136,7 @@ function DrillDownModal({ title, records, lang, onClose }: {
 }
 
 function DailyRevenueChart({ data, lang, onPointClick }: {
-  data: Array<{ date: string; label: string; revenue: number }>;
+  data: Array<{ date: string; label: string; revenue: number; prescriptionRevenue: number; retailRevenue: number }>;
   lang: string;
   onPointClick: (date: string) => void;
 }) {
@@ -146,9 +149,18 @@ function DailyRevenueChart({ data, lang, onPointClick }: {
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Ciro"]) as ChartFormatter}
+            formatter={((value: string | number | undefined, name: string | number | undefined) => {
+              const label = name === "prescriptionRevenue" ? (en ? "Prescription" : "Reçeteli")
+                : name === "retailRevenue" ? (en ? "Retail" : "Perakende")
+                : (en ? "Total Revenue" : "Toplam Ciro");
+              return [formatCurrency(Number(value ?? 0)), label];
+            }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
+          <Legend formatter={(value: string) =>
+            value === "prescriptionRevenue" ? (en ? "Prescription" : "Reçeteli")
+              : value === "retailRevenue" ? (en ? "Retail" : "Perakende")
+              : (en ? "Total Revenue" : "Toplam Ciro")} />
           <Line
             type="monotone"
             dataKey="revenue"
@@ -161,6 +173,8 @@ function DailyRevenueChart({ data, lang, onPointClick }: {
               if (p?.payload?.date) onPointClick(p.payload.date);
             }}
           />
+          <Line type="monotone" dataKey="prescriptionRevenue" stroke={PIE_COLORS[0]} strokeWidth={1.5} dot={false} strokeDasharray="4 3" />
+          <Line type="monotone" dataKey="retailRevenue" stroke={PIE_COLORS[1]} strokeWidth={1.5} dot={false} strokeDasharray="4 3" />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -389,6 +403,155 @@ function TrendChart({ data, lang }: {
   );
 }
 
+function TransactionTypeChart({ data, lang }: {
+  data: Array<{ label: string; revenue: number }>;
+  lang: string;
+}) {
+  const chartData = data.map(d => ({
+    name: d.label.length > 22 ? d.label.slice(0, 20) + "…" : d.label,
+    fullName: d.label,
+    revenue: d.revenue,
+  }));
+  return (
+    <div style={{ height: 300 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 32, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: "var(--color-text)" }} />
+          <Tooltip
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), lang === "en" ? "Revenue" : "Gelir"]) as ChartFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar dataKey="revenue" fill={CHART_COLORS[5]} radius={[0, 4, 4, 0]}>
+            {chartData.map((_entry, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function RechVsRetailComparisonChart({ prescriptionRevenue, retailRevenue, prescriptionCount, retailCount, lang }: {
+  prescriptionRevenue: number;
+  retailRevenue: number;
+  prescriptionCount: number;
+  retailCount: number;
+  lang: string;
+}) {
+  const en = lang === "en";
+  const revenueData = [
+    { name: en ? "Prescription" : "Reçeteli", value: prescriptionRevenue },
+    { name: en ? "Retail" : "Perakende", value: retailRevenue },
+  ];
+  const countData = [
+    { name: en ? "Prescription" : "Reçeteli", value: prescriptionCount },
+    { name: en ? "Retail" : "Perakende", value: retailCount },
+  ];
+  return (
+    <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-4)" }}>
+      <div>
+        <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "6px", textAlign: "center" }}>
+          {en ? "Total Revenue" : "Toplam Ciro"}
+        </p>
+        <div style={{ height: 220 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={revenueData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+              <Tooltip
+                formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Ciro"]) as ChartFormatter}
+                contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+              />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {revenueData.map((_e, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      <div>
+        <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "6px", textAlign: "center" }}>
+          {en ? "Transaction Count" : "İşlem Sayısı"}
+        </p>
+        <div style={{ height: 220 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={countData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+              <Tooltip
+                formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR"), en ? "Transactions" : "İşlem"]) as ChartFormatter}
+                contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+              />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {countData.map((_e, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomerAccountsTable({ data, lang }: {
+  data: Array<{ customerName: string; totalRevenue: number; transactionCount: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+        <thead>
+          <tr>
+            <th>{en ? "Customer / Account" : "Cari / Müşteri"}</th>
+            <th>{en ? "Total Revenue" : "Toplam Ciro"}</th>
+            <th>{en ? "Transaction Count" : "İşlem Sayısı"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(row => (
+            <tr key={row.customerName}>
+              <td style={{ fontWeight: 600 }}>{row.customerName}</td>
+              <td style={{ fontWeight: 700 }}>{formatCurrency(row.totalRevenue)}</td>
+              <td>{row.transactionCount.toLocaleString("tr-TR")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LoyaltyScatterChart({ data, lang }: {
+  data: Array<{ loyaltyPoints: number; netRevenue: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ height: 280 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis type="number" dataKey="loyaltyPoints" name={en ? "Loyalty Points" : "Puan Tutar"} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+          <YAxis type="number" dataKey="netRevenue" name={en ? "Revenue" : "Ciro"} tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <Tooltip
+            cursor={{ strokeDasharray: "3 3" }}
+            formatter={((value: string | number | undefined, name: string | number | undefined) =>
+              [name === "netRevenue" ? formatCurrency(Number(value ?? 0)) : Number(value ?? 0).toLocaleString("tr-TR"), name === "netRevenue" ? (en ? "Revenue" : "Ciro") : (en ? "Loyalty Points" : "Puan Tutar")]) as ChartFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Scatter data={data} fill={CHART_COLORS[6]} />
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // Seçilen sütunun dosyadaki ilk birkaç gerçek değerini döndürür — kullanıcı
 // "bu sütun gerçekten doğru mu" sorusunu kör tahminle değil, örnek veriye
 // bakarak yanıtlayabilir (envanter modülündeki aynı UX iyileştirmesi).
@@ -441,7 +604,46 @@ function ColSelect({ fieldKey, label, hint, headers, dataRows, selected, lang, o
 
 export default function SatisRaporPage() {
   const { lang } = useLangContext();
-  const [tab, setTab] = useState<"upload" | "list">("list");
+  const [tab, setTab] = useState<"upload" | "list" | "history">("list");
+
+  // İçe Aktarma Geçmişi (Part B)
+  interface ImportBatch {
+    importBatchId: string | null;
+    importDate: string | null;
+    recordCount: number;
+    dateRangeStart: string | null;
+    dateRangeEnd: string | null;
+    totalRevenue: number;
+  }
+  const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+  const [batchDeleteTarget, setBatchDeleteTarget] = useState<ImportBatch | null>(null);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const fetchBatches = async () => {
+    setBatchesLoading(true);
+    try {
+      const res = await fetch("/api/v1/satis/batches", { headers: { "Accept-Language": lang } });
+      const json = await res.json() as { success: boolean; data?: { batches: ImportBatch[] } };
+      if (json.success && json.data) setBatches(json.data.batches);
+    } catch { /* silent */ } finally { setBatchesLoading(false); }
+  };
+
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (tab === "history") void fetchBatches(); }, [tab]);
+
+  const handleDeleteBatch = async () => {
+    if (!batchDeleteTarget) return;
+    setBatchDeleting(true);
+    try {
+      const idPart = batchDeleteTarget.importBatchId === null ? "_none_" : encodeURIComponent(batchDeleteTarget.importBatchId);
+      await fetch(`/api/v1/satis/batches/${idPart}`, { method: "DELETE", headers: { "Accept-Language": lang } });
+      setBatchDeleteTarget(null);
+      await fetchBatches();
+      await fetchRecords();
+    } catch { /* silent */ } finally { setBatchDeleting(false); }
+  };
 
   // Upload state
   const [file, setFile] = useState<File | null>(null);
@@ -471,19 +673,96 @@ export default function SatisRaporPage() {
   const [drillDown, setDrillDown] = useState<{ title: string; records: SaleRecord[] } | null>(null);
 
   const dailyRevenueData = useMemo(() => {
-    const byDay = new Map<string, number>();
+    const byDay = new Map<string, { revenue: number; prescriptionRevenue: number; retailRevenue: number }>();
     for (const r of records) {
       const day = r.saleDate.split("T")[0];
-      byDay.set(day, (byDay.get(day) ?? 0) + r.netRevenue);
+      const cur = byDay.get(day) ?? { revenue: 0, prescriptionRevenue: 0, retailRevenue: 0 };
+      cur.revenue += r.netRevenue;
+      if (r.saleType === "PRESCRIPTION") cur.prescriptionRevenue += r.netRevenue;
+      else cur.retailRevenue += r.netRevenue;
+      byDay.set(day, cur);
     }
     return Array.from(byDay.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, revenue]) => ({
+      .map(([date, v]) => ({
         date,
         label: format(parseDateOnlyLocal(date), "dd MMM", { locale: lang === "en" ? enUS : tr }),
-        revenue,
+        ...v,
       }));
   }, [records, lang]);
+
+  // #2 İşlem/Ödeme Tiplerine Göre Satış Dağılımı — ham "İşlem Tipi" metnine göre
+  // gruplanır (K.K./Nakit/Reçete ayrımını koruyarak). rawTransactionType hiçbir
+  // kayıtta yoksa (eski dosyalar) boş dizi döner — sayfa bunu boş-durum olarak gösterir.
+  const transactionTypeData = useMemo(() => {
+    const withType = records.filter(r => r.rawTransactionType?.trim());
+    if (withType.length === 0) return [];
+    const byType = new Map<string, number>();
+    for (const r of withType) {
+      const key = r.rawTransactionType!.trim();
+      byType.set(key, (byType.get(key) ?? 0) + r.netRevenue);
+    }
+    const items = Array.from(byType.entries()).map(([label, revenue]) => ({ label, revenue }));
+    const { top, otherSum } = topNWithOther(items, "label", "revenue", 8);
+    const result = top.map(t => ({ label: t.label, revenue: t.revenue }));
+    if (otherSum > 0) result.push({ label: lang === "en" ? "Other" : "Diğer", revenue: otherSum });
+    return result;
+  }, [records, lang]);
+
+  // #4 Ortalama Sepet Tutarı (AOV) — tüm dönem geneli tek bir stat.
+  const overallAov = useMemo(() => {
+    if (records.length === 0) return 0;
+    return records.reduce((s, r) => s + r.netRevenue, 0) / records.length;
+  }, [records]);
+
+  // #5 Yüksek Hacimli Cari Hesaplar — "PERAKENDE MÜŞTERİ" gibi anonim yer
+  // tutucular hariç tutulur (gerçek takip edilebilir bir hesabı temsil etmez).
+  const customerAccountsData = useMemo(() => {
+    const withCustomer = records.filter(r => r.customerName?.trim() && !isGenericWalkInCustomer(r.customerName));
+    if (withCustomer.length === 0) return [];
+    const byCustomer = new Map<string, { totalRevenue: number; transactionCount: number }>();
+    for (const r of withCustomer) {
+      const key = r.customerName!.trim();
+      const cur = byCustomer.get(key) ?? { totalRevenue: 0, transactionCount: 0 };
+      cur.totalRevenue += r.netRevenue;
+      cur.transactionCount += 1;
+      byCustomer.set(key, cur);
+    }
+    return Array.from(byCustomer.entries())
+      .map(([customerName, v]) => ({ customerName, ...v }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 15);
+  }, [records]);
+
+  // Veresiye (açık hesap/running-tab) sinyali — yalnızca gerçek bir sinyal
+  // bulunursa gösterilir, aksi halde "tespit edilmedi" boş durumu.
+  const veresiyeRecords = useMemo(() =>
+    records.filter(r => {
+      const t = r.rawTransactionType?.toLowerCase() ?? "";
+      return t.includes("veresiye") || t.includes("açık hesap") || t.includes("acik hesap") || t.includes("credit");
+    }), [records]);
+
+  // #6 Haftanın Günlerine Göre Perakende Satış Yoğunluğu — SADECE perakende.
+  const dayOfWeekRetailData = useMemo(() => aggregateByDayOfWeek(records, lang === "en" ? "en" : "tr", "RETAIL"), [records, lang]);
+
+  // #7 Sadakat Puanı vs Ciro İlişkisi — puan verisi olan ve 0'dan büyük satırlar.
+  const loyaltyScatterData = useMemo(() => {
+    return records
+      .filter(r => typeof r.loyaltyPoints === "number" && r.loyaltyPoints > 0)
+      .map(r => ({ loyaltyPoints: r.loyaltyPoints as number, netRevenue: r.netRevenue }));
+  }, [records]);
+
+  // #8 Satış İadeleri (Kayıp Ciro) Analizi
+  const returnsData = useMemo(() => {
+    const returned = records.filter(r => isReturnTransaction(r.rawTransactionType));
+    const totalReturned = returned.reduce((s, r) => s + r.netRevenue, 0);
+    const grossRevenue = records.reduce((s, r) => s + r.netRevenue, 0);
+    return {
+      count: returned.length,
+      totalReturned,
+      pctOfGross: grossRevenue > 0 ? (totalReturned / grossRevenue) * 100 : 0,
+    };
+  }, [records]);
 
   const groupRevenueData = useMemo(() => {
     if (!summary) return [];
@@ -798,10 +1077,12 @@ export default function SatisRaporPage() {
           <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>{lang === "en" ? "Analyze pharmacy sales data by date range" : "Eczane satış verilerini tarih aralığına göre analiz edin"}</p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          {(["list", "upload"] as const).map(t => (
+          {(["list", "upload", "history"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className="btn"
               style={{ background: tab === t ? "var(--color-primary)" : "var(--color-surface)", color: tab === t ? "white" : "var(--color-text)", border: "1px solid var(--color-border)", fontWeight: 600, fontSize: "13px" }}>
-              {t === "list" ? (lang === "en" ? "📋 Sales List" : "📋 Satış Listesi") : (lang === "en" ? "📤 Import Data" : "📤 Veri Aktar")}
+              {t === "list" ? (lang === "en" ? "📋 Sales List" : "📋 Satış Listesi")
+                : t === "upload" ? (lang === "en" ? "📤 Import Data" : "📤 Veri Aktar")
+                : (lang === "en" ? "🕒 Import History" : "🕒 İçe Aktarma Geçmişi")}
             </button>
           ))}
         </div>
@@ -1279,6 +1560,119 @@ export default function SatisRaporPage() {
                   )}
                 </section>
               </div>
+
+              {/* #2 İşlem/Ödeme Tiplerine Göre Satış Dağılımı */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Sales by Transaction / Payment Type" : "İşlem ve Ödeme Tiplerine Göre Satış Dağılımı"}</h3>
+                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                  {lang === "en" ? "Based on the raw 'Transaction Type' column (e.g. card vs. cash vs. prescription)." : "Ham 'İşlem Tipi' sütununa göre (ör. kredi kartı, nakit, reçeteli ayrımı)."}
+                </p>
+                {transactionTypeData.length > 0 ? (
+                  <TransactionTypeChart data={transactionTypeData} lang={lang} />
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en" ? "No transaction type column detected in imported files." : "İçe aktarılan dosyalarda işlem tipi sütunu tespit edilmedi."}
+                  </div>
+                )}
+              </section>
+
+              {/* #3 Reçeteli / Perakende Karşılaştırması (genişletilmiş) */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Prescription vs Retail (OTC) Comparison" : "Reçeteli ve Perakende (OTC) Satış Karşılaştırması"}</h3>
+                <RechVsRetailComparisonChart
+                  prescriptionRevenue={summary.prescriptionRevenue}
+                  retailRevenue={summary.retailRevenue}
+                  prescriptionCount={summary.prescriptionCount}
+                  retailCount={summary.retailCount}
+                  lang={lang}
+                />
+              </section>
+
+              {/* #4 Ortalama Sepet Tutarı (AOV) */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Average Order Value (AOV) Analysis" : "Ortalama Sepet Tutarı (AOV) Analizi"}</h3>
+                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)", margin: "var(--spacing-3) 0" }}>
+                  {lang === "en" ? "Avg. Order Value: " : "Ortalama Sepet Tutarı: "}{fmt(overallAov)}
+                </div>
+                {periodTrendData.length > 0 ? (
+                  <TrendChart data={periodTrendData} lang={lang} />
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en" ? "Not enough data for this period." : "Bu dönem için yeterli veri yok."}
+                  </div>
+                )}
+              </section>
+
+              {/* #5 Yüksek Hacimli Cari Hesaplar ve Veresiye Takibi */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "High-Volume Accounts & Credit-Tab Tracking" : "Yüksek Hacimli Cari Hesaplar ve Veresiye Takibi"}</h3>
+                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                  {lang === "en" ? "Anonymous walk-in placeholder entries are excluded from this ranking." : "Anonim 'Perakende Müşteri' yer tutucu kayıtları bu sıralamaya dahil edilmez."}
+                </p>
+                {customerAccountsData.length > 0 ? (
+                  <CustomerAccountsTable data={customerAccountsData} lang={lang} />
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en" ? "No customer/account column detected in imported files." : "İçe aktarılan dosyalarda cari/müşteri sütunu tespit edilmedi."}
+                  </div>
+                )}
+                <div style={{ marginTop: "var(--spacing-4)", paddingTop: "var(--spacing-4)", borderTop: "1px solid var(--color-border)" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>{lang === "en" ? "Credit-Tab (Veresiye) Tracking" : "Veresiye Takibi"}</h4>
+                  {veresiyeRecords.length > 0 ? (
+                    <p style={{ fontSize: "13px" }}>
+                      {lang === "en"
+                        ? `${veresiyeRecords.length} credit-tab transaction(s) found, totaling ${fmt(veresiyeRecords.reduce((s, r) => s + r.netRevenue, 0))}.`
+                        : `${veresiyeRecords.length} veresiye işlemi bulundu, toplam ${fmt(veresiyeRecords.reduce((s, r) => s + r.netRevenue, 0))}.`}
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
+                      {lang === "en" ? "No credit-tab (veresiye) transactions detected in this period." : "Bu dönemde veresiye işlemi tespit edilmedi."}
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* #6 Haftanın Günlerine Göre Perakende Satış Yoğunluğu (Yeni) */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Day-of-Week Retail Density (New)" : "Haftanın Günlerine Göre Perakende Satış Yoğunluğu (Yeni)"}</h3>
+                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                  {lang === "en" ? "Same metric as above, but scoped to RETAIL sales only (excludes prescription/SGK)." : "Yukarıdakiyle aynı metrik, ancak SADECE perakende satışlar (reçeteli/SGK hariç)."}
+                </p>
+                <DayOfWeekChart data={dayOfWeekRetailData} lang={lang} />
+              </section>
+
+              {/* #7 Müşteri Sadakat Puanı ve Ciro İlişkisi */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Loyalty Points vs Revenue Relationship" : "Müşteri Sadakat Puanı (Puan Tutar) ve Ciro İlişkisi"}</h3>
+                {loyaltyScatterData.length > 0 ? (
+                  <LoyaltyScatterChart data={loyaltyScatterData} lang={lang} />
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en" ? "No loyalty point usage detected in this period." : "Bu dönemde puan kullanımı tespit edilmedi."}
+                  </div>
+                )}
+              </section>
+
+              {/* #8 Satış İadelerinin (Kayıp Ciro) Analizi */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>{lang === "en" ? "Sales Returns (Lost Revenue) Analysis" : "Satış İadelerinin (Kayıp Ciro) Analizi"}</h3>
+                {returnsData.count > 0 ? (
+                  <div>
+                    <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-danger)" }}>
+                      {lang === "en" ? `Lost Revenue: ${fmt(returnsData.totalReturned)}` : `Kayıp Ciro: ${fmt(returnsData.totalReturned)}`}
+                    </div>
+                    <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                      {lang === "en"
+                        ? `${returnsData.pctOfGross.toFixed(1)}% of gross revenue · ${returnsData.count} return transaction(s)`
+                        : `Brüt Cironun %${returnsData.pctOfGross.toFixed(1)}'si · ${returnsData.count} iade işlemi`}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en" ? "No return/cancellation transactions detected in this period." : "Bu dönemde iade işlemi tespit edilmedi."}
+                  </div>
+                )}
+              </section>
             </div>
           )}
 
@@ -1339,6 +1733,82 @@ export default function SatisRaporPage() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── İÇE AKTARMA GEÇMİŞİ ── */}
+      {tab === "history" && (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", fontWeight: 700, fontSize: "14px" }}>
+            {lang === "en" ? "Import History" : "İçe Aktarma Geçmişi"}
+          </div>
+          {batchesLoading ? (
+            <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
+          ) : batches.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 40px", color: "var(--color-text-muted)" }}>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>🕒</div>
+              <p style={{ fontSize: "16px", fontWeight: 600 }}>{lang === "en" ? "No Import History Yet" : "Henüz İçe Aktarma Geçmişi Yok"}</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>{lang === "en" ? "Import Date" : "Yükleme Tarihi"}</th>
+                    <th>{lang === "en" ? "Date Range" : "Tarih Aralığı"}</th>
+                    <th>{lang === "en" ? "Record Count" : "Kayıt Sayısı"}</th>
+                    <th>{lang === "en" ? "Total Revenue" : "Toplam Ciro"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map(b => (
+                    <tr key={b.importBatchId ?? "_none_"}>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {b.importBatchId === null
+                          ? (lang === "en" ? "Legacy records without import info" : "Toplu içe aktarma bilgisi olmayan eski kayıtlar")
+                          : (b.importDate ? format(new Date(b.importDate), "dd MMM yyyy HH:mm", { locale: lang === "en" ? enUS : tr }) : "—")}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                        {b.dateRangeStart && b.dateRangeEnd
+                          ? `${format(parseDateOnlyLocal(b.dateRangeStart), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })} – ${format(parseDateOnlyLocal(b.dateRangeEnd), "dd MMM yyyy", { locale: lang === "en" ? enUS : tr })}`
+                          : "—"}
+                      </td>
+                      <td>{b.recordCount.toLocaleString("tr-TR")}</td>
+                      <td style={{ fontWeight: 700 }}>{fmt(b.totalRevenue)}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button onClick={() => setBatchDeleteTarget(b)}
+                          style={{ padding: "3px 8px", fontSize: "11px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+                          {lang === "en" ? "Delete This Import" : "Bu Yüklemeyi Sil"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {batchDeleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "420px", padding: "var(--spacing-6)", textAlign: "center" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{lang === "en" ? "Delete This Import" : "Bu Yüklemeyi Sil"}</h3>
+            <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
+              {lang === "en"
+                ? `This will delete ${batchDeleteTarget.recordCount.toLocaleString("en-US")} sales records from this import. This action cannot be undone.`
+                : `Bu içe aktarmaya ait ${batchDeleteTarget.recordCount.toLocaleString("tr-TR")} satış kaydı silinecek. Bu işlem geri alınamaz.`}
+            </p>
+            <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => setBatchDeleteTarget(null)}>{lang === "en" ? "Cancel" : "İptal"}</button>
+              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }}
+                onClick={() => void handleDeleteBatch()} disabled={batchDeleting}>
+                {batchDeleting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
+              </button>
+            </div>
           </div>
         </div>
       )}

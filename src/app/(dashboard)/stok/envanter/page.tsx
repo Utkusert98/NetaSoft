@@ -874,6 +874,8 @@ export default function EnvanterPage() {
   const [historyList, setHistoryList] = useState<InventoryReportSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string>("");
+  const [deleteTarget, setDeleteTarget] = useState<InventoryReportSummary | null>(null);
+  const [deletingReport, setDeletingReport] = useState(false);
 
   const runAnalysis = (headers: string[], rows: ParsedRow[], override: Partial<InventoryColumnMap>): void => {
     const parsed = parseInventoryRows(headers, rows, override);
@@ -971,6 +973,28 @@ export default function EnvanterPage() {
     }
   };
 
+  const handleDeleteReport = async (): Promise<void> => {
+    if (!deleteTarget) return;
+    setDeletingReport(true);
+    try {
+      const res = await fetch(`/api/v1/stok/envanter-raporu/${deleteTarget.id}`, {
+        method: "DELETE",
+        headers: { "Accept-Language": lang },
+      });
+      const data = (await res.json()) as { success: boolean; error?: string };
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? (en ? "Delete failed" : "Silme başarısız oldu"));
+      }
+      setDeleteTarget(null);
+      await fetchHistory();
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : (en ? "Delete failed" : "Silme başarısız oldu"));
+      setDeleteTarget(null);
+    } finally {
+      setDeletingReport(false);
+    }
+  };
+
   const handleSelectTab = (mode: "new" | "history"): void => {
     setViewMode(mode);
     if (mode === "history") void fetchHistory();
@@ -1043,18 +1067,30 @@ export default function EnvanterPage() {
                     <th scope="col">{en ? "Total Revenue" : "Toplam Gelir"}</th>
                     <th scope="col">{en ? "Net Profit" : "Net Kâr"}</th>
                     <th scope="col"></th>
+                    <th scope="col"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyList.map((r) => (
-                    <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => void handleSelectHistoryReport(r.id)}>
-                      <td style={{ fontWeight: 500 }}>{r.fileName}</td>
-                      <td>{formatDate(r.createdAt, true)}</td>
-                      <td>{formatCurrency(Number(r.totalRevenue))}</td>
-                      <td style={{ color: Number(r.totalProfit) >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                    <tr key={r.id} style={{ cursor: "pointer" }}>
+                      <td style={{ fontWeight: 500 }} onClick={() => void handleSelectHistoryReport(r.id)}>{r.fileName}</td>
+                      <td onClick={() => void handleSelectHistoryReport(r.id)}>{formatDate(r.createdAt, true)}</td>
+                      <td onClick={() => void handleSelectHistoryReport(r.id)}>{formatCurrency(Number(r.totalRevenue))}</td>
+                      <td
+                        onClick={() => void handleSelectHistoryReport(r.id)}
+                        style={{ color: Number(r.totalProfit) >= 0 ? "var(--color-success)" : "var(--color-danger)" }}
+                      >
                         {formatCurrency(Number(r.totalProfit))}
                       </td>
-                      <td><span className="badge badge-info">{en ? "View" : "Görüntüle"}</span></td>
+                      <td onClick={() => void handleSelectHistoryReport(r.id)}><span className="badge badge-info">{en ? "View" : "Görüntüle"}</span></td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}
+                          style={{ padding: "3px 8px", fontSize: "11px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}
+                        >
+                          {en ? "Delete" : "Sil"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1062,6 +1098,27 @@ export default function EnvanterPage() {
             </div>
           )}
         </div>
+
+        {deleteTarget && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+            <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
+              <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+              <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{en ? "Delete Report" : "Raporu Sil"}</h3>
+              <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
+                {en
+                  ? `Are you sure you want to delete "${deleteTarget.fileName}"?`
+                  : `"${deleteTarget.fileName}" adlı raporu silmek istediğinizden emin misiniz?`}
+              </p>
+              <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
+                <button className="btn" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>{en ? "Cancel" : "İptal"}</button>
+                <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }}
+                  onClick={() => void handleDeleteReport()} disabled={deletingReport}>
+                  {deletingReport ? (en ? "Deleting..." : "Siliniyor...") : (en ? "Yes, Delete" : "Evet, Sil")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }

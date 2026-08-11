@@ -19,6 +19,15 @@ export interface ParsedSaleRow {
   /** Bazı POS dosyalarında bulunan personel/çalışan adı sütunu — opsiyonel,
    *  tüm dosyalarda bulunmaz. */
   staffName?: string;
+  /** "İşlem Tipi" sütunundaki ham metin (ör. "P.SATIŞ (K.K.)", "REÇETELİ SATIŞ") —
+   *  `saleType` ikili sınıflandırmasını DEĞİŞTİRMEDEN, ödeme yöntemi/işlem türü
+   *  detayını kaybetmeden saklamak için eklendi. */
+  rawTransactionType?: string;
+  /** "Cari Adı"/"Müşteri Adı"/"Hasta Adı" sütunundaki müşteri/hesap adı — `productName`
+   *  fallback'inden BAĞIMSIZ, kendi başına saklanan ayrı bir alan. */
+  customerName?: string;
+  /** "Puan Tutar" (sadakat puanı) sütunundaki tutar — opsiyonel. */
+  loyaltyPoints?: number;
 }
 
 export interface ColumnMap {
@@ -56,6 +65,27 @@ export function parseSaleType(raw: string): "PRESCRIPTION" | "RETAIL" {
     return "PRESCRIPTION";
   }
   return "RETAIL";
+}
+
+/**
+ * Bir işlem tipinin iade/iptal olup olmadığını tespit eder — "iade"/"return"/"iptal"
+ * içeren `İşlem Tipi` değerleri (ör. "İADE", "SATIŞ İPTALİ", "RETURN"). `saleType`
+ * ikili (PRESCRIPTION/RETAIL) sınıflandırmasından TAMAMEN ayrı, ek bir sinyaldir —
+ * mevcut davranışı etkilemez.
+ */
+export function isReturnTransaction(rawType: string | undefined | null): boolean {
+  if (!rawType) return false;
+  // Türkçe büyük noktalı "İ" -> düz "i" (norm() ile aynı gerekçe, bkz. yukarısı).
+  const v = rawType.replace(/İ/g, "i").toLowerCase().trim();
+  return v.includes("iade") || v.includes("return") || v.includes("iptal");
+}
+
+/** "PERAKENDE MÜŞTERİ" gibi anonim/genel müşteri yer tutucusu mu? */
+export function isGenericWalkInCustomer(name: string | undefined | null): boolean {
+  if (!name) return false;
+  const v = name.replace(/İ/g, "i").toLowerCase().trim()
+    .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
+  return v === "perakende musteri" || v === "genel musteri";
 }
 
 /** Bir tarih değerini ayrıştıramadığında true döner — çağıran taraf bunu kullanarak
@@ -232,6 +262,14 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
   // Personel/çalışan sütunu — bilgi amaçlı, tüm dosyalarda bulunmaz.
   const staffIdx = gi(override.staff,    ["personel", "calisan", "satis personeli", "staff", "employee"], ["personel", "calisan"]);
+  // Cari Adı/Müşteri Adı/Hasta Adı — `nameIdx` zaten bu alias'ları ürün adı fallback'i
+  // olarak deneyebilir; burada AYRICA (nameIdx'ten bağımsız, sütunu tekrar "ele
+  // geçirmeden") kendi başına customerName olarak da yakalanır.
+  const customerIdx = findIdx(headers, ["cari adi", "musteri adi", "hasta adi"], new Set<number>());
+  // "Puan Tutar" (sadakat puanı) — "puan" kısa/genel bir kelime olduğu için yalnızca
+  // exactOnlyKeys üzerinden, tam eşleşmede denenir (bulanık eşleşmede ilgisiz bir
+  // sütunu yakalamasın diye).
+  const loyaltyIdx = findIdx(headers, ["puan tutar", "sadakat puani", "loyalty points"], new Set<number>(), ["puan"]);
 
   const priceNum = parseNum(gv(priceIdx));
   const qtyNum = Math.max(1, Math.round(parseNum(gv(qtyIdx)) || 1));
@@ -277,6 +315,9 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
       quantity:       finalQty,
       netRevenue,
       staffName:      staffIdx >= 0 ? (String(gv(staffIdx) ?? "").trim() || undefined) : undefined,
+      rawTransactionType: typeIdx >= 0 ? (String(gv(typeIdx) ?? "").trim() || undefined) : undefined,
+      customerName:   customerIdx >= 0 ? (String(gv(customerIdx) ?? "").trim() || undefined) : undefined,
+      loyaltyPoints:  loyaltyIdx >= 0 ? parseNum(gv(loyaltyIdx)) : undefined,
     },
     colMap: {
       price:      gh(priceIdx),

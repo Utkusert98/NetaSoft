@@ -60,9 +60,14 @@ export interface DayOfWeekDensity {
  * ISO string olmalı — yerel saat dilimi kaymasını önlemek için tarih parçası doğrudan
  * ayrıştırılır (bkz. sayfa içindeki `parseDateOnlyLocal`).
  */
-export function aggregateByDayOfWeek(records: Array<Pick<ParsedSaleRow, "saleDate" | "netRevenue">>, lang: "tr" | "en" = "tr"): DayOfWeekDensity[] {
+export function aggregateByDayOfWeek(
+  records: Array<Pick<ParsedSaleRow, "saleDate" | "netRevenue" | "saleType">>,
+  lang: "tr" | "en" = "tr",
+  saleTypeFilter?: "PRESCRIPTION" | "RETAIL",
+): DayOfWeekDensity[] {
+  const filtered = saleTypeFilter ? records.filter(r => r.saleType === saleTypeFilter) : records;
   const buckets = new Map<number, { totalRevenue: number; saleCount: number; distinctDates: Set<string> }>();
-  for (const r of records) {
+  for (const r of filtered) {
     const dateOnly = r.saleDate.slice(0, 10);
     const [y, m, d] = dateOnly.split("-").map(Number);
     if (!y || !m || !d) continue;
