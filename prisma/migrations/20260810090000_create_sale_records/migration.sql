@@ -1,8 +1,12 @@
 -- CreateEnum
-CREATE TYPE "SaleType" AS ENUM ('PRESCRIPTION', 'RETAIL');
+DO $$ BEGIN
+    CREATE TYPE "SaleType" AS ENUM ('PRESCRIPTION', 'RETAIL');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateTable
-CREATE TABLE "sale_records" (
+CREATE TABLE IF NOT EXISTS "sale_records" (
     "id" TEXT NOT NULL,
     "pharmacy_id" TEXT NOT NULL,
     "product_group" TEXT,
@@ -22,16 +26,20 @@ CREATE TABLE "sale_records" (
 );
 
 -- CreateIndex
-CREATE INDEX "sale_records_pharmacy_id_sale_date_idx" ON "sale_records"("pharmacy_id", "sale_date");
+CREATE INDEX IF NOT EXISTS "sale_records_pharmacy_id_sale_date_idx" ON "sale_records"("pharmacy_id", "sale_date");
 
 -- CreateIndex
-CREATE INDEX "sale_records_pharmacy_id_sale_type_idx" ON "sale_records"("pharmacy_id", "sale_type");
+CREATE INDEX IF NOT EXISTS "sale_records_pharmacy_id_sale_type_idx" ON "sale_records"("pharmacy_id", "sale_type");
 
 -- CreateIndex
-CREATE INDEX "sale_records_pharmacy_id_product_group_idx" ON "sale_records"("pharmacy_id", "product_group");
+CREATE INDEX IF NOT EXISTS "sale_records_pharmacy_id_product_group_idx" ON "sale_records"("pharmacy_id", "product_group");
 
 -- CreateIndex
-CREATE INDEX "sale_records_deleted_at_idx" ON "sale_records"("deleted_at");
+CREATE INDEX IF NOT EXISTS "sale_records_deleted_at_idx" ON "sale_records"("deleted_at");
 
 -- AddForeignKey
-ALTER TABLE "sale_records" ADD CONSTRAINT "sale_records_pharmacy_id_fkey" FOREIGN KEY ("pharmacy_id") REFERENCES "pharmacies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "sale_records" ADD CONSTRAINT "sale_records_pharmacy_id_fkey" FOREIGN KEY ("pharmacy_id") REFERENCES "pharmacies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
