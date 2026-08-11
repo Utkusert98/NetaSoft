@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectInventoryColumnMap, isAutoMappingConfident, parseInventoryRows, analyzeInventory } from "./inventory-analysis";
+import { detectInventoryColumnMap, isAutoMappingConfident, parseInventoryRows, analyzeInventory, truncateLabel, topNWithOther } from "./inventory-analysis";
 
 // Gerçek bir eczane "stok değerleme" dışa aktarımından alınan başlıklar ve örnek
 // satırlar (bkz. envanter_temmuz_ayi.xls). Bu dosya biçiminde dönem içi "satış
@@ -70,5 +70,51 @@ describe("analyzeInventory — satış verisi olmayan stok değerleme dosyası",
   it("stok değerine göre en değerli ürünler listesi doludur", () => {
     expect(analysis.topByStockValue.length).toBe(2);
     expect(analysis.topByStockValue[0].name).toContain("IZO.NACL");
+  });
+});
+
+describe("truncateLabel — grafik eksenlerinde uzun isimlerin kısaltılması", () => {
+  it("maxLen'den kısa isimleri değiştirmeden bırakır", () => {
+    expect(truncateLabel("PAROL", 20)).toBe("PAROL");
+  });
+
+  it("maxLen'den uzun isimleri kısaltıp üç nokta ekler", () => {
+    const result = truncateLabel("PARASETAMOL 500 MG 20 TABLET KUTUSU", 20);
+    expect(result.length).toBe(20);
+    expect(result.endsWith("…")).toBe(true);
+  });
+
+  it("tam maxLen uzunluğundaki ismi değiştirmez", () => {
+    expect(truncateLabel("ABCDE", 5)).toBe("ABCDE");
+  });
+});
+
+describe("topNWithOther — çok sayıda kalemi ilk N + Diğer olarak kırpar", () => {
+  const items = [
+    { category: "A", value: 100 },
+    { category: "B", value: 80 },
+    { category: "C", value: 60 },
+    { category: "D", value: 40 },
+    { category: "E", value: 20 },
+  ];
+
+  it("N'den az kalem varsa hepsini döner ve otherSum sıfırdır", () => {
+    const { top, otherSum, otherLabels } = topNWithOther(items, "category", "value", 10);
+    expect(top.length).toBe(5);
+    expect(otherSum).toBe(0);
+    expect(otherLabels).toEqual([]);
+  });
+
+  it("N'den fazla kalem varsa ilk N'i değere göre azalan sırada döner, kalanı toplar", () => {
+    const { top, otherSum, otherLabels } = topNWithOther(items, "category", "value", 3);
+    expect(top.map((t) => t.category)).toEqual(["A", "B", "C"]);
+    expect(otherSum).toBe(60); // D(40) + E(20)
+    expect(otherLabels).toEqual(["D", "E"]);
+  });
+
+  it("giriş sırası karışık olsa bile değere göre sıralar", () => {
+    const shuffled = [items[3], items[0], items[4], items[2], items[1]];
+    const { top } = topNWithOther(shuffled, "category", "value", 2);
+    expect(top.map((t) => t.category)).toEqual(["A", "B"]);
   });
 });

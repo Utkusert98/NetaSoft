@@ -396,7 +396,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       </div>
 
       {/* ── Ana Grid (trend + SGK pasta) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+      <div className="responsive-grid responsive-grid-2-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Aylık Trend */}
         <ChartCard title={tx(d.trend, lang)}>
           <div style={{ height: 260 }}>
@@ -464,7 +464,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       </div>
 
       {/* ── Platform Geliri + Yaklaşan SGK ── */}
-      <div style={{ display: "grid", gridTemplateColumns: platformIncome.length > 0 ? "1fr 1fr" : "1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+      <div className={`responsive-grid ${platformIncome.length > 0 ? "responsive-grid-1-1" : ""}`} style={{ gridTemplateColumns: platformIncome.length > 0 ? undefined : "1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Platform gelirleri — gizle eğer kayıt yoksa */}
         {platformIncome.length > 0 && (
           <ChartCard title={tx(d.platformIncome, lang)}>
@@ -512,7 +512,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       </div>
 
       {/* ── Analitik Satırı: Gider Dağılımı + Nakit/POS + 30 Günlük Pist ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+      <div className="responsive-grid responsive-grid-1-1-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Gider Dağılımı Donut */}
         <ChartCard title={lang === "en" ? "Expense Breakdown" : "Gider Dağılımı"}>
           {expenseBreakdown.length === 0 ? (
