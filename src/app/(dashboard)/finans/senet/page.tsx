@@ -213,7 +213,7 @@ export default function SenetPage() {
       </div>
 
       {/* Özet kartları */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
+      <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
         {[
           { label: lang === "en" ? "Total Notes" : "Toplam Senet", value: notes.length, color: "var(--color-text)" },
           { label: lang === "en" ? "Pending Notes" : "Bekleyen Senet", value: unpaid.length, color: "var(--color-warning)" },
@@ -226,7 +226,7 @@ export default function SenetPage() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "var(--spacing-6)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-6)", alignItems: "start" }}>
 
         {/* ── Form ── */}
         <div className="card">

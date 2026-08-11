@@ -214,7 +214,7 @@ export default function PlatformGelirPage() {
 
       {/* Summary Card */}
       {incomes.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "24px" }}>
+        <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "16px", marginBottom: "24px" }}>
           {[
             { label: lang === "en" ? "Pending Total" : "Bekleyen Toplam", value: totalPending, color: "#d97706" },
             { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: incomes.length, isCnt: true, color: "var(--color-primary)" },
@@ -230,7 +230,7 @@ export default function PlatformGelirPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "var(--spacing-8)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* FORM */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>

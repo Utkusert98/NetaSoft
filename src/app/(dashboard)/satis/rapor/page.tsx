@@ -1013,7 +1013,7 @@ export default function SatisRaporPage() {
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{lang === "en" ? "Sales Reports" : "Satış Raporları"}</h1>
           <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>{lang === "en" ? "Analyze pharmacy sales data by date range" : "Eczane satış verilerini tarih aralığına göre analiz edin"}</p>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {(["list", "upload", "history"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} className="btn"
               style={{ background: tab === t ? "var(--color-primary)" : "var(--color-surface)", color: tab === t ? "white" : "var(--color-text)", border: "1px solid var(--color-border)", fontWeight: 600, fontSize: "13px" }}>

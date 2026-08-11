@@ -666,16 +666,21 @@ export default function AyarlarPage() {
         <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>{tx(t.settings.subtitle, lang)}</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "4px", borderBottom: "2px solid var(--color-border)", marginBottom: "var(--spacing-6)" }}>
+      {/* Tabs — mobilde 5 sekme tek satıra sığmadığından yatay kaydırmalı,
+          taşan sekmeler sayfayı genişletmesin diye flex-shrink:0 + nowrap */}
+      <div style={{
+        display: "flex", gap: "4px", borderBottom: "2px solid var(--color-border)",
+        marginBottom: "var(--spacing-6)", overflowX: "auto", WebkitOverflowScrolling: "touch",
+      }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setSuccess(""); setError(""); }}
             style={{
-              padding: "10px 20px", background: "none", border: "none", cursor: "pointer",
+              padding: "10px 16px", background: "none", border: "none", cursor: "pointer",
               fontWeight: tab === t.key ? 700 : 500, fontSize: "var(--font-size-sm)",
               color: tab === t.key ? "var(--color-primary)" : "var(--color-text-muted)",
               borderBottom: tab === t.key ? "2px solid var(--color-primary)" : "2px solid transparent",
               marginBottom: "-2px", display: "flex", alignItems: "center", gap: "6px",
+              flexShrink: 0, whiteSpace: "nowrap",
             }}>
             {t.icon} {t.label}
           </button>
