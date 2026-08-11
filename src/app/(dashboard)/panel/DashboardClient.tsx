@@ -175,6 +175,7 @@ export default function DashboardClient({ data, pharmacistName }: {
   pharmacistName: string;
 }) {
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const { lang } = useLangContext();
   const d = t.dashboard;
   const c = t.common;
@@ -224,9 +225,20 @@ export default function DashboardClient({ data, pharmacistName }: {
   // ── PDF Export ─────────────────────────────────────────────────────────
   const handleExportPdf = async () => {
     setExporting(true);
+    setExportError("");
     try {
       const { generateDashboardPdf } = await import("@/lib/pdf/generateDashboardPdf");
       await generateDashboardPdf(data, pharmacistName);
+    } catch (err) {
+      // Önceden burada catch yoktu — PDF üretimi hata verdiğinde buton
+      // sessizce sıfırlanıyor, kullanıcıya hiçbir Türkçe hata mesajı
+      // gösterilmiyordu (gerçek bir test turunda bulunan hata).
+      setExportError(
+        lang === "en"
+          ? "PDF could not be created. Please try again."
+          : "PDF oluşturulamadı. Lütfen tekrar deneyin."
+      );
+      console.error(err);
     } finally {
       setExporting(false);
     }
@@ -257,6 +269,16 @@ export default function DashboardClient({ data, pharmacistName }: {
           )}
         </button>
       </div>
+
+      {exportError && (
+        <div style={{
+          background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)",
+          color: "var(--color-danger)", borderRadius: "var(--radius-md)",
+          padding: "10px 16px", marginBottom: "var(--spacing-5)", fontSize: "14px",
+        }}>
+          ⚠️ {exportError}
+        </div>
+      )}
 
       {/* ── Kritik Uyarı Banneri ── */}
       {urgentNotesCount > 0 && (
