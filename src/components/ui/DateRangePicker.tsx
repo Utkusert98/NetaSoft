@@ -13,7 +13,7 @@
  * "Filtrele" butonuna basılana kadar bekleyen davranışıyla tutarlıdır).
  */
 
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect, useId, type CSSProperties } from "react";
 import {
   buildMonthGrid,
   nextRangeSelection,
@@ -46,7 +46,28 @@ export default function DateRangePicker({ startDate, endDate, onChange, lang = "
   const [selection, setSelection] = useState<RangeSelection>({ start: startDate, end: endDate });
   const [hoverDateStr, setHoverDateStr] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
+  // Popover, `.card` gibi `overflow: hidden` içeren atalar tarafından
+  // KESİLMESİN diye `position: fixed` ile tetikleyici butona göre hesaplanan
+  // viewport koordinatlarında konumlandırılır (bkz. AGENTS/görev notu —
+  // popover'ın kart içine kırpılması sorunu).
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setPopoverPos({ top: rect.bottom + 6, left: rect.left });
+    };
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open]);
 
   const initialMonth = startDate ? new Date(startDate).getMonth() : new Date().getMonth();
   const initialYear = startDate ? new Date(startDate).getFullYear() : new Date().getFullYear();
@@ -107,6 +128,7 @@ export default function DateRangePicker({ startDate, endDate, onChange, lang = "
   return (
     <div ref={containerRef} className="drp-root">
       <button
+        ref={triggerRef}
         type="button"
         className="drp-trigger"
         disabled={disabled}
@@ -121,7 +143,13 @@ export default function DateRangePicker({ startDate, endDate, onChange, lang = "
       </button>
 
       {open && (
-        <div id={popoverId} role="dialog" aria-label={en ? "Select date range" : "Tarih aralığı seç"} className="drp-popover">
+        <div
+          id={popoverId}
+          role="dialog"
+          aria-label={en ? "Select date range" : "Tarih aralığı seç"}
+          className="drp-popover"
+          style={popoverPos ? ({ "--drp-top": `${popoverPos.top}px`, "--drp-left": `${popoverPos.left}px` } as CSSProperties) : undefined}
+        >
           <div className="drp-header">
             <button type="button" className="drp-nav-btn" onClick={goPrevMonth} aria-label={en ? "Previous month" : "Önceki ay"}>‹</button>
             <span className="drp-header-label">{monthNames[viewMonth]} {viewYear}</span>

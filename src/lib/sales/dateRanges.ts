@@ -91,3 +91,20 @@ export function matchPreset(start: string, end: string, now: Date = new Date()):
   }
   return null;
 }
+
+/**
+ * Ayrıştırılmış (parse edilmiş) satış satırlarının `saleDate` alanları
+ * üzerinden en küçük/en büyük tarihi (YYYY-MM-DD) hesaplar. Hem dosya
+ * ÖNİZLEME aşamasında (kayıt henüz yapılmadan) hem de KAYIT sonrasında
+ * filtre aralığını dosyanın gerçek tarih aralığına göre ayarlamak için
+ * kullanılan tek, paylaşılan (DRY) saf fonksiyon.
+ *
+ * `saleDate` alanı `"YYYY-MM-DD"` veya `"YYYY-MM-DDTHH:mm:ss.sssZ"` biçiminde
+ * olabilir — yalnızca ilk 10 karakter (tarih kısmı) kullanılır. Boş dizi için
+ * `null` döner.
+ */
+export function saleRowsDateSpan(rows: Array<{ saleDate: string }>): DateRange | null {
+  if (rows.length === 0) return null;
+  const days = rows.map(r => r.saleDate.slice(0, 10)).sort();
+  return { start: days[0], end: days[days.length - 1] };
+}
