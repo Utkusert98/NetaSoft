@@ -112,7 +112,12 @@ export function parseNum(raw: unknown): number {
 }
 
 function norm(h: string): string {
-  return h.toLowerCase().trim()
+  // ÖNEMLİ: JS'in .toLowerCase()'i Türkçe büyük noktalı "İ" (U+0130) harfini
+  // düz "i" değil, üzerinde ayrı bir birleşik nokta işaretiyle "i̇" (U+0069 +
+  // U+0307) üretir — bu da "İşlem Tipi", "İskonto Tutar" gibi İ ile başlayan
+  // başlıkların "islem tipi"/"iskonto tutar" ile hiç eşleşmemesine (sessizce)
+  // yol açıyordu. toLowerCase()'den ÖNCE İ'yi düz "i"ye çevirmek bunu çözer.
+  return h.replace(/İ/g, "i").toLowerCase().trim()
     .replace(/\s+/g, " ")
     .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g")
     .replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
@@ -165,7 +170,11 @@ function isNetCol(colName: string): boolean {
 export function isColumnMapConfident(colMap: ColumnMap): boolean {
   const found = (v: string) => v !== "" && v !== "(bulunamadı)" && v !== "—";
   const hasQty = colMap.priceIsNet || found(colMap.quantity);
-  return found(colMap.name) && found(colMap.date) && found(colMap.price) && hasQty;
+  // Ürün adı sütunu olmayan, işlem/fiş bazlı raporlarda (ör. Cari Adı/İşlem
+  // Tipi taşıyan dosyalar) satış tipi veya grup sütunu bulunması da yeterli
+  // bir kimlik alanıdır — kullanıcıya anlamsız yere manuel eşleştirme sorulmaz.
+  const hasIdentity = found(colMap.name) || found(colMap.type) || found(colMap.group);
+  return hasIdentity && found(colMap.date) && found(colMap.price) && hasQty;
 }
 
 export function mapRow(headers: string[], row: unknown[], override: ColumnOverride): MappedRow {
@@ -206,9 +215,14 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   // "adi"/"urun"/"stok"/"name"/"product" bare kelimeleri yalnızca tam eşleşmede
   // denenir — bulanık eşleşmede "Adisyon No" veya "Stok Kodu" gibi TAMAMEN
   // İLGİSİZ bir sütunu ürün adı sanabilir (gerçek bir üretim hatasının kök nedeniydi).
-  const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "malzeme adi"], ["urun", "product", "adi", "name", "stok"]);
+  // "cari adi"/"musteri adi"/"hasta adi" — ürün adı sütunu olmayan, işlem/fiş
+  // bazlı raporlarda (ör. sadece İşlem No/Cari Adı/İşlem Tipi/Tarih/Tutar
+  // içeren dosyalar) ürün adı yerine kullanılabilecek en anlamlı kimlik alanı.
+  const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "malzeme adi", "cari adi", "musteri adi", "hasta adi"], ["urun", "product", "adi", "name", "stok"]);
   const groupIdx = gi(override.group,    ["urun grubu", "product group", "kategori", "category", "ana grup"], ["grup", "group"]);
-  const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "recete", "prescription"], ["tip", "type"]);
+  // "islem tipi" — işlem/fiş bazlı raporlarda satış türünü (reçeteli/perakende)
+  // taşıyan asıl sütun genelde budur.
+  const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "islem tipi", "recete", "prescription"], ["tip", "type"]);
   const discIdx  = gi(override.discount, ["iskonto tutari", "iskonto tutar", "indirim tutari", "discount amount"], ["iskonto", "discount", "indirim", "ind."]);
   const discRIdx = gi(undefined,         ["iskonto %", "iskonto yuzde", "indirim %", "discount %", "discount rate"]);
 
@@ -229,11 +243,15 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   let netRevenue: number;
 
   if (priceIsNet) {
-    // priceNum zaten toplam gelir — adete bölme, quantity=1
+    // priceNum zaten net tutar (iskonto düşülmüş nihai tutar) — adete bölme,
+    // quantity=1. discountAmount yalnızca bilgi amaçlı gösterim için saklanır;
+    // netRevenue'dan TEKRAR düşülmez — aksi halde iskonto çift sayılıp ciro
+    // olduğundan düşük hesaplanır (ör. "Toplam Tutar/İskonto Tutar/Net Tutar"
+    // üçlüsü olan dosyalarda Net Tutar zaten son tutardır).
     finalPrice   = priceNum;
     finalQty     = 1;
     finalDiscount = discountAmount;
-    netRevenue   = priceNum - discountAmount;
+    netRevenue   = priceNum;
   } else {
     finalPrice   = priceNum;
     finalQty     = qtyNum;
