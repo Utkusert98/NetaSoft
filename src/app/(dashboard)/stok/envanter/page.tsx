@@ -493,6 +493,28 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
   const { summary, hasSalesData } = analysis;
   const categoryValueData = analysis.categoryBreakdown.map((c) => ({ category: c.category, value: hasSalesData ? c.revenue : c.stockValue }));
 
+  // Kategori sayısı fazlaysa (ör. 15+ ürün grubu) x-ekseni okunaksız hale gelir —
+  // birincil metriğe (gelir/stok değeri) göre en büyük 8 kategori gösterilir,
+  // kalanı "Diğer" altında toplanır. Etiketler ayrıca kısaltılır.
+  const categoryChartRaw = hasSalesData
+    ? analysis.categoryBreakdown.map((c) => ({ category: c.category, revenue: c.revenue, profit: c.profit }))
+    : analysis.categoryBreakdown.map((c) => ({ category: c.category, revenue: c.stockValue, profit: c.stockCost }));
+  const CATEGORY_CHART_LIMIT = 8;
+  const categoryChartSorted = [...categoryChartRaw].sort((a, b) => b.revenue - a.revenue);
+  const categoryChartTop = categoryChartSorted.slice(0, CATEGORY_CHART_LIMIT);
+  const categoryChartRest = categoryChartSorted.slice(CATEGORY_CHART_LIMIT);
+  const categoryChartData = [
+    ...categoryChartTop.map((c) => ({ category: c.category, label: truncateLabel(c.category, 14), revenue: c.revenue, profit: c.profit })),
+    ...(categoryChartRest.length > 0
+      ? [{
+          category: en ? "Other" : "Diğer",
+          label: en ? "Other" : "Diğer",
+          revenue: categoryChartRest.reduce((s, c) => s + c.revenue, 0),
+          profit: categoryChartRest.reduce((s, c) => s + c.profit, 0),
+        }]
+      : []),
+  ];
+
   const [detail, setDetail] = useState<{ title: string; rows: InventoryRow[] } | null>(null);
 
   const handleProductClick = (name: string): void => {
@@ -634,9 +656,9 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           </h3>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hasSalesData ? analysis.categoryBreakdown : analysis.categoryBreakdown.map(c => ({ category: c.category, revenue: c.stockValue, profit: c.stockCost }))} margin={{ left: 8, right: 16, top: 8, bottom: 40 }}>
+              <BarChart data={categoryChartData} margin={{ left: 8, right: 16, top: 8, bottom: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="category" tick={{ fontSize: 11, fill: "var(--color-text)" }} angle={-30} textAnchor="end" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text)" }} angle={-30} textAnchor="end" interval={0} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
                 <Tooltip
                   formatter={((value: string | number | undefined, name?: string | number) => {
