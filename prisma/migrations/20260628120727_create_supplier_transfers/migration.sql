@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "supplier_transfers" (
+CREATE TABLE IF NOT EXISTS "supplier_transfers" (
     "id" TEXT NOT NULL,
     "pharmacy_id" TEXT NOT NULL,
     "supplier_name" TEXT NOT NULL,
@@ -15,10 +15,14 @@ CREATE TABLE "supplier_transfers" (
 );
 
 -- CreateIndex
-CREATE INDEX "supplier_transfers_pharmacy_id_transfer_date_idx" ON "supplier_transfers"("pharmacy_id", "transfer_date");
+CREATE INDEX IF NOT EXISTS "supplier_transfers_pharmacy_id_transfer_date_idx" ON "supplier_transfers"("pharmacy_id", "transfer_date");
 
 -- CreateIndex
-CREATE INDEX "supplier_transfers_deleted_at_idx" ON "supplier_transfers"("deleted_at");
+CREATE INDEX IF NOT EXISTS "supplier_transfers_deleted_at_idx" ON "supplier_transfers"("deleted_at");
 
 -- AddForeignKey
-ALTER TABLE "supplier_transfers" ADD CONSTRAINT "supplier_transfers_pharmacy_id_fkey" FOREIGN KEY ("pharmacy_id") REFERENCES "pharmacies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "supplier_transfers" ADD CONSTRAINT "supplier_transfers_pharmacy_id_fkey" FOREIGN KEY ("pharmacy_id") REFERENCES "pharmacies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
