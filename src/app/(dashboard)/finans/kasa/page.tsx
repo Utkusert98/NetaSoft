@@ -269,10 +269,10 @@ export default function KasaPage() {
             </div>
 
             <div style={{ padding: "14px 16px", background: "var(--color-primary-light)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid var(--color-primary)" }}>
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-primary)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-on-primary-light)" }}>
                 {lang === "en" ? "Total (TRY)" : "Toplam (TL)"}
               </span>
-              <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-primary)" }}>
+              <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-on-primary-light)" }}>
                 {calcTotal(formData).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
               </span>
             </div>

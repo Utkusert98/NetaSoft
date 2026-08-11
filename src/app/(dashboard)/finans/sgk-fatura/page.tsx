@@ -545,7 +545,7 @@ export default function SgkFaturaPage() {
                             fontSize: "12px",
                             fontWeight: 600,
                             background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
-                            color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary)" : "#7c3aed",
+                            color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "#7c3aed",
                           }}>
                             {getTypeLabel(inv.invoiceType)}
                           </span>
@@ -639,7 +639,7 @@ export default function SgkFaturaPage() {
                           fontSize: "12px",
                           fontWeight: 600,
                           background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
-                          color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary)" : "#7c3aed",
+                          color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "#7c3aed",
                         }}>
                           {getTypeLabel(inv.invoiceType)}
                         </span>
