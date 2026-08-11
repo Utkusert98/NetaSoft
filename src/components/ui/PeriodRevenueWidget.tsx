@@ -168,8 +168,8 @@ export default function PeriodRevenueWidget({
 
           <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
             ℹ️ {lang === "en"
-              ? "Informational only. This combined total does not feed into any other page's official figures — SGK Invoice remains the source of truth for invoiced/collectible prescription revenue."
-              : "Sadece bilgilendirme amaçlıdır. Bu toplam başka hiçbir sayfanın resmi rakamlarını beslemez veya değiştirmez — faturalanabilir/tahsil edilebilir reçeteli gelirin doğruluk kaynağı SGK Fatura'dır."}
+              ? "Informational only. This combined total does not feed into any other page's official figures. It uses the actual prescription revenue from Sales Report, not the SGK Invoice amount — so it may differ from the official Total Income figure elsewhere, which uses the SGK Invoice amount as the source of truth for invoiced/collectible prescription revenue."
+              : "Sadece bilgilendirme amaçlıdır. Bu toplam başka hiçbir sayfanın resmi rakamlarını beslemez veya değiştirmez. Buradaki reçete tutarı Satış Raporu'ndaki GERÇEK satış tutarıdır, SGK Fatura'ya girilen tutar değildir — bu yüzden başka bir yerdeki resmi Toplam Gelir rakamından farklı çıkabilir (o rakam, faturalanabilir/tahsil edilebilir reçeteli gelirin doğruluk kaynağı olan SGK Fatura tutarını kullanır)."}
           </p>
         </div>
       )}
