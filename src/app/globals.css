@@ -13,6 +13,9 @@
   --color-primary-light-hover: #8fd960;
   --color-primary-pale: #f0fce8;
   --color-primary-muted: #d4f5b5;
+  /* Açık yeşil arkaplan üzerine sabit koyu yazı — hem açık hem koyu modda arkaplan
+     canlı limon yeşili kaldığı için bu renk temaya göre değişmez */
+  --color-on-primary-light: #163300;
 
   /* === Yüzey Renkleri === */
   --color-bg: #f7f8fa;
@@ -470,7 +473,7 @@ h6 { font-size: var(--font-size-base); }
 /* Accent Button (Lime) */
 .btn-accent {
   background: var(--color-primary-light);
-  color: var(--color-primary);
+  color: var(--color-on-primary-light);
   border-color: var(--color-primary-light);
 }
 
