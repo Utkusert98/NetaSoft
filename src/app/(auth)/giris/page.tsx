@@ -14,10 +14,11 @@ function GirisForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/panel";
   const { lang } = useLangContext();
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", password: "", otpCode: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [needsOtp, setNeedsOtp] = useState(false);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,6 +37,9 @@ function GirisForm() {
     const newErrors: Record<string, string> = {};
     if (!formData.email) newErrors.email = lang === "en" ? "Email Address Required" : "E-Posta Adresi Gereklidir";
     if (!formData.password) newErrors.password = lang === "en" ? "Password Required" : "Şifre Gereklidir";
+    if (needsOtp && !formData.otpCode) {
+      newErrors.otpCode = lang === "en" ? "6-Digit Code Required" : "6 Haneli Kodu Giriniz";
+    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       setLoading(false);
@@ -46,10 +50,19 @@ function GirisForm() {
       const result = await signIn("credentials", {
         email: formData.email.toLowerCase().trim(),
         password: formData.password,
+        otpCode: needsOtp ? formData.otpCode.trim() : undefined,
         redirect: false,
       });
 
-      if (result?.error) {
+      if (result?.code === "2FA_REQUIRED") {
+        // Şifre doğru; sunucu OTP kodu istiyor. İlk seferse alanı göster,
+        // kod zaten girilmiş ama hatalıysa "geçersiz kod" mesajını göster.
+        if (needsOtp) {
+          setErrors({ otpCode: lang === "en" ? "Invalid Verification Code" : "Geçersiz Doğrulama Kodu" });
+        } else {
+          setNeedsOtp(true);
+        }
+      } else if (result?.error) {
         setErrors({
           general: lang === "en"
             ? "Invalid Email Or Password. Please Try Again."
@@ -144,6 +157,34 @@ function GirisForm() {
           <span className="form-error" role="alert">⚠ {errors.password}</span>
         )}
       </div>
+
+      {needsOtp && (
+        <div className="form-group">
+          <label htmlFor="otpCode" className="form-label required">
+            {lang === "en" ? "Verification Code" : "Doğrulama Kodu"}
+          </label>
+          <input
+            id="otpCode"
+            name="otpCode"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            className={`form-input ${errors.otpCode ? "error" : ""}`}
+            placeholder="000000"
+            value={formData.otpCode}
+            onChange={handleChange}
+            disabled={loading}
+            autoFocus
+          />
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+            {lang === "en" ? "Enter The 6-Digit Code" : "6 Haneli Kodu Giriniz"}
+          </p>
+          {errors.otpCode && (
+            <span className="form-error" role="alert">⚠ {errors.otpCode}</span>
+          )}
+        </div>
+      )}
 
       <div style={{ textAlign: "right", marginBottom: "var(--spacing-6)", marginTop: "calc(-1 * var(--spacing-3))" }}>
         <Link href="/sifremi-unuttum" className="auth-link" style={{ fontSize: "var(--font-size-sm)" }}>

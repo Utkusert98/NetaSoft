@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
+import { createTotp, verifyTotpCode } from "@/lib/auth/totp";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("setup") }),
@@ -46,14 +47,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   if (parsed.data.action === "setup") {
     const secret = new OTPAuth.Secret({ size: 20 });
-    const totp = new OTPAuth.TOTP({
-      issuer: "NetaSoft",
-      label: user.email,
-      algorithm: "SHA1",
-      digits: 6,
-      period: 30,
-      secret,
-    });
+    const totp = createTotp(user.email, secret.base32);
     const uri = totp.toString();
     const qrCodeDataUrl = await QRCode.toDataURL(uri);
 
@@ -66,16 +60,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!user.twoFactorSecret) {
       return apiError("Önce 2FA kurulumunu başlatmalısınız", "SETUP_REQUIRED", 400);
     }
-    const totp = new OTPAuth.TOTP({
-      issuer: "NetaSoft",
-      label: user.email,
-      algorithm: "SHA1",
-      digits: 6,
-      period: 30,
-      secret: OTPAuth.Secret.fromBase32(user.twoFactorSecret),
-    });
-    const delta = totp.validate({ token: parsed.data.code, window: 1 });
-    if (delta === null) {
+    if (!verifyTotpCode(user.email, user.twoFactorSecret, parsed.data.code)) {
       return apiError("Doğrulama kodu hatalı", "INVALID_CODE", 400);
     }
 
