@@ -1,334 +1,309 @@
 import type { DashboardData } from "@/app/(dashboard)/panel/DashboardClient";
 
-const PRIMARY = [78, 124, 63] as const;   // #4e7c3f
-const ACCENT  = [159, 232, 112] as const; // #9fe870
-const DANGER  = [231, 76, 60] as const;
-const GRAY    = [120, 120, 120] as const;
-const LIGHT   = [247, 248, 250] as const;
-const DARK    = [30, 40, 30] as const;
+/**
+ * PDF raporu artık jsPDF'in yerleşik "helvetica" fontuyla değil, gerçek bir
+ * HTML/CSS şablonunu tarayıcıda render edip (html2canvas) görüntü olarak
+ * PDF'e gömerek üretiliyor. Bunun tek nedeni jsPDF'in standart fontlarının
+ * WinAnsi kodlamasını kullanması — bu kodlamada ç/ö/ü var ama Türkçe'ye özgü
+ * ı, İ, ş, Ş, ğ, Ğ karakterleri YOK. Eski üretici bu yüzden "harfler sayılar
+ * çok kötü" görünüyordu (Türkçe karakterler kayboluyor/bozuluyordu) ve manuel
+ * y-koordinat hesapları sayfa taşmalarına yol açıyordu. Tarayıcı üzerinden
+ * render etmek Türkçe karakterleri doğru gösterir ve CSS akışı taşma riskini
+ * ortadan kaldırır.
+ */
 
-type RGB = readonly [number, number, number];
-type JSPDF = import("jspdf").jsPDF;
+const COLORS = {
+  primary: "#4e7c3f",
+  primaryDark: "#163300",
+  accent: "#9fe870",
+  danger: "#e74c3c",
+  blue: "#3498db",
+  purple: "#9b59b6",
+  text: "#1e2a1e",
+  muted: "#6b7a6b",
+  bg: "#f7f8fa",
+  border: "#e2e6e2",
+} as const;
 
 function fmtTL(v: number): string {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
 }
 
-function pct(cur: number, prev: number): string {
+function pctChange(cur: number, prev: number): string {
   if (!prev) return "—";
   const p = ((cur - prev) / prev) * 100;
-  return `${p >= 0 ? "+" : ""}${p.toFixed(1)}%`;
+  return `${p >= 0 ? "▲ +" : "▼ "}${p.toFixed(1)}%`;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function setFill(doc: JSPDF, rgb: RGB) { doc.setFillColor(rgb[0], rgb[1], rgb[2]); }
-function setTextColor(doc: JSPDF, rgb: RGB) { doc.setTextColor(rgb[0], rgb[1], rgb[2]); }
-function setDrawColor(doc: JSPDF, rgb: RGB) { doc.setDrawColor(rgb[0], rgb[1], rgb[2]); }
-
-function headerBand(doc: JSPDF, w: number, title: string, subtitle: string) {
-  setFill(doc, DARK);
-  doc.rect(0, 0, w, 28, "F");
-  setTextColor(doc, ACCENT);
-  doc.setFontSize(18); doc.setFont("helvetica", "bold");
-  doc.text("NetaSoft", 12, 17);
-  setTextColor(doc, [255, 255, 255]);
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  doc.text(title, 12, 24);
-  doc.setFontSize(8);
-  doc.text(subtitle, w - 12, 24, { align: "right" });
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function sectionTitle(doc: JSPDF, y: number, label: string, w: number): number {
-  setFill(doc, PRIMARY);
-  doc.roundedRect(10, y, w - 20, 9, 2, 2, "F");
-  setTextColor(doc, [255, 255, 255]);
-  doc.setFontSize(9); doc.setFont("helvetica", "bold");
-  doc.text(label.toUpperCase(), 15, y + 6.5);
-  setTextColor(doc, DARK);
-  return y + 14;
+// ── Küçük HTML bileşenleri ───────────────────────────────────────────────
+
+function statCard(label: string, value: string, color: string, sub?: string): string {
+  return `
+    <div style="flex:1;background:${COLORS.bg};border-radius:10px;padding:14px 16px;border-left:4px solid ${color};min-width:0;">
+      <div style="font-size:11px;color:${COLORS.muted};font-weight:600;margin-bottom:4px;">${esc(label)}</div>
+      <div style="font-size:20px;font-weight:800;color:${color};line-height:1.2;">${esc(value)}</div>
+      ${sub ? `<div style="font-size:10px;color:${COLORS.muted};margin-top:3px;">${esc(sub)}</div>` : ""}
+    </div>`;
 }
 
-function statBox(doc: JSPDF, x: number, y: number, w: number, h: number,
-                 label: string, value: string, color: RGB) {
-  setFill(doc, LIGHT);
-  doc.roundedRect(x, y, w, h, 3, 3, "F");
-  setDrawColor(doc, color);
-  doc.setLineWidth(0.5);
-  doc.line(x, y + 3, x, y + h - 3);
-  setTextColor(doc, GRAY);
-  doc.setFontSize(7); doc.setFont("helvetica", "normal");
-  doc.text(label, x + 4, y + 7);
-  setTextColor(doc, color);
-  doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text(value, x + 4, y + 16);
-  setTextColor(doc, DARK);
-  doc.setLineWidth(0.1);
+function sectionTitle(label: string): string {
+  return `
+    <div style="background:linear-gradient(135deg,${COLORS.primary},${COLORS.primaryDark});color:white;
+                border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.03em;
+                text-transform:uppercase;margin:20px 0 12px;">
+      ${esc(label)}
+    </div>`;
 }
 
-function barChart(doc: JSPDF, x: number, y: number, w: number, h: number,
-                  data: Array<{ label: string; value: number; color: RGB }>) {
-  if (!data.length) return;
-  const max = Math.max(...data.map(d => d.value), 1);
-  const barW = Math.min((w - 10) / data.length - 4, 22);
-  const chartH = h - 14;
-
-  setFill(doc, LIGHT);
-  doc.roundedRect(x, y, w, h, 2, 2, "F");
-
-  data.forEach((d, i) => {
-    const bx = x + 5 + i * (barW + 4);
-    const bh = (d.value / max) * chartH;
-    const by = y + h - 14 - bh;
-    setFill(doc, d.color);
-    doc.roundedRect(bx, by, barW, bh, 1, 1, "F");
-    setTextColor(doc, GRAY);
-    doc.setFontSize(6);
-    doc.text(d.label.slice(0, 5), bx + barW / 2, y + h - 7, { align: "center" });
-    setTextColor(doc, DARK);
-    doc.setFontSize(6);
-    doc.text(fmtTL(d.value), bx + barW / 2, by - 1, { align: "center" });
-  });
-  setTextColor(doc, DARK);
+function horizontalBar(label: string, value: number, max: number, color: string, valueLabel: string): string {
+  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
+  return `
+    <div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+        <span style="color:${COLORS.text};font-weight:600;">${esc(label)}</span>
+        <span style="color:${COLORS.muted};">${esc(valueLabel)}</span>
+      </div>
+      <div style="background:${COLORS.border};border-radius:5px;height:9px;overflow:hidden;">
+        <div style="background:${color};width:${pct}%;height:100%;border-radius:5px;"></div>
+      </div>
+    </div>`;
 }
 
-function simpleTable(doc: JSPDF, x: number, y: number, w: number,
-                     headers: string[], rows: string[][], colWidths: number[]): number {
-  const rowH = 8;
-  // Header
-  setFill(doc, PRIMARY);
-  doc.rect(x, y, w, rowH, "F");
-  setTextColor(doc, [255, 255, 255]);
-  doc.setFontSize(7); doc.setFont("helvetica", "bold");
-  let cx = x + 2;
-  headers.forEach((h, i) => { doc.text(h, cx + 1, y + 5.5); cx += colWidths[i]; });
-
-  // Rows
-  rows.forEach((row, ri) => {
-    const ry = y + rowH + ri * rowH;
-    if (ri % 2 === 0) { setFill(doc, LIGHT); doc.rect(x, ry, w, rowH, "F"); }
-    setTextColor(doc, DARK);
-    doc.setFont("helvetica", "normal");
-    let cx2 = x + 2;
-    row.forEach((cell, ci) => {
-      const text = doc.splitTextToSize(cell, colWidths[ci] - 2);
-      doc.text(text[0] as string, cx2 + 1, ry + 5.5);
-      cx2 += colWidths[ci];
-    });
-  });
-  setTextColor(doc, DARK);
-  return y + rowH + rows.length * rowH + 4;
+function dataTable(headers: string[], rows: string[][], widths: number[]): string {
+  const total = widths.reduce((a, b) => a + b, 0);
+  const colgroup = widths.map(w => `<col style="width:${(w / total) * 100}%;">`).join("");
+  const thead = headers.map(h => `<th style="text-align:left;padding:7px 10px;font-size:10px;">${esc(h)}</th>`).join("");
+  const tbody = rows.map((row, i) => `
+    <tr style="background:${i % 2 === 0 ? COLORS.bg : "transparent"};">
+      ${row.map(cell => `<td style="padding:7px 10px;font-size:11px;color:${COLORS.text};">${esc(cell)}</td>`).join("")}
+    </tr>`).join("");
+  return `
+    <table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;">
+      <colgroup>${colgroup}</colgroup>
+      <thead><tr style="background:${COLORS.primary};color:white;">${thead}</tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
 }
 
-// ── Main export function ───────────────────────────────────────────────────
+function emptyState(message: string): string {
+  return `<p style="color:${COLORS.muted};font-size:11px;padding:10px 4px;">${esc(message)}</p>`;
+}
+
+// ── Sayfa şablonları ──────────────────────────────────────────────────────
+
+function pageShell(headerTitle: string, subtitle: string, bodyHtml: string, pageLabel: string): string {
+  return `
+    <section style="width:210mm;min-height:297mm;background:white;font-family:'Segoe UI',Arial,sans-serif;
+                     color:${COLORS.text};box-sizing:border-box;display:flex;flex-direction:column;
+                     page-break-after:always;">
+      <header style="background:linear-gradient(135deg,${COLORS.primaryDark},#0f2400);color:white;
+                      padding:16px 24px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:20px;font-weight:800;color:${COLORS.accent};">NetaSoft</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">${esc(headerTitle)}</div>
+        </div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.7);text-align:right;">${esc(subtitle)}</div>
+      </header>
+      <div style="padding:20px 24px;flex:1;">
+        ${bodyHtml}
+      </div>
+      <footer style="padding:8px 24px;font-size:9px;color:${COLORS.muted};text-align:center;border-top:1px solid ${COLORS.border};">
+        NetaSoft Eczane Yönetim Sistemi · ${esc(pageLabel)}
+      </footer>
+    </section>`;
+}
+
+function buildPage1(data: DashboardData, subtitle: string): string {
+  const { summary, sgkVsCash } = data;
+  const total = sgkVsCash.sgkTotal + sgkVsCash.cashTotal || 1;
+  const sgkRatio = (sgkVsCash.sgkTotal / total) * 100;
+  const cashRatio = 100 - sgkRatio;
+
+  const trendRows = data.monthlyTrend.slice(-6).map(m => [m.month, fmtTL(m.gelir), fmtTL(m.gider), fmtTL(m.kar)]);
+  const maxTrend = Math.max(...data.monthlyTrend.map(m => Math.max(m.gelir, m.gider)), 1);
+
+  const body = `
+    ${sectionTitle("Bu Ay Özeti")}
+    <div style="display:flex;gap:10px;">
+      ${statCard("Toplam Gelir", fmtTL(summary.totalIncome), COLORS.primary, pctChange(summary.totalIncome, summary.totalIncome / (1 + summary.incomeChange / 100)) + " geçen aya göre")}
+      ${statCard("Toplam Gider", fmtTL(summary.totalExpense), COLORS.danger)}
+      ${statCard("Net Kâr", fmtTL(summary.netProfit), summary.netProfit >= 0 ? COLORS.primary : COLORS.danger)}
+    </div>
+
+    ${sectionTitle("SGK / Elden Satış Dağılımı")}
+    <div style="background:${COLORS.bg};border-radius:8px;padding:12px 16px;">
+      <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:10px;">
+        <div style="width:${sgkRatio}%;background:${COLORS.primary};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;">${sgkRatio > 12 ? `SGK %${sgkRatio.toFixed(0)}` : ""}</div>
+        <div style="width:${cashRatio}%;background:${COLORS.blue};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;">${cashRatio > 12 ? `Elden %${cashRatio.toFixed(0)}` : ""}</div>
+      </div>
+      <div style="display:flex;gap:20px;font-size:11px;">
+        <span><span style="display:inline-block;width:9px;height:9px;background:${COLORS.primary};border-radius:2px;margin-right:5px;"></span>SGK: ${fmtTL(sgkVsCash.sgkTotal)}</span>
+        <span><span style="display:inline-block;width:9px;height:9px;background:${COLORS.blue};border-radius:2px;margin-right:5px;"></span>Elden (POS/Nakit): ${fmtTL(sgkVsCash.cashTotal)}</span>
+      </div>
+    </div>
+
+    ${sectionTitle("Son 6 Ay Gelir / Gider / Kâr Trendi")}
+    ${data.monthlyTrend.length
+      ? `<div style="margin-bottom:10px;">
+          ${data.monthlyTrend.slice(-6).map(m => `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <div style="width:36px;font-size:10px;color:${COLORS.muted};">${esc(m.month)}</div>
+              <div style="flex:1;display:flex;gap:2px;height:12px;">
+                <div style="width:${Math.max(1, (m.gelir / maxTrend) * 100)}%;background:${COLORS.primary};border-radius:2px;"></div>
+              </div>
+              <div style="width:70px;font-size:10px;text-align:right;color:${COLORS.text};">${fmtTL(m.gelir)}</div>
+            </div>`).join("")}
+        </div>
+        ${dataTable(["Ay", "Gelir", "Gider", "Kâr"], trendRows, [20, 27, 27, 26])}`
+      : emptyState("Henüz aylık trend verisi yok.")}
+
+    ${sectionTitle("Eczacınız İçin Öneriler")}
+    <div style="background:${COLORS.bg};border-radius:8px;padding:14px 16px;">
+      ${buildTips(data).map(tip => `
+        <div style="display:flex;gap:8px;margin-bottom:8px;font-size:11px;line-height:1.5;">
+          <span style="color:${COLORS.primary};font-weight:800;">•</span>
+          <span>${esc(tip)}</span>
+        </div>`).join("")}
+    </div>
+  `;
+  return pageShell("Finansal Özet Raporu", subtitle, body, "Sayfa 1/3 — Finansal Özet");
+}
+
+function buildPage2(data: DashboardData, subtitle: string): string {
+  const unpaid = data.promissoryNotes.filter(n => !n.isPaid);
+  const totalUnpaid = unpaid.reduce((s, n) => s + n.amount, 0);
+
+  const notesSection = unpaid.length === 0
+    ? emptyState("Ödenmemiş senet bulunmamaktadır.")
+    : `${dataTable(
+        ["Senet No", "Vade Tarihi", "Tutar", "Durum"],
+        unpaid.slice(0, 12).map(n => {
+          const due = new Date(n.dueDate);
+          const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+          return [`#${n.noteNumber}`, due.toLocaleDateString("tr-TR"), fmtTL(n.amount), daysLeft <= 0 ? "Gecikti!" : `${daysLeft} gün kaldı`];
+        }),
+        [22, 26, 26, 26],
+      )}
+      <div style="text-align:right;font-size:12px;font-weight:700;color:${COLORS.danger};margin-top:8px;">
+        Toplam ödenmemiş: ${fmtTL(totalUnpaid)}
+      </div>`;
+
+  const sgkSection = data.upcomingSgk.length === 0
+    ? emptyState("Yaklaşan SGK ödemesi bulunmamaktadır.")
+    : dataTable(
+        ["Tür", "Tahmini Tarih", "Tutar"],
+        data.upcomingSgk.map(s => [s.invoiceType.replace(/_/g, " "), new Date(s.expectedPaymentDate).toLocaleDateString("tr-TR"), fmtTL(s.amount)]),
+        [40, 30, 30],
+      );
+
+  const maxPlatform = Math.max(...data.platformIncome.map(p => p.amount), 1);
+  const platformSection = data.platformIncome.length === 0
+    ? emptyState("Bu ay platform geliri girilmemiştir.")
+    : `${dataTable(["Platform", "Tutar", "Durum"], data.platformIncome.map(p => [p.platformName, fmtTL(p.amount), p.status]), [40, 30, 30])}
+       <div style="margin-top:12px;">
+        ${data.platformIncome.map((p, i) => horizontalBar(
+          p.platformName, p.amount, maxPlatform,
+          [COLORS.primary, COLORS.blue, COLORS.purple, COLORS.accent][i % 4],
+          fmtTL(p.amount),
+        )).join("")}
+       </div>`;
+
+  const body = `
+    ${sectionTitle("Yaklaşan Senetler")}
+    ${notesSection}
+    ${sectionTitle("Yaklaşan SGK Ödemeleri (+3 Ay)")}
+    ${sgkSection}
+    ${sectionTitle("Platform Gelirleri")}
+    ${platformSection}
+  `;
+  return pageShell("Senet & SGK & Platform Raporu", subtitle, body, "Sayfa 2/3 — Ödemeler");
+}
+
+function buildPage3(data: DashboardData, subtitle: string): string {
+  const score = calcScore(data);
+  const analysis = buildAnalysis(data);
+  const actions = buildActions(data);
+
+  const body = `
+    ${sectionTitle("Finansal Sağlık Skoru")}
+    <div style="background:${COLORS.bg};border-radius:8px;padding:4px;margin-bottom:6px;">
+      <div style="background:${COLORS.border};border-radius:8px;height:22px;overflow:hidden;">
+        <div style="width:${score.value}%;background:${score.color};height:100%;display:flex;align-items:center;padding-left:10px;color:white;font-size:11px;font-weight:700;">
+          ${score.value}/100 — ${score.label}
+        </div>
+      </div>
+    </div>
+
+    ${sectionTitle("Detaylı Analiz")}
+    <div style="background:${COLORS.bg};border-radius:8px;padding:14px 16px;">
+      ${analysis.map(section => `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:${COLORS.primary};margin-bottom:4px;">${esc(section.heading)}</div>
+          ${section.lines.map(l => `<div style="font-size:11px;color:${COLORS.text};line-height:1.5;">${esc(l)}</div>`).join("")}
+        </div>`).join("")}
+    </div>
+
+    ${sectionTitle("Eylem Planı — Bu Ay Yapılması Gerekenler")}
+    <div>
+      ${actions.map((action, i) => `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 12px;background:${i % 2 === 0 ? COLORS.bg : "transparent"};border-radius:6px;margin-bottom:2px;">
+          <span style="color:${COLORS.primary};font-weight:800;font-size:11px;flex-shrink:0;">${i + 1}.</span>
+          <span style="font-size:11px;color:${COLORS.text};line-height:1.4;">${esc(action)}</span>
+        </div>`).join("")}
+    </div>
+  `;
+  return pageShell("Kârlılık Analizi & Eylem Planı", subtitle, body, "Sayfa 3/3 — Analiz");
+}
+
+// ── Ana dışa aktarım fonksiyonu ─────────────────────────────────────────────
 
 export async function generateDashboardPdf(data: DashboardData, pharmacyName: string): Promise<void> {
-  const { default: jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = doc.internal.pageSize.getWidth();
+  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+    import("jspdf"),
+    import("html2canvas"),
+  ]);
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
   const subtitle = `${pharmacyName} · ${dateStr}`;
 
-  // ══════════════════════════════════════════════
-  // SAYFA 1 — Finansal Özet
-  // ══════════════════════════════════════════════
-  headerBand(doc, W, "Finansal Özet Raporu", subtitle);
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.top = "0";
+  wrapper.style.left = "-99999px";
+  wrapper.style.zIndex = "-1";
+  wrapper.innerHTML = buildPage1(data, subtitle) + buildPage2(data, subtitle) + buildPage3(data, subtitle);
+  document.body.appendChild(wrapper);
 
-  let y = 36;
-  y = sectionTitle(doc, y, "Bu Ay Özeti", W);
+  try {
+    const pageSections = Array.from(wrapper.children) as HTMLElement[];
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidthMm = doc.internal.pageSize.getWidth();
+    const pageHeightMm = doc.internal.pageSize.getHeight();
 
-  const { summary } = data;
-  const boxW = (W - 24) / 3;
-  statBox(doc, 12, y, boxW, 24, "Toplam Gelir", fmtTL(summary.totalIncome), PRIMARY);
-  statBox(doc, 12 + boxW + 4, y, boxW, 24, "Toplam Gider", fmtTL(summary.totalExpense), DANGER);
-  statBox(doc, 12 + (boxW + 4) * 2, y, boxW, 24, "Net Kar",
-    fmtTL(summary.netProfit), summary.netProfit >= 0 ? PRIMARY : DANGER);
-  y += 30;
-
-  // SGK vs Elden
-  y = sectionTitle(doc, y, "SGK / Elden Satış Dağılımı", W);
-  const { sgkVsCash } = data;
-  const total = sgkVsCash.sgkTotal + sgkVsCash.cashTotal || 1;
-  const sgkRatio = ((sgkVsCash.sgkTotal / total) * 100).toFixed(1);
-  const cashRatio = ((sgkVsCash.cashTotal / total) * 100).toFixed(1);
-
-  // Progress bar
-  setFill(doc, LIGHT);
-  doc.roundedRect(12, y, W - 24, 14, 2, 2, "F");
-  const sgkBarW = ((sgkVsCash.sgkTotal / total) * (W - 28));
-  setFill(doc, PRIMARY);
-  doc.roundedRect(14, y + 2, sgkBarW, 10, 2, 2, "F");
-  setTextColor(doc, [255, 255, 255]);
-  doc.setFontSize(7); doc.setFont("helvetica", "bold");
-  if (sgkBarW > 20) doc.text(`SGK %${sgkRatio}`, 16, y + 8);
-  setTextColor(doc, PRIMARY);
-  doc.text(`Elden %${cashRatio}`, W - 14, y + 8, { align: "right" });
-  setTextColor(doc, DARK); y += 18;
-
-  const hw = (W - 28) / 2;
-  statBox(doc, 12, y, hw, 22, "SGK Toplam", fmtTL(sgkVsCash.sgkTotal), PRIMARY);
-  statBox(doc, 12 + hw + 4, y, hw, 22, "Elden (POS/Nakit)", fmtTL(sgkVsCash.cashTotal), [52, 152, 219]);
-  y += 28;
-
-  // Aylık trend tablosu
-  y = sectionTitle(doc, y, "6 Aylik Gelir / Gider / Kar Trendi", W);
-  if (data.monthlyTrend.length) {
-    y = simpleTable(doc, 12, y, W - 24,
-      ["Ay", "Gelir", "Gider", "Kar"],
-      data.monthlyTrend.map(m => [m.month, fmtTL(m.gelir), fmtTL(m.gider), fmtTL(m.kar)]),
-      [35, 52, 52, 52]);
-  }
-
-  // Sezonluk ipuçları
-  y = sectionTitle(doc, y, "Eczaciniz Icin Oneriler", W);
-  setFill(doc, LIGHT);
-  doc.roundedRect(12, y, W - 24, 52, 2, 2, "F");
-  setTextColor(doc, DARK);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  const tips = buildTips(data);
-  tips.forEach((tip, i) => {
-    setTextColor(doc, PRIMARY);
-    doc.setFont("helvetica", "bold"); doc.text("•", 16, y + 7 + i * 9);
-    setTextColor(doc, DARK);
-    doc.setFont("helvetica", "normal");
-    doc.text(tip, 20, y + 7 + i * 9);
-  });
-  y += 58;
-
-  // ══════════════════════════════════════════════
-  // SAYFA 2 — Senetler + SGK Ödemeleri + Platform
-  // ══════════════════════════════════════════════
-  doc.addPage();
-  headerBand(doc, W, "Senet & SGK & Platform Raporu", subtitle);
-  y = 36;
-
-  // Senetler
-  y = sectionTitle(doc, y, "Yaklasan Senetler", W);
-  const unpaid = data.promissoryNotes.filter(n => !n.isPaid);
-  if (unpaid.length === 0) {
-    setTextColor(doc, GRAY); doc.setFontSize(8);
-    doc.text("Odenmemis senet bulunmamaktadir.", 14, y + 6);
-    y += 12;
-  } else {
-    y = simpleTable(doc, 12, y, W - 24,
-      ["Senet No", "Vade Tarihi", "Tutar", "Durum"],
-      unpaid.slice(0, 12).map(n => {
-        const due = new Date(n.dueDate);
-        const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
-        return [
-          `#${n.noteNumber}`,
-          due.toLocaleDateString("tr-TR"),
-          fmtTL(n.amount),
-          daysLeft <= 0 ? "GECIKTI!" : `${daysLeft} gun`,
-        ];
-      }),
-      [30, 38, 52, 35]);
-    const totalUnpaid = unpaid.reduce((s, n) => s + n.amount, 0);
-    setTextColor(doc, DANGER);
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text(`Toplam odenmemis: ${fmtTL(totalUnpaid)}`, W - 12, y, { align: "right" });
-    y += 8;
-  }
-
-  // Yaklaşan SGK
-  y = sectionTitle(doc, y, "Yaklasan SGK Odemeleri (+3 Ay)", W);
-  if (data.upcomingSgk.length === 0) {
-    setTextColor(doc, GRAY); doc.setFontSize(8);
-    doc.text("Yaklaşan SGK ödemesi bulunmamaktadır.", 14, y + 6);
-    y += 12;
-  } else {
-    y = simpleTable(doc, 12, y, W - 24,
-      ["Tur", "Tahmini Tarih", "Tutar"],
-      data.upcomingSgk.map(s => [
-        s.invoiceType.replace(/_/g, " "),
-        new Date(s.expectedPaymentDate).toLocaleDateString("tr-TR"),
-        fmtTL(s.amount),
-      ]),
-      [65, 42, 48]);
-  }
-
-  // Platform gelirleri
-  y = sectionTitle(doc, y, "Platform Gelirleri", W);
-  if (data.platformIncome.length === 0) {
-    setTextColor(doc, GRAY); doc.setFontSize(8);
-    doc.text("Bu ay platform geliri girilmemistir.", 14, y + 6);
-    y += 12;
-  } else {
-    y = simpleTable(doc, 12, y, W - 24,
-      ["Platform", "Tutar", "Durum"],
-      data.platformIncome.map(p => [p.platformName, fmtTL(p.amount), p.status]),
-      [65, 48, 42]);
-
-    // Mini bar chart
-    if (data.platformIncome.length > 1) {
-      barChart(doc, 12, y, W - 24, 50,
-        data.platformIncome.map((p, i) => ({
-          label: p.platformName,
-          value: p.amount,
-          color: ([PRIMARY, [52, 152, 219], [155, 89, 182], ACCENT] as RGB[])[i % 4],
-        })));
-      y += 56;
+    for (let i = 0; i < pageSections.length; i++) {
+      const canvas = await html2canvas(pageSections[i], {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      const imgData = canvas.toDataURL("image/png");
+      // Canvas oranını koru, A4 sayfasına tam otur (gerekirse hafif küçült,
+      // asla sayfa dışına taşırma).
+      const imgHeightMm = Math.min(pageHeightMm, (canvas.height / canvas.width) * pageWidthMm);
+      if (i > 0) doc.addPage();
+      doc.addImage(imgData, "PNG", 0, 0, pageWidthMm, imgHeightMm);
     }
+
+    const fileName = `netasoft-rapor-${now.toLocaleDateString("tr-TR").replace(/\./g, "-")}.pdf`;
+    doc.save(fileName);
+  } finally {
+    document.body.removeChild(wrapper);
   }
-
-  // ══════════════════════════════════════════════
-  // SAYFA 3 — Analiz & Öneriler
-  // ══════════════════════════════════════════════
-  doc.addPage();
-  headerBand(doc, W, "Karlılık Analizi & Eylem Plani", subtitle);
-  y = 36;
-
-  y = sectionTitle(doc, y, "Finansal Saglik Skoru", W);
-  const score = calcScore(data);
-  setFill(doc, LIGHT);
-  doc.roundedRect(12, y, W - 24, 18, 2, 2, "F");
-  setFill(doc, score.color);
-  doc.roundedRect(14, y + 2, ((score.value / 100) * (W - 28)), 14, 2, 2, "F");
-  setTextColor(doc, [255, 255, 255]);
-  doc.setFontSize(9); doc.setFont("helvetica", "bold");
-  doc.text(`${score.value}/100 — ${score.label}`, 16, y + 11);
-  setTextColor(doc, DARK); y += 24;
-
-  y = sectionTitle(doc, y, "Detayli Analiz", W);
-  setFill(doc, LIGHT);
-  doc.roundedRect(12, y, W - 24, 80, 2, 2, "F");
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
-  const analysis = buildAnalysis(data);
-  analysis.forEach((line, i) => {
-    const isHeading = line.startsWith("■");
-    doc.setFont("helvetica", isHeading ? "bold" : "normal");
-    setTextColor(doc, isHeading ? PRIMARY : DARK);
-    doc.text(line, 16, y + 8 + i * 8);
-  });
-  y += 88;
-
-  y = sectionTitle(doc, y, "Eylem Plani — Bu Ay Yapilmasi Gerekenler", W);
-  const actions = buildActions(data);
-  actions.forEach((action, i) => {
-    setFill(doc, i % 2 === 0 ? LIGHT : [255, 255, 255]);
-    doc.roundedRect(12, y, W - 24, 10, 1, 1, "F");
-    setTextColor(doc, PRIMARY);
-    doc.setFontSize(8); doc.setFont("helvetica", "bold");
-    doc.text(`${i + 1}.`, 15, y + 6.5);
-    setTextColor(doc, DARK);
-    doc.setFont("helvetica", "normal");
-    doc.text(action, 22, y + 6.5);
-    y += 11;
-  });
-
-  // Footer tüm sayfalara
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    setTextColor(doc, GRAY);
-    doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text(`NetaSoft Eczane Yönetim Sistemi · Sayfa ${i}/${pageCount} · ${dateStr}`,
-      W / 2, doc.internal.pageSize.getHeight() - 6, { align: "center" });
-  }
-
-  const fileName = `netasoft-rapor-${now.toLocaleDateString("tr-TR").replace(/\./g, "-")}.pdf`;
-  doc.save(fileName);
 }
 
 // ── Akıllı öneri & analiz üreteci ────────────────────────────────────────
@@ -338,56 +313,60 @@ function buildTips(data: DashboardData): string[] {
   const { summary, sgkVsCash, promissoryNotes } = data;
 
   if (summary.netProfit < 0)
-    tips.push("Giderleriniz gelirlerinizi asiyor. Sabit giderleri gozden gecirin.");
+    tips.push("Giderleriniz gelirlerinizi aşıyor. Sabit giderleri gözden geçirin.");
   else if (summary.netProfit > 0)
-    tips.push(`Bu ay ${fmtTL(summary.netProfit)} net kar elde edildi.`);
+    tips.push(`Bu ay ${fmtTL(summary.netProfit)} net kâr elde edildi.`);
 
   const sgkRatio = sgkVsCash.sgkTotal / (sgkVsCash.sgkTotal + sgkVsCash.cashTotal || 1);
   if (sgkRatio > 0.7)
-    tips.push("SGK oraniniz %70+ — platform gelirlerini artirmak dengeyi iyilestirir.");
+    tips.push("SGK oranınız %70+ — platform gelirlerini artırmak dengeyi iyileştirir.");
   else if (sgkRatio < 0.4)
-    tips.push("Elden satis oraniniz yuksek — SGK faturalarini sisteme eklemek gelir tahminini iyilestirir.");
+    tips.push("Elden satış oranınız yüksek — SGK faturalarını sisteme eklemek gelir tahminini iyileştirir.");
 
   const unpaid = promissoryNotes.filter(n => !n.isPaid);
   if (unpaid.length > 0) {
     const urgent = unpaid.filter(n => Math.ceil((new Date(n.dueDate).getTime() - Date.now()) / 86400000) <= 7);
     if (urgent.length > 0)
-      tips.push(`${urgent.length} senedin vadesi 7 gun icinde! Odeme planlayin.`);
+      tips.push(`${urgent.length} senedin vadesi 7 gün içinde! Ödeme planlayın.`);
     else
-      tips.push(`${unpaid.length} adet odenmemis senet takipte.`);
+      tips.push(`${unpaid.length} adet ödenmemiş senet takipte.`);
   }
 
   if (data.upcomingSgk.length > 0) {
     const totalSgk = data.upcomingSgk.reduce((s, x) => s + x.amount, 0);
-    tips.push(`Onumüzdeki 3 ayda ${fmtTL(totalSgk)} SGK odemesi bekleniyor.`);
+    tips.push(`Önümüzdeki 3 ayda ${fmtTL(totalSgk)} SGK ödemesi bekleniyor.`);
   }
 
-  if (tips.length < 3) tips.push("Envanter raporunu duzenli yuklemek karliliginizi gormenizi saglar.");
+  if (tips.length < 3) tips.push("Envanter raporunu düzenli yüklemek kârlılığınızı görmenizi sağlar.");
   return tips.slice(0, 5);
 }
 
-function buildAnalysis(data: DashboardData): string[] {
-  const lines: string[] = [];
+function buildAnalysis(data: DashboardData): Array<{ heading: string; lines: string[] }> {
+  const sections: Array<{ heading: string; lines: string[] }> = [];
   const { summary, sgkVsCash, monthlyTrend } = data;
   const margin = summary.totalIncome > 0 ? (summary.netProfit / summary.totalIncome) * 100 : 0;
 
-  lines.push("■ Kar Marji Analizi");
-  lines.push(`  Kar Marji: %${margin.toFixed(1)} (Gelir: ${fmtTL(summary.totalIncome)}, Gider: ${fmtTL(summary.totalExpense)})`);
-  lines.push("");
+  sections.push({
+    heading: "Kâr Marjı Analizi",
+    lines: [`Kâr Marjı: %${margin.toFixed(1)} (Gelir: ${fmtTL(summary.totalIncome)}, Gider: ${fmtTL(summary.totalExpense)})`],
+  });
 
-  lines.push("■ SGK Analizi");
   const total = sgkVsCash.sgkTotal + sgkVsCash.cashTotal || 1;
-  lines.push(`  SGK: %${((sgkVsCash.sgkTotal / total) * 100).toFixed(0)} | Elden: %${((sgkVsCash.cashTotal / total) * 100).toFixed(0)}`);
-  lines.push("");
+  sections.push({
+    heading: "SGK Analizi",
+    lines: [`SGK: %${((sgkVsCash.sgkTotal / total) * 100).toFixed(0)} | Elden: %${((sgkVsCash.cashTotal / total) * 100).toFixed(0)}`],
+  });
 
   if (monthlyTrend.length >= 2) {
-    lines.push("■ Trend Analizi (Son 2 Ay)");
     const last = monthlyTrend[monthlyTrend.length - 1];
     const prev = monthlyTrend[monthlyTrend.length - 2];
-    lines.push(`  Gelir degisimi: ${pct(last.gelir, prev.gelir)} | Gider: ${pct(last.gider, prev.gider)}`);
+    sections.push({
+      heading: "Trend Analizi (Son 2 Ay)",
+      lines: [`Gelir değişimi: ${pctChange(last.gelir, prev.gelir)} | Gider: ${pctChange(last.gider, prev.gider)}`],
+    });
   }
 
-  return lines;
+  return sections;
 }
 
 function buildActions(data: DashboardData): string[] {
@@ -395,16 +374,16 @@ function buildActions(data: DashboardData): string[] {
   const unpaid = data.promissoryNotes.filter(n => !n.isPaid);
   const urgent = unpaid.filter(n => Math.ceil((new Date(n.dueDate).getTime() - Date.now()) / 86400000) <= 14);
 
-  if (urgent.length > 0) actions.push(`${urgent.length} senedin odemesini planlayin (14 gun icinde).`);
+  if (urgent.length > 0) actions.push(`${urgent.length} senedin ödemesini planlayın (14 gün içinde).`);
   if (data.upcomingSgk.length > 0) actions.push("SGK ödeme tarihlerini takvime ekleyin.");
   if (data.platformIncome.length === 0) actions.push("Platform gelirlerinizi bu ay sisteme girin.");
-  if (data.summary.netProfit < 0) actions.push("Gider kalemlerini gozden gecirin, tasarruf alanlari belirleyin.");
-  actions.push("Aylik envanter raporunu yukleyin — karlılık analizini gunceller.");
-  actions.push("SGK faturalarinizi PDF olarak yukleyin, sistem otomatik okur.");
+  if (data.summary.netProfit < 0) actions.push("Gider kalemlerini gözden geçirin, tasarruf alanları belirleyin.");
+  actions.push("Aylık envanter raporunu yükleyin — kârlılık analizini günceller.");
+  actions.push("SGK faturalarınızı PDF olarak yükleyin, sistem otomatik okur.");
   return actions.slice(0, 7);
 }
 
-function calcScore(data: DashboardData): { value: number; label: string; color: RGB } {
+function calcScore(data: DashboardData): { value: number; label: string; color: string } {
   let score = 50;
   const { summary } = data;
   if (summary.netProfit > 0) score += 20;
@@ -415,7 +394,7 @@ function calcScore(data: DashboardData): { value: number; label: string; color: 
   if (data.upcomingSgk.length > 0) score += 5;
   score = Math.min(100, Math.max(10, score));
 
-  if (score >= 75) return { value: score, label: "Iyi", color: PRIMARY };
-  if (score >= 50) return { value: score, label: "Orta", color: [245, 166, 35] };
-  return { value: score, label: "Dikkat Gerekiyor", color: DANGER };
+  if (score >= 75) return { value: score, label: "İyi", color: COLORS.primary };
+  if (score >= 50) return { value: score, label: "Orta", color: "#f5a623" };
+  return { value: score, label: "Dikkat Gerekiyor", color: COLORS.danger };
 }
