@@ -6,6 +6,7 @@ import { apiError } from "@/lib/utils";
 import { rateLimit } from "@/lib/utils/rate-limit";
 import { getLang, m } from "@/lib/i18n/api-messages";
 import { getActivePharmacyId } from "@/lib/pharmacy";
+import { countHolidaysInRange } from "@/lib/utils/turkishHolidays";
 
 const AI_CHAT_RATE_LIMIT = 15;
 const AI_CHAT_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -27,6 +28,7 @@ KESİN KURALLAR:
 3. Genel finansal, muhasebe, tıbbi veya hukuki tavsiye vermezsin.
 4. NetaSoft dışı konulara yanıt vermezsin.
 5. SGK gelirleri, fatura tarihinden 3 ay sonra her ayın 15'inde gelir — bu konuda doğru bilgi ver.
+6. "Bu ay kâr eder miyiz/edecek miyiz", "ay sonunda kârda mı zararda mı olacağız" gibi GELECEĞE dönük (henüz bitmemiş ay hakkında tahmin isteyen) sorularda kesinlikle "AY SONU TAHMİNİ" bloğundaki rakamları kullan — "BUGÜNE KADAR GERÇEKLEŞEN NET KAR/ZARAR" satırı sadece ayın şu ana kadar geçen kısmını gösterir, ay bitmeden bunu "bu ayki kârımız" diye sunmak YANLIŞTIR ve kullanıcıyı yanıltır. Kullanıcı "şu ana kadar/bugüne kadar" diye özellikle belirtirse o zaman BUGÜNE KADAR GERÇEKLEŞEN rakamını kullanabilirsin. AY SONU TAHMİNİ'ni kullandığında bunun bir TAHMİN olduğunu (garanti değil) mutlaka belirt ve varsa çalışılan gün sayısı/kalan çalışma günü gibi dayanağı kısaca özetle.
 
 YAPABİLECEKLERİN (yalnızca sisteme girilmiş veriler için):
 - Tüm dönem gelir/gider ve net kâr yorumu
@@ -48,6 +50,7 @@ STRICT RULES:
 3. Do not give general financial, accounting, medical or legal advice.
 4. Do not respond to topics outside of NetaSoft.
 5. SGK income arrives on the 15th of the month, exactly 3 months after the invoice date.
+6. For FORWARD-LOOKING questions about an ongoing (not-yet-finished) month — e.g. "will we be profitable this month?" — always use the "MONTH-END FORECAST" block, never the "NET PROFIT/LOSS SO FAR" line, since that only covers elapsed days and presenting it as "this month's profit" while the month is still ongoing is MISLEADING. Only use the "SO FAR" figure if the user explicitly asks about the elapsed period so far. When using the forecast, always state clearly that it is an ESTIMATE, not a guarantee, and briefly mention its basis (days worked so far / remaining working days).
 
 WHAT YOU CAN DO (only for data entered into the system):
 - All-period income/expense and net profit commentary
@@ -88,7 +91,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       // Current month kasa
       prisma.dailyRegister.findMany({
         where: { pharmacyId, deletedAt: null, registerDate: { gte: startOfMonth, lte: endOfMonth } },
-        select: { posAmount: true, cashAmount: true, wireAmount: true },
+        select: { posAmount: true, cashAmount: true, wireAmount: true, registerDate: true },
       }),
       // Last 12 months kasa (geçmiş aylar hakkında soru sorulabilmesi için)
       prisma.dailyRegister.findMany({
@@ -205,6 +208,36 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       return d >= startOfMonth && d <= endOfMonth;
     }).reduce((s, r) => s + Number(r.totalAmount), 0);
 
+    // ── AY SONU CİRO TAHMİNİ ─────────────────────────────────────────────────
+    // Kullanıcı "bu ay kâr eder miyiz" gibi GELECEĞE dönük bir soru sorduğunda,
+    // sadece bugüne kadar gerçekleşen kısmi ay verisini net kâr/zarar diye
+    // sunmak yanıltıcıydı (ay henüz bitmedi). Bunun yerine: fiilen kasa girişi
+    // yapılan (çalışılan) günlere göre günlük ortalama ciro hesaplanır, ayın
+    // kalan günlerinden resmi tatiller düşülerek tahmini kalan çalışma günü
+    // bulunur ve bu ortalamayla ay sonuna kadar projekte edilir. Sabit/personel
+    // giderleri günlük bir kalem olmadığı için (runway30 ile aynı gerekçe)
+    // ekstrapole edilmez, bu ana kadarki gerçek tutarları kullanılır.
+    const workedDayKeys = new Set(
+      dailyRegs.map(r => {
+        const d = new Date(r.registerDate);
+        return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+      })
+    );
+    const workedDaysCount = workedDayKeys.size;
+    const avgCiroPerWorkedDay = workedDaysCount > 0 ? cashIncome / workedDaysCount : 0;
+
+    const todayDateNum = now.getUTCDate();
+    const remainingCalendarDays = Math.max(0, lastDayNum - todayDateNum);
+    const tomorrow = new Date(Date.UTC(y, mo - 1, todayDateNum + 1));
+    const remainingHolidays = remainingCalendarDays > 0 ? countHolidaysInRange(tomorrow, endOfMonth) : 0;
+    const projectedRemainingWorkingDays = Math.max(0, remainingCalendarDays - remainingHolidays);
+    const projectedRemainingCash = avgCiroPerWorkedDay * projectedRemainingWorkingDays;
+    const projectedMonthCash = cashIncome + projectedRemainingCash;
+    const projectedTotalIncome = projectedMonthCash + thisMonthSgkTotal + platformTotal;
+    const projectedExpense = thisMonthFixed + thisMonthEmp;
+    const projectedNet = projectedTotalIncome - projectedExpense;
+    const isMonthOver = remainingCalendarDays === 0;
+
     const fmt = (v: number) => v.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL";
     const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString(isEn ? "en-GB" : "tr-TR");
 
@@ -225,7 +258,20 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       fixed: isEn ? "Fixed Expenses" : "Sabit Giderler",
       staff: isEn ? "Staff Expenses" : "Personel Giderleri",
       supplier: isEn ? "Warehouse Transfers" : "Depo Havaleleri",
-      net: isEn ? "NET PROFIT/LOSS" : "NET KAR/ZARAR",
+      net: isEn ? "NET PROFIT/LOSS SO FAR (only elapsed days this month, NOT a full-month figure)" : "BUGÜNE KADAR GERÇEKLEŞEN NET KAR/ZARAR (sadece ayın şu ana kadar geçen günleri, TAM AY rakamı DEĞİLDİR)",
+      forecast: isEn ? "MONTH-END FORECAST (ESTIMATE — use this for questions like \"will we be profitable this month\")" : "AY SONU TAHMİNİ (TAHMİNİDİR — \"bu ay kâr eder miyiz/edecek miyiz\" gibi sorular için BUNU kullan)",
+      forecastWorkedDays: isEn ? "Days worked so far (days with a register entry)" : "Bugüne kadar çalışılan gün sayısı (kasa girişi yapılan günler)",
+      forecastAvgPerDay: isEn ? "Average register revenue per worked day" : "Çalışılan gün başına ortalama kasa cirosu",
+      forecastRemainingDays: isEn ? "Remaining calendar days this month" : "Ayın kalan takvim günü",
+      forecastRemainingHolidays: isEn ? "Official holidays among remaining days" : "Kalan günler içindeki resmi tatil sayısı",
+      forecastRemainingWorkingDays: isEn ? "Estimated remaining working days" : "Tahmini kalan çalışma günü",
+      forecastProjectedIncome: isEn ? "Projected total income (month-end)" : "Tahmini ay sonu toplam gelir",
+      forecastProjectedExpense: isEn ? "Expenses used in forecast (fixed+staff, not extrapolated — see note)" : "Tahminde kullanılan gider (sabit+personel, ekstrapole edilmez — açıklamaya bakın)",
+      forecastNet: isEn ? "PROJECTED NET PROFIT/LOSS (month-end estimate)" : "TAHMİNİ NET KAR/ZARAR (ay sonu tahmini)",
+      forecastNote: isEn
+        ? "This is an ESTIMATE based on the average revenue of days actually worked so far, projected across the remaining working days (calendar days minus official Turkish holidays) until month-end. Fixed/staff expenses are usually one-time monthly entries, so they are NOT extrapolated — this month's actual amounts are used as-is. Always tell the user this is an estimate, not a guarantee."
+        : "Bu bir TAHMİNDİR: bugüne kadar fiilen çalışılan günlerin ortalama cirosu, ay sonuna kadar kalan çalışma günlerine (takvim günü eksi resmi tatiller) yansıtılarak hesaplanmıştır. Sabit/personel giderleri genelde ay içinde tek seferlik girildiği için ekstrapole EDİLMEZ, bu ayki gerçek tutarları kullanılır. Kullanıcıya bunun bir tahmin olduğunu, kesin bir garanti olmadığını her zaman belirt.",
+      monthOver: isEn ? "This month has already ended — the figures above ARE the final month total, not an estimate." : "Bu ay zaten sona erdi — yukarıdaki rakamlar tahmin değil, ayın kesin toplam sonucudur.",
       sgkAll: isEn ? "ALL SGK INVOICES (full history)" : "TÜM SGK FATURALARI (tüm geçmiş)",
       sgkNote: isEn ? "SGK payments arrive on the 15th of the month, 3 months after invoice date." : "SGK ödemeleri fatura ayından 3 ay sonra, her ayın 15'inde gelir.",
       invoiceDate: isEn ? "Invoice Date" : "Fatura Tarihi",
@@ -257,6 +303,21 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       `- ${L.staff}: ${fmt(thisMonthEmp)}`,
       `- ${L.supplier}: ${fmt(supplierTransfers.filter(t => { const d = new Date(t.transferDate); return d >= startOfMonth && d <= endOfMonth; }).reduce((s, r) => s + Number(r.amount), 0))}`,
       `- ${L.net}: ${fmt(totalIncome - thisMonthFixed - thisMonthEmp)}`,
+      ``,
+      `${L.forecast}`,
+      ...(isMonthOver
+        ? [`(${L.monthOver})`]
+        : [
+            `- ${L.forecastWorkedDays}: ${workedDaysCount} ${L.days}`,
+            `- ${L.forecastAvgPerDay}: ${fmt(avgCiroPerWorkedDay)}`,
+            `- ${L.forecastRemainingDays}: ${remainingCalendarDays} ${L.days}`,
+            `- ${L.forecastRemainingHolidays}: ${remainingHolidays} ${L.days}`,
+            `- ${L.forecastRemainingWorkingDays}: ${projectedRemainingWorkingDays} ${L.days}`,
+            `- ${L.forecastProjectedIncome}: ${fmt(projectedTotalIncome)}`,
+            `- ${L.forecastProjectedExpense}: ${fmt(projectedExpense)}`,
+            `- ${L.forecastNet}: ${fmt(projectedNet)}`,
+          ]),
+      `(${L.forecastNote})`,
       ``,
       `${L.sgkAll}`,
       `${L.sgkNote}`,
