@@ -150,7 +150,7 @@ export default function AylikOzetPage() {
             <PeriodRevenueWidget
               startDate={toDate(year, month, 1)}
               endDate={toDate(year, month, lastDay(year, month))}
-              title={lang === "en" ? `${months[month]} ${year} Revenue (Register + Prescription)` : `${months[month]} ${year} Ciro (Kasa + Reçete)`}
+              title={lang === "en" ? `${months[month]} ${year} Revenue` : `${months[month]} ${year} Ciro`}
             />
           </div>
 

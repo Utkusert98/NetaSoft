@@ -1029,7 +1029,7 @@ export default function SatisRaporPage() {
         <PeriodRevenueWidget
           startDate={startDate}
           endDate={endDate}
-          title={lang === "en" ? "Period Revenue (Register + Prescription)" : "Dönemsel Ciro (Kasa + Reçete)"}
+          title={lang === "en" ? "Period Revenue" : "Dönemsel Ciro"}
         />
       </div>
 
