@@ -117,6 +117,9 @@ export const loginSchema = z.object({
     .toLowerCase()
     .trim(),
   password: z.string().min(1, "Şifre gereklidir"),
+  // İki adımlı doğrulama (2FA) açık kullanıcılar için opsiyonel doğrulama kodu.
+  // Şifre doğru olduğunda ve twoFactorEnabled ise zorunlu hale gelir (bkz. auth.ts).
+  otpCode: z.string().optional(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

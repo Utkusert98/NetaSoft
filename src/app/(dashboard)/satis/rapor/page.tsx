@@ -391,6 +391,56 @@ function TrendChart({ data, lang }: {
   );
 }
 
+// Seçilen sütunun dosyadaki ilk birkaç gerçek değerini döndürür — kullanıcı
+// "bu sütun gerçekten doğru mu" sorusunu kör tahminle değil, örnek veriye
+// bakarak yanıtlayabilir (envanter modülündeki aynı UX iyileştirmesi).
+function sampleValuesFor(headers: string[], dataRows: unknown[][], headerName: string): string[] {
+  const idx = headers.indexOf(headerName);
+  if (idx < 0) return [];
+  return dataRows
+    .slice(0, 3)
+    .map(row => String(row[idx] ?? "").trim())
+    .filter(v => v !== "");
+}
+
+// Modül kapsamında tanımlandı — render içinde tanımlanırsa her render'da yeni
+// bir bileşen türü sayılır ve seçim kutusu odağını/durumunu kaybedebilir.
+function ColSelect({ fieldKey, label, hint, headers, dataRows, selected, lang, onChange }: {
+  fieldKey: keyof ColumnOverride;
+  label: string;
+  hint?: string;
+  headers: string[];
+  dataRows: unknown[][];
+  selected: string;
+  lang: string;
+  onChange: (fieldKey: keyof ColumnOverride, value: string) => void;
+}) {
+  const samples = selected ? sampleValuesFor(headers, dataRows, selected) : [];
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <label className="form-label">{label}</label>
+      <select className="form-input" value={selected}
+        onChange={e => onChange(fieldKey, e.target.value)}>
+        <option value="">{lang === "en" ? "— Not Selected —" : "— Seçilmedi —"}</option>
+        {headers.map(h => <option key={h} value={h}>{h}</option>)}
+      </select>
+      {hint && <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>{hint}</p>}
+      <div style={{ marginTop: "4px", fontSize: "11px", minHeight: "16px" }}>
+        {selected && (
+          samples.length > 0 ? (
+            <span style={{ color: "var(--color-text-muted)" }}>
+              {lang === "en" ? "Sample: " : "Örnek: "}
+              <span style={{ fontWeight: 600, color: "var(--color-text)" }}>{samples.join(" · ")}</span>
+            </span>
+          ) : (
+            <span style={{ color: "var(--color-text-muted)" }}>{lang === "en" ? "This column appears empty in the first rows." : "Bu sütun ilk satırlarda boş görünüyor."}</span>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SatisRaporPage() {
   const { lang } = useLangContext();
   const [tab, setTab] = useState<"upload" | "list">("list");
@@ -721,46 +771,6 @@ export default function SatisRaporPage() {
   const setOvr = (key: keyof ColumnOverride, val: string | boolean) =>
     setOverride(prev => ({ ...prev, [key]: val }));
 
-  // Seçilen sütunun dosyadaki ilk birkaç gerçek değerini gösterir — kullanıcı
-  // "bu sütun gerçekten doğru mu" sorusunu kör tahminle değil, örnek veriye
-  // bakarak yanıtlayabilir (envanter modülündeki aynı UX iyileştirmesi).
-  const sampleValuesFor = (headerName: string): string[] => {
-    const idx = headers.indexOf(headerName);
-    if (idx < 0) return [];
-    return dataRows
-      .slice(0, 3)
-      .map(row => String(row[idx] ?? "").trim())
-      .filter(v => v !== "");
-  };
-
-  const ColSelect = ({ fieldKey, label, hint }: { fieldKey: keyof ColumnOverride; label: string; hint?: string }) => {
-    const selected = effectiveMap(fieldKey);
-    const samples = selected ? sampleValuesFor(selected) : [];
-    return (
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">{label}</label>
-        <select className="form-input" value={selected}
-          onChange={e => setOvr(fieldKey, e.target.value)}>
-          <option value="">{lang === "en" ? "— Not Selected —" : "— Seçilmedi —"}</option>
-          {headers.map(h => <option key={h} value={h}>{h}</option>)}
-        </select>
-        {hint && <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>{hint}</p>}
-        <div style={{ marginTop: "4px", fontSize: "11px", minHeight: "16px" }}>
-          {selected && (
-            samples.length > 0 ? (
-              <span style={{ color: "var(--color-text-muted)" }}>
-                {lang === "en" ? "Sample: " : "Örnek: "}
-                <span style={{ fontWeight: 600, color: "var(--color-text)" }}>{samples.join(" · ")}</span>
-              </span>
-            ) : (
-              <span style={{ color: "var(--color-text-muted)" }}>{lang === "en" ? "This column appears empty in the first rows." : "Bu sütun ilk satırlarda boş görünüyor."}</span>
-            )
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
 
@@ -878,7 +888,8 @@ export default function SatisRaporPage() {
 
               <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-4)" }}>
                 <ColSelect fieldKey="price" label={lang === "en" ? "Price Column *" : "Fiyat Kolonu *"}
-                  hint={lang === "en" ? "'Unit Price' = qty × price calculated · 'Amount/Net Amount' = already total" : "'Birim Fiyat' = adet × fiyat hesaplanır · 'Tutar/Net Tutar' = zaten toplam"} />
+                  hint={lang === "en" ? "'Unit Price' = qty × price calculated · 'Amount/Net Amount' = already total" : "'Birim Fiyat' = adet × fiyat hesaplanır · 'Tutar/Net Tutar' = zaten toplam"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("price")} lang={lang} onChange={setOvr} />
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">{lang === "en" ? "Price Type" : "Fiyat Türü"}</label>
@@ -890,15 +901,22 @@ export default function SatisRaporPage() {
                   </select>
                 </div>
 
-                <ColSelect fieldKey="quantity" label={lang === "en" ? "Quantity Column" : "Adet Kolonu"} />
-                <ColSelect fieldKey="discount" label={lang === "en" ? "Discount Column" : "İskonto Kolonu"} />
-                <ColSelect fieldKey="name" label={lang === "en" ? "Product Name Column *" : "Ürün Adı Kolonu *"} />
-                <ColSelect fieldKey="date" label={lang === "en" ? "Date Column *" : "Tarih Kolonu *"} />
-                <ColSelect fieldKey="group" label={lang === "en" ? "Product Group Column" : "Ürün Grubu Kolonu"} />
+                <ColSelect fieldKey="quantity" label={lang === "en" ? "Quantity Column" : "Adet Kolonu"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("quantity")} lang={lang} onChange={setOvr} />
+                <ColSelect fieldKey="discount" label={lang === "en" ? "Discount Column" : "İskonto Kolonu"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("discount")} lang={lang} onChange={setOvr} />
+                <ColSelect fieldKey="name" label={lang === "en" ? "Product Name Column *" : "Ürün Adı Kolonu *"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("name")} lang={lang} onChange={setOvr} />
+                <ColSelect fieldKey="date" label={lang === "en" ? "Date Column *" : "Tarih Kolonu *"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("date")} lang={lang} onChange={setOvr} />
+                <ColSelect fieldKey="group" label={lang === "en" ? "Product Group Column" : "Ürün Grubu Kolonu"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("group")} lang={lang} onChange={setOvr} />
                 <ColSelect fieldKey="type" label={lang === "en" ? "Sale Type Column" : "Satış Tipi Kolonu"}
-                  hint={lang === "en" ? "Distinguishes Prescription/SGK from Retail/Direct" : "Reçeteli/SGK veya Perakende/Elden ayrımı"} />
+                  hint={lang === "en" ? "Distinguishes Prescription/SGK from Retail/Direct" : "Reçeteli/SGK veya Perakende/Elden ayrımı"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("type")} lang={lang} onChange={setOvr} />
                 <ColSelect fieldKey="staff" label={lang === "en" ? "Staff Column (optional)" : "Personel Kolonu (opsiyonel)"}
-                  hint={lang === "en" ? "Only if your file has a staff/employee column" : "Dosyanızda personel/çalışan sütunu varsa"} />
+                  hint={lang === "en" ? "Only if your file has a staff/employee column" : "Dosyanızda personel/çalışan sütunu varsa"}
+                  headers={headers} dataRows={dataRows} selected={effectiveMap("staff")} lang={lang} onChange={setOvr} />
               </div>
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-5)" }}>

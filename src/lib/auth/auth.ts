@@ -1,10 +1,22 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { loginSchema } from "@/lib/validators/auth";
 import { authConfig } from "./auth.config";
+import { verifyTotpCode } from "./totp";
+
+/**
+ * Şifre doğru ama hesapta 2FA açık ve geçerli bir OTP kodu sağlanmadığında
+ * fırlatılır. `CredentialsSignin` alt sınıfı olduğu için Auth.js bunu
+ * "yanlış şifre" ile aynı genel hataya sarmaz — `code` alanı istemciye
+ * (giriş sayfası) redirect URL'sindeki `code` parametresi olarak ulaşır,
+ * böylece istemci "yanlış şifre" ile "OTP gerekli" durumlarını ayırt edebilir.
+ */
+class TwoFactorRequiredError extends CredentialsSignin {
+  code = "2FA_REQUIRED";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -15,12 +27,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "E-Posta", type: "email" },
         password: { label: "Şifre", type: "password" },
+        otpCode: { label: "Doğrulama Kodu", type: "text" },
       },
       async authorize(credentials) {
         const validated = loginSchema.safeParse(credentials);
         if (!validated.success) return null;
 
-        const { email, password } = validated.data;
+        const { email, password, otpCode } = validated.data;
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -32,6 +45,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             pharmacistName: true,
             isActive: true,
             deletedAt: true,
+            twoFactorEnabled: true,
+            twoFactorSecret: true,
           },
         });
 
@@ -39,10 +54,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user.password) return null;
 
         const isValid = await bcrypt.compare(password, user.password);
-        // TODO: twoFactorEnabled kullanıcılar için authorize() sonrası ikinci adım (OTP doğrulama)
-        // akışı ayrı bir UI değişikliği gerektirir — şu an sadece ayarlar sayfasından 2FA
-        // açılıp/kapatılabiliyor, login akışına entegre değil.
         if (!isValid) return null;
+
+        // İki adımlı doğrulama (2FA) açık kullanıcılar için şifre doğru olsa bile
+        // geçerli bir OTP kodu zorunludur. Kod eksik/hatalıysa girişi reddet — istemci
+        // bu hatayı "yanlış şifre" hatasından ayırt edip OTP giriş alanını gösterir.
+        if (user.twoFactorEnabled) {
+          if (!user.twoFactorSecret) return null;
+          if (!otpCode || !verifyTotpCode(user.email, user.twoFactorSecret, otpCode)) {
+            throw new TwoFactorRequiredError();
+          }
+        }
 
         // Son giriş zamanı güncelle
         await prisma.user.update({
