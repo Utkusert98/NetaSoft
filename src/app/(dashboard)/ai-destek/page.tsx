@@ -258,7 +258,7 @@ export default function AiDestek() {
   };
 
   return (
-    <main className="page-content" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - var(--header-height))", maxWidth: 900 }}>
+    <main className="page-content ai-destek-main" style={{ display: "flex", flexDirection: "column", maxWidth: 900 }}>
       {/* Header */}
       <div style={{ marginBottom: "var(--spacing-5)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-4)" }}>
         <div>
@@ -381,6 +381,7 @@ export default function AiDestek() {
           placeholder={ui.placeholder}
           disabled={loading}
           rows={2}
+          className="ai-chat-input"
           style={{
             flex: 1, resize: "none", padding: "12px 16px",
             borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",

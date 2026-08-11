@@ -175,7 +175,7 @@ export default function AylikOzetPage() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
+          <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             {/* Gelir Kırılımı */}
             <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
               <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)" }}>
