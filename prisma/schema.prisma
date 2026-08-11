@@ -780,6 +780,7 @@ model SaleRecord {
   netRevenue     Decimal  @default(0) @map("net_revenue") @db.Decimal(15, 2)
   saleType       SaleType @default(RETAIL) @map("sale_type") // PRESCRIPTION | RETAIL
   quantity       Int      @default(1)
+  staffName      String?  @map("staff_name") // Personel/çalışan adı — opsiyonel, tüm dosyalarda bulunmaz
 
   importBatchId String? @map("import_batch_id") // Grup yüklemeleri eşleştirme
 

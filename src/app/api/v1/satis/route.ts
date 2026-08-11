@@ -15,6 +15,7 @@ const rowSchema = z.object({
   netRevenue: z.number().min(0).default(0),
   saleType: z.enum(["PRESCRIPTION", "RETAIL"]).default("RETAIL"),
   quantity: z.number().int().min(1).default(1),
+  staffName: z.string().optional(),
 });
 
 const confirmSchema = z.object({
@@ -46,6 +47,7 @@ export async function POST(req: Request): Promise<Response> {
       netRevenue: r.netRevenue > 0 ? r.netRevenue : r.price * r.quantity - r.discountAmount,
       saleType: r.saleType,
       quantity: r.quantity,
+      staffName: r.staffName ?? null,
       importBatchId: batchId,
     }));
 
@@ -128,6 +130,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         netRevenue: getNet(r),
         saleType: r.saleType,
         quantity: r.quantity,
+        staffName: r.staffName ?? undefined,
       })),
       summary: {
         totalRecords: records.length,
