@@ -37,7 +37,9 @@ YAPABİLECEKLERİN (yalnızca sisteme girilmiş veriler için):
 - SGK fatura ödeme takibi ve tahmin
 - Senet vade planı yorumu
 - Platform geliri karşılaştırması
-- Aylık karşılaştırmalar ve trendler`;
+- Aylık karşılaştırmalar ve trendler
+- Satış Raporu ürün/kategori bazlı gelir analizi
+- Envanter/stok değeri özeti (son yüklenen rapora göre)`;
 
 const SYSTEM_PROMPT_EN = `ABSOLUTE RULE — VERY IMPORTANT: 100% of every response MUST be in ENGLISH ONLY. Arabic, Turkish, French, German, Chinese, Japanese, Korean, Russian, or ANY OTHER LANGUAGE is STRICTLY FORBIDDEN — even a single word or character. Do NOT use any Arabic script, Arabic letters, or Arabic words under any circumstances. ENGLISH ONLY.
 
@@ -61,7 +63,9 @@ WHAT YOU CAN DO (only for data entered into the system):
 - SGK invoice payment tracking and forecasting
 - Promissory note maturity plan commentary
 - Platform income comparison
-- Monthly comparisons and trends`;
+- Monthly comparisons and trends
+- Sales Report product/category revenue analysis
+- Inventory/stock value summary (based on the last uploaded report)`;
 
 async function getFinancialContext(userId: string, lang: string): Promise<string> {
   const isEn = lang === "en";
@@ -91,6 +95,9 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       allNotes,
       supplierTransfers,
       pharmacy,
+      currentMonthSales,
+      anySaleExists,
+      latestInventoryReport,
     ] = await Promise.all([
       // Current month kasa
       prisma.dailyRegister.findMany({
@@ -143,6 +150,33 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
         take: 20,
       }),
       prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { name: true } }),
+      // Current month sale records - bounded for LLM context, ordered by revenue
+      prisma.saleRecord.findMany({
+        where: { pharmacyId, deletedAt: null, saleDate: { gte: startOfMonth, lte: endOfMonth } },
+        select: { productGroup: true, productName: true, netRevenue: true, saleType: true, quantity: true },
+        orderBy: { netRevenue: "desc" },
+        take: 500,
+      }),
+      // Signal whether the pharmacy has ever uploaded sales data at all
+      prisma.saleRecord.findFirst({
+        where: { pharmacyId, deletedAt: null },
+        select: { id: true },
+      }),
+      // Most recent inventory analysis snapshot (if any)
+      prisma.inventoryReport.findFirst({
+        where: { pharmacyId, deletedAt: null },
+        select: {
+          fileName: true,
+          totalProducts: true,
+          soldProducts: true,
+          totalRevenue: true,
+          totalCost: true,
+          totalProfit: true,
+          profitMargin: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
 
     const cashIncome = dailyRegs.reduce((s, r) => s + Number(r.posAmount) + Number(r.cashAmount) + Number(r.wireAmount), 0);
@@ -242,6 +276,27 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     const projectedNet = projectedTotalIncome - projectedExpense;
     const isMonthOver = remainingCalendarDays === 0;
 
+    // ── SATIŞ RAPORU (BU AY) ─────────────────────────────────────────────────
+    const salesTxCount = currentMonthSales.length;
+    const prescriptionSales = currentMonthSales.filter(s => s.saleType === "PRESCRIPTION");
+    const retailSales = currentMonthSales.filter(s => s.saleType === "RETAIL");
+    const prescriptionRevenue = prescriptionSales.reduce((s, r) => s + Number(r.netRevenue), 0);
+    const retailRevenue = retailSales.reduce((s, r) => s + Number(r.netRevenue), 0);
+    const totalSalesRevenue = prescriptionRevenue + retailRevenue;
+
+    const topProducts = [...currentMonthSales]
+      .sort((a, b) => Number(b.netRevenue) - Number(a.netRevenue))
+      .slice(0, 10);
+
+    const groupRevenueMap = new Map<string, number>();
+    currentMonthSales.forEach(s => {
+      const key = s.productGroup ?? (isEn ? "Uncategorized" : "Kategorisiz");
+      groupRevenueMap.set(key, (groupRevenueMap.get(key) ?? 0) + Number(s.netRevenue));
+    });
+    const topGroups = Array.from(groupRevenueMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
     // ÖNEMLİ: `maximumFractionDigits` verilmezse tr-TR yerel ayarı bazı ondalıklı
     // sayıları (ör. bölme sonucu oluşan 47641.363636... gibi kesirli tahmin
     // rakamları) 3 basamağa kadar gösterebiliyordu (ör. "1.846.382,723 TL").
@@ -296,6 +351,25 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       due: isEn ? "Due" : "Vade",
       history12: isEn ? "12-MONTH TOTALS (last 12 months)" : "12 AYLIK TOPLAMLAR (son 12 ay)",
       monthlyBreakdown: isEn ? "MONTH-BY-MONTH BREAKDOWN (use this for questions about a specific past month)" : "AYLIK KIRILIM (belirli bir geçmiş ay sorulduğunda bunu kullan)",
+      salesReport: isEn ? "SALES REPORT (CURRENT MONTH)" : "SATIŞ RAPORU (BU AY)",
+      salesNoDataEver: isEn ? "Sales Report: No sales data has ever been uploaded for this pharmacy." : "Satış Raporu: Bu eczane için henüz satış verisi yüklenmemiş.",
+      salesNoDataThisMonth: isEn ? "No sale records found for the current month (sales data exists for other months)." : "Bu ay için satış kaydı bulunamadı (başka aylara ait satış verisi mevcut).",
+      salesTxCount: isEn ? "Transaction Count" : "İşlem Sayısı",
+      salesPrescription: isEn ? "Prescription Sales Revenue" : "Reçeteli Satış Geliri",
+      salesRetail: isEn ? "Retail Sales Revenue" : "Perakende Satış Geliri",
+      salesTotal: isEn ? "Total Sales Revenue" : "Toplam Satış Geliri",
+      topProducts: isEn ? "Top Products by Revenue" : "Gelire Göre En Çok Satan Ürünler",
+      topGroups: isEn ? "Top Product Groups by Revenue" : "Gelire Göre En Çok Satan Ürün Grupları",
+      inventoryReport: isEn ? "INVENTORY ANALYSIS (SNAPSHOT — NOT LIVE STOCK)" : "ENVANTER ANALİZİ (ANLIK DEĞİL, KAYDEDİLMİŞ RAPOR)",
+      inventoryNoData: isEn ? "Inventory Report: No inventory analysis has ever been uploaded for this pharmacy." : "Envanter Analizi: Bu eczane için henüz envanter raporu yüklenmemiş.",
+      inventoryAsOf: isEn ? "As of the last uploaded inventory report (snapshot date)" : "Son yüklenen envanter raporuna göre (rapor tarihi)",
+      inventoryFileName: isEn ? "Source File" : "Kaynak Dosya",
+      inventoryTotalProducts: isEn ? "Total Products" : "Toplam Ürün",
+      inventorySoldProducts: isEn ? "Sold Products" : "Satılan Ürün",
+      inventoryTotalRevenue: isEn ? "Total Revenue" : "Toplam Gelir",
+      inventoryTotalCost: isEn ? "Total Cost" : "Toplam Maliyet",
+      inventoryTotalProfit: isEn ? "Total Profit" : "Toplam Kâr",
+      inventoryProfitMargin: isEn ? "Profit Margin" : "Kâr Marjı",
     };
 
     const lines: string[] = [
@@ -387,6 +461,36 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       const byPlatform: Record<string, number> = {};
       platformIncomes.forEach(p => { byPlatform[p.platformName] = (byPlatform[p.platformName] ?? 0) + Number(p.amount); });
       Object.entries(byPlatform).forEach(([name, total]) => lines.push(`  * ${name}: ${fmt(total)}`));
+    }
+
+    lines.push(``, `${L.salesReport}`);
+    if (!anySaleExists) {
+      lines.push(`  (${L.salesNoDataEver})`);
+    } else if (salesTxCount === 0) {
+      lines.push(`  (${L.salesNoDataThisMonth})`);
+    } else {
+      lines.push(`- ${L.salesTxCount}: ${salesTxCount}`);
+      lines.push(`- ${L.salesPrescription}: ${fmt(prescriptionRevenue)} (${prescriptionSales.length} ${L.records})`);
+      lines.push(`- ${L.salesRetail}: ${fmt(retailRevenue)} (${retailSales.length} ${L.records})`);
+      lines.push(`- ${L.salesTotal}: ${fmt(totalSalesRevenue)}`);
+      lines.push(`  ${L.topProducts}:`);
+      topProducts.forEach(p => lines.push(`    * ${p.productName}${p.productGroup ? ` (${p.productGroup})` : ""}: ${fmt(Number(p.netRevenue))} — ${isEn ? "Qty" : "Adet"}: ${p.quantity}`));
+      lines.push(`  ${L.topGroups}:`);
+      topGroups.forEach(([name, total]) => lines.push(`    * ${name}: ${fmt(total)}`));
+    }
+
+    lines.push(``, `${L.inventoryReport}`);
+    if (!latestInventoryReport) {
+      lines.push(`  (${L.inventoryNoData})`);
+    } else {
+      lines.push(`- ${L.inventoryAsOf}: ${fmtDate(latestInventoryReport.createdAt)}`);
+      lines.push(`- ${L.inventoryFileName}: ${latestInventoryReport.fileName}`);
+      lines.push(`- ${L.inventoryTotalProducts}: ${latestInventoryReport.totalProducts}`);
+      lines.push(`- ${L.inventorySoldProducts}: ${latestInventoryReport.soldProducts}`);
+      lines.push(`- ${L.inventoryTotalRevenue}: ${fmt(Number(latestInventoryReport.totalRevenue))}`);
+      lines.push(`- ${L.inventoryTotalCost}: ${fmt(Number(latestInventoryReport.totalCost))}`);
+      lines.push(`- ${L.inventoryTotalProfit}: ${fmt(Number(latestInventoryReport.totalProfit))}`);
+      lines.push(`- ${L.inventoryProfitMargin}: %${Number(latestInventoryReport.profitMargin).toLocaleString(isEn ? "en-GB" : "tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     }
 
     return lines.join("\n");
