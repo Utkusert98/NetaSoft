@@ -29,6 +29,8 @@ KESİN KURALLAR:
 4. NetaSoft dışı konulara yanıt vermezsin.
 5. SGK gelirleri, fatura tarihinden 3 ay sonra her ayın 15'inde gelir — bu konuda doğru bilgi ver.
 6. "Bu ay kâr eder miyiz/edecek miyiz", "ay sonunda kârda mı zararda mı olacağız" gibi GELECEĞE dönük (henüz bitmemiş ay hakkında tahmin isteyen) sorularda kesinlikle "AY SONU TAHMİNİ" bloğundaki rakamları kullan — "BUGÜNE KADAR GERÇEKLEŞEN NET KAR/ZARAR" satırı sadece ayın şu ana kadar geçen kısmını gösterir, ay bitmeden bunu "bu ayki kârımız" diye sunmak YANLIŞTIR ve kullanıcıyı yanıltır. Kullanıcı "şu ana kadar/bugüne kadar" diye özellikle belirtirse o zaman BUGÜNE KADAR GERÇEKLEŞEN rakamını kullanabilirsin. AY SONU TAHMİNİ'ni kullandığında bunun bir TAHMİN olduğunu (garanti değil) mutlaka belirt ve varsa çalışılan gün sayısı/kalan çalışma günü gibi dayanağı kısaca özetle.
+7. TAHMİNİ NET KAR/ZARAR pozitifse (kâr) ve kullanıcı "zararımız ne kadar olacak" diye sorarsa: "veri bulunamadı" DEME — bunun yerine öngörülen zararın olmadığını, aksine tahmini kârın X TL olduğunu açıkça söyle. Aynı şekilde net kâr negatifse ve "kârımız ne kadar" diye sorulursa öngörülen kârın olmadığını, tahmini zararın Y TL olduğunu söyle.
+8. Sayısal hesaplamaları KISA ve NET sun — verilen rakamları olduğu gibi kullan, kendi kendine yeniden türetme/tekrar tekrar aynı işlemi farklı şekilde ifade etme, ara adımları gereksiz yere tekrarlama. Bir rakamı bir kez doğru ver, aynı hesabı ikinci kez farklı bir sırayla tekrarlama.
 
 YAPABİLECEKLERİN (yalnızca sisteme girilmiş veriler için):
 - Tüm dönem gelir/gider ve net kâr yorumu
@@ -51,6 +53,8 @@ STRICT RULES:
 4. Do not respond to topics outside of NetaSoft.
 5. SGK income arrives on the 15th of the month, exactly 3 months after the invoice date.
 6. For FORWARD-LOOKING questions about an ongoing (not-yet-finished) month — e.g. "will we be profitable this month?" — always use the "MONTH-END FORECAST" block, never the "NET PROFIT/LOSS SO FAR" line, since that only covers elapsed days and presenting it as "this month's profit" while the month is still ongoing is MISLEADING. Only use the "SO FAR" figure if the user explicitly asks about the elapsed period so far. When using the forecast, always state clearly that it is an ESTIMATE, not a guarantee, and briefly mention its basis (days worked so far / remaining working days).
+7. If the PROJECTED NET PROFIT/LOSS is positive (profit) and the user asks "what will our loss be", do NOT say "no data found" — instead clearly say there is no projected loss, and state the projected profit amount instead. Symmetrically, if it's negative (loss) and the user asks about profit, say there is no projected profit and state the projected loss amount.
+8. Keep numeric explanations SHORT and DIRECT — use the given figures as-is, do not re-derive or restate the same calculation multiple times in different orders, do not repeat intermediate steps unnecessarily. State each number correctly once.
 
 WHAT YOU CAN DO (only for data entered into the system):
 - All-period income/expense and net profit commentary
@@ -238,7 +242,13 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     const projectedNet = projectedTotalIncome - projectedExpense;
     const isMonthOver = remainingCalendarDays === 0;
 
-    const fmt = (v: number) => v.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL";
+    // ÖNEMLİ: `maximumFractionDigits` verilmezse tr-TR yerel ayarı bazı ondalıklı
+    // sayıları (ör. bölme sonucu oluşan 47641.363636... gibi kesirli tahmin
+    // rakamları) 3 basamağa kadar gösterebiliyordu (ör. "1.846.382,723 TL").
+    // Bu bozuk görünümlü sayı, modelin kendi metin çıktısında saçma/çok dilli
+    // bir tekrar döngüsüne girmesine yol açan gerçek bir üretim hatasıydı —
+    // para birimi HER ZAMAN tam olarak 2 ondalık basamakla gösterilmeli.
+    const fmt = (v: number) => v.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
     const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString(isEn ? "en-GB" : "tr-TR");
 
     const monthLabel = now.toLocaleDateString(isEn ? "en-GB" : "tr-TR", { month: "long", year: "numeric" });

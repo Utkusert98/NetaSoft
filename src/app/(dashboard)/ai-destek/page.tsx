@@ -208,6 +208,16 @@ export default function AiDestek() {
     setTimeout(tick, 12);
   }, []);
 
+  const startNewChat = () => {
+    pendingRef.current = "";
+    isAnimatingRef.current = false;
+    setDisplayedText("");
+    setLoading(false);
+    setInput("");
+    setMessages([{ id: "welcome", role: "assistant", content: ui.welcome }]);
+    followUpIndexRef.current = 0;
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text.trim() };
@@ -311,19 +321,38 @@ export default function AiDestek() {
           </p>
         </div>
 
-        <a
-          href="/ayarlar"
-          title={lang === "tr" ? "Dil ayarlarına git" : "Go to language settings"}
-          style={{
-            display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
-            padding: "6px 12px", borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--color-border)", background: "var(--color-surface)",
-            textDecoration: "none", color: "var(--color-text-muted)",
-            fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
-          }}
-        >
-          🌐 {lang.toUpperCase()}
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={startNewChat}
+            disabled={loading}
+            title={lang === "tr" ? "Sohbeti temizle, baştan başla" : "Clear chat and start over"}
+            style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "6px 12px", borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--color-border)", background: "var(--color-surface)",
+              color: "var(--color-text)", cursor: loading ? "not-allowed" : "pointer",
+              fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            ✨ {lang === "tr" ? "Yeni Sohbet" : "New Chat"}
+          </button>
+
+          <a
+            href="/ayarlar"
+            title={lang === "tr" ? "Dil ayarlarına git" : "Go to language settings"}
+            style={{
+              display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
+              padding: "6px 12px", borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--color-border)", background: "var(--color-surface)",
+              textDecoration: "none", color: "var(--color-text-muted)",
+              fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
+            }}
+          >
+            🌐 {lang.toUpperCase()}
+          </a>
+        </div>
       </div>
 
       {/* Chat area */}
