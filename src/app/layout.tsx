@@ -1,6 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // `viewport-fit=cover` olmadan `env(safe-area-inset-*)` her zaman 0 döner;
+  // sabit (fixed) konumlu elemanların iOS çentik/home-indicator alanının
+  // altında kalmaması için gereklidir (bkz. .mobile-topbar / .toast-container
+  // / .drp-popover mobil stilleri).
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: {

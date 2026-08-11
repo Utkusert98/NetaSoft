@@ -1206,8 +1206,8 @@ h6 { font-size: var(--font-size-base); }
 
 .toast-container {
   position: fixed;
-  bottom: var(--spacing-6);
-  right: var(--spacing-6);
+  bottom: calc(var(--spacing-6) + env(safe-area-inset-bottom));
+  right: calc(var(--spacing-6) + env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3);
@@ -1385,11 +1385,13 @@ h6 { font-size: var(--font-size-base); }
   left: 0;
   right: 0;
   height: 56px;
+  padding-top: env(safe-area-inset-top); /* iOS çentik alanı */
   background: var(--sidebar-bg);
   z-index: 300;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
   box-shadow: var(--shadow-md);
 }
 
@@ -1476,6 +1478,13 @@ h6 { font-size: var(--font-size-base); }
 
   /* Form inputs full width */
   .form-input { font-size: 16px; } /* prevents iOS zoom */
+
+  /* iOS Safari/Chrome-iOS otomatik olarak sayfayı zoom'lar eğer odaklanılan
+     bir form elemanının font-size'ı 16px'in altındaysa. Bazı sayfalarda
+     inline style={{ fontSize: "13px" }} ile `.form-input` sınıfı ezildiği
+     (ya da hiç sınıf kullanılmadığı) için burada tüm native form elemanları
+     için !important ile taban çizgi garanti edilir. */
+  input, select, textarea { font-size: 16px !important; }
 
   /* Page titles */
   .header-title { font-size: var(--font-size-lg); }
@@ -1698,9 +1707,9 @@ h6 { font-size: var(--font-size-base); }
 @media (max-width: 480px) {
   .drp-popover {
     position: fixed;
-    left: var(--spacing-3);
-    right: var(--spacing-3);
-    bottom: var(--spacing-3);
+    left: calc(var(--spacing-3) + env(safe-area-inset-left));
+    right: calc(var(--spacing-3) + env(safe-area-inset-right));
+    bottom: calc(var(--spacing-3) + env(safe-area-inset-bottom)); /* home-indicator altında kalmasın */
     top: auto;
     width: auto;
     max-width: none;
