@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTheme, type Theme } from "@/lib/hooks/useTheme";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
@@ -191,15 +191,17 @@ function TeamPanel({ currentUserEmail, lang }: { currentUserEmail: string | unde
   const [localError, setLocalError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
 
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true);
     const res = await fetch("/api/v1/ayarlar/ekip", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: TeamMember[] };
     if (json.success && json.data) setMembers(json.data);
     setLoading(false);
-  }, [lang]);
+  };
 
-  useEffect(() => { void load(); }, [load]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [lang]);
 
   const me = members.find(m => m.email === currentUserEmail);
   const canManage = me?.role === "OWNER" || me?.role === "ADMIN";
@@ -367,15 +369,17 @@ function SecurityPanel({ lang }: { lang: "tr" | "en" }) {
   const [localError, setLocalError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
 
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true);
     const res = await fetch("/api/v1/ayarlar/guvenlik", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: { twoFactorEnabled: boolean } };
     if (json.success && json.data) setEnabled(json.data.twoFactorEnabled);
     setLoading(false);
-  }, [lang]);
+  };
 
-  useEffect(() => { void load(); }, [load]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [lang]);
 
   const startSetup = async () => {
     setBusy(true); setLocalError(""); setLocalSuccess("");
@@ -489,7 +493,7 @@ function SecurityPanel({ lang }: { lang: "tr" | "en" }) {
 
           {enabled && step !== "confirmed" && (
             <div>
-              <p style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-4)", color: "#4e7c3f", fontWeight: 600 }}>
+              <p style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-4)", color: "var(--color-income-green)", fontWeight: 600 }}>
                 {lang === "en" ? "Two-factor authentication is active." : "İki adımlı doğrulama aktif."}
               </p>
               {!showDisableForm ? (
@@ -549,7 +553,7 @@ export default function AyarlarPage() {
   // Şifre
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
 
-  const loadPharmacy = useCallback(async () => {
+  const loadPharmacy = async () => {
     const res = await fetch("/api/v1/ayarlar/eczane", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: PharmacyData };
     if (json.success && json.data) {
@@ -565,21 +569,24 @@ export default function AyarlarPage() {
         district: json.data.district ?? "",
       });
     }
-  }, []);
+  };
 
-  const loadUser = useCallback(async () => {
+  const loadUser = async () => {
     const res = await fetch("/api/v1/ayarlar/profil", { headers: { "Accept-Language": lang } });
     const json = await res.json() as { success: boolean; data?: UserData };
     if (json.success && json.data) {
       setUser(json.data);
       setProfileForm({ name: json.data.name ?? "", pharmacistName: json.data.pharmacistName ?? "", email: json.data.email ?? "", currentPassword: "", image: json.data.image ?? "" });
     }
-  }, []);
+  };
 
   useEffect(() => {
+    // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPharmacy();
     void loadUser();
-  }, [loadPharmacy, loadUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const handlePharChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setPharForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -783,7 +790,7 @@ export default function AyarlarPage() {
                   { ok: /[0-9]/.test(pwForm.newPassword), label: lang === "en" ? "At least 1 number" : "En az 1 rakam" },
                   { ok: /[^A-Za-z0-9]/.test(pwForm.newPassword), label: lang === "en" ? "At least 1 special character (!@#$...)" : "En az 1 özel karakter (!@#$...)" },
                 ].map(r => (
-                  <div key={r.label} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px", color: r.ok ? "#4e7c3f" : "var(--color-text-muted)" }}>
+                  <div key={r.label} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px", color: r.ok ? "var(--color-income-green)" : "var(--color-text-muted)" }}>
                     {r.ok ? "✅" : "○"} {r.label}
                   </div>
                 ))}

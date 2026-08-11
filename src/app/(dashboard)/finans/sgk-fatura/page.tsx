@@ -2,7 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format, addMonths } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import type { ParsedSgkInvoice } from "@/app/api/v1/finans/sgk-fatura/parse-pdf/route";
@@ -245,6 +245,22 @@ const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   SGK_INVOICE_TYPES.filter(t => t.value).map(t => [t.value, t.label])
 );
 
+function InvoiceTypeSelect({ value, onChange, name }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; name: string }) {
+  return (
+    <select className="form-input" name={name} value={value} onChange={onChange} required>
+      {SGK_INVOICE_TYPES.map((t, i) =>
+        t.disabled ? (
+          <option key={i} value="" disabled style={{ fontStyle: "italic", color: "gray" }}>
+            {t.label}
+          </option>
+        ) : (
+          <option key={t.value} value={t.value}>{t.label}</option>
+        )
+      )}
+    </select>
+  );
+}
+
 function getTypeLabel(type: string): string {
   if (TYPE_LABEL[type]) return TYPE_LABEL[type];
   const up = type.toUpperCase().replace(/[\s-]/g, "_");
@@ -293,7 +309,7 @@ export default function SgkFaturaPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = async () => {
     try {
       const res = await fetch("/api/v1/finans/sgk-fatura", { headers: { "Accept-Language": lang } });
       const json = await res.json();
@@ -303,9 +319,11 @@ export default function SgkFaturaPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchInvoices(); }, []);
 
   // Tarih + 3 ay önizlemesi — her zaman o ayın 15'i
   const dateLocale = lang === "en" ? enUS : tr;
@@ -404,20 +422,6 @@ export default function SgkFaturaPage() {
   };
 
   const fmt = (v: number) => Number(v).toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
-
-  const InvoiceTypeSelect = ({ value, onChange, name }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; name: string }) => (
-    <select className="form-input" name={name} value={value} onChange={onChange} required>
-      {SGK_INVOICE_TYPES.map((t, i) =>
-        t.disabled ? (
-          <option key={i} value="" disabled style={{ fontStyle: "italic", color: "gray" }}>
-            {t.label}
-          </option>
-        ) : (
-          <option key={t.value} value={t.value}>{t.label}</option>
-        )
-      )}
-    </select>
-  );
 
   const nowM = new Date();
   const thisMonthInvoices = invoices.filter(r => {
@@ -545,7 +549,7 @@ export default function SgkFaturaPage() {
                             fontSize: "12px",
                             fontWeight: 600,
                             background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
-                            color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "#7c3aed",
+                            color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "var(--color-accent-purple)",
                           }}>
                             {getTypeLabel(inv.invoiceType)}
                           </span>
@@ -639,7 +643,7 @@ export default function SgkFaturaPage() {
                           fontSize: "12px",
                           fontWeight: 600,
                           background: inv.invoiceType.startsWith("GROUP_") ? "var(--color-primary-light)" : "rgba(139,92,246,0.1)",
-                          color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "#7c3aed",
+                          color: inv.invoiceType.startsWith("GROUP_") ? "var(--color-on-primary-light)" : "var(--color-accent-purple)",
                         }}>
                           {getTypeLabel(inv.invoiceType)}
                         </span>

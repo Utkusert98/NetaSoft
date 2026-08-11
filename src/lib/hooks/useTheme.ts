@@ -12,19 +12,25 @@ function applyTheme(theme: Theme) {
   localStorage.setItem(STORAGE_KEY, theme);
 }
 
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  try {
+    return (localStorage.getItem(STORAGE_KEY) as Theme) ?? "light";
+  } catch {
+    return "light";
+  }
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // İlk yüklemede localStorage'dan oku
-    try {
-      const saved = (localStorage.getItem(STORAGE_KEY) as Theme) ?? "light";
-      setThemeState(saved);
-      applyTheme(saved);
-    } catch (e) {
-      setThemeState("light");
-    }
+    // İlk yüklemede tema DOM'a uygulanır
+    applyTheme(theme);
+    // Hydration'ın tamamlandığını işaretlemek için gereklidir; senkron bir
+    // alternatifi yoktur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

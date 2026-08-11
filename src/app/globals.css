@@ -17,6 +17,17 @@
      canlı limon yeşili kaldığı için bu renk temaya göre değişmez */
   --color-on-primary-light: #163300;
 
+  /* Mor vurgu (örn. bekleyen kayıt sayacı, SGK fatura rozetleri). Açık temada koyu
+     mor (#7c3aed) --color-surface (beyaz) üzerinde okunaklı; ancak koyu temada
+     --color-surface çok koyu bir laciverte döndüğü için aynı ton neredeyse
+     görünmez hale geliyordu (kontrast ~2.8:1). Koyu modda daha açık bir mor kullanılır. */
+  --color-accent-purple: #7c3aed;
+
+  /* Gelir/pozitif tutar vurgusu (örn. "Toplam Gelir", kâr marjı). Açık temada
+     --color-surface (beyaz) üzerinde okunaklı; koyu temada aynı ton --color-surface
+     ile yeterince kontrast oluşturmuyordu (~3.3:1, AA eşiğinin altında). */
+  --color-income-green: #4e7c3f;
+
   /* === Yüzey Renkleri === */
   --color-bg: #f7f8fa;
   --color-bg-alt: #eef0f3;
@@ -117,6 +128,8 @@
   --color-primary-light-hover: #8fd960;
   --color-primary-pale: rgba(159, 232, 112, 0.12);
   --color-primary-muted: rgba(159, 232, 112, 0.2);
+  --color-accent-purple: #b794f6;
+  --color-income-green: #7fc95f;
 
   --color-bg: #0f1117;
   --color-bg-alt: #161b22;

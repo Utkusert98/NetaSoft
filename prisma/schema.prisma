@@ -14,6 +14,10 @@ datasource db {
 // (NextAuth.js v5 uyumlu)
 // ================================
 
+// Not: Account, Session, VerificationToken — NextAuth.js v5 (Auth.js) standart adapter şeması.
+// created_at/updated_at/deleted_at kasıtlı olarak eklenmedi: bu tablolar Auth.js adapter'ı
+// tarafından yönetilir, iş verisi değil kimlik doğrulama oturum/token kayıtlarıdır ve
+// süresi dolunca (expires) doğrudan silinir/yenilenir — soft delete uygulanmaz.
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
@@ -145,6 +149,8 @@ model UserPharmacyRole {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // deletedAt yok: saf many-to-many bağlantı satırı — ekip üyesi çıkarılınca
+  // (ayarlar/ekip route'unda olduğu gibi) satır doğrudan silinir, soft delete gerekmez.
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
@@ -298,6 +304,8 @@ model InvoiceItem {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // deletedAt yok: fatura kalemi — üst faturayla birlikte (onDelete: Cascade) silinir,
+  // bağımsız soft delete akışı yok.
 
   invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id])
@@ -390,6 +398,8 @@ model StockMovement {
   stockAfter  Decimal @map("stock_after") @db.Decimal(10, 3)
 
   createdAt DateTime @default(now()) @map("created_at")
+  // updatedAt / deletedAt yok: ek-yalnız (append-only) stok hareket kaydı — audit amaçlı,
+  // oluşturulduktan sonra düzenlenmez veya silinmez; düzeltme yeni bir ADJUST hareketiyle yapılır.
 
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
   product  Product  @relation(fields: [productId], references: [id])
@@ -437,8 +447,9 @@ model FileImport {
   approvedAt DateTime? @map("approved_at")
   approvedBy String?   @map("approved_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at") // Kullanıcı yükleme geçmişinden kaydı silebilir (soft delete)
 
   pharmacy     Pharmacy        @relation(fields: [pharmacyId], references: [id])
   user         User            @relation(fields: [userId], references: [id])
@@ -449,6 +460,7 @@ model FileImport {
   @@index([pharmacyId, status])
   @@index([pharmacyId, module])
   @@index([userId])
+  @@index([deletedAt])
   @@map("file_imports")
 }
 
@@ -466,6 +478,8 @@ model FileImportRow {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  // deletedAt yok: satır bazlı parse kaydı — üst FileImport (deletedAt veya cascade) silinince
+  // birlikte kaybolur, bağımsız soft delete gerekmez.
 
   fileImport FileImport @relation(fields: [fileImportId], references: [id], onDelete: Cascade)
 
@@ -515,6 +529,8 @@ model AuditLog {
   userAgent String? @map("user_agent") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
+  // updatedAt / deletedAt yok: değişmez (immutable) denetim kaydı — bir kez yazılır,
+  // asla güncellenmez veya silinmez (audit trail bütünlüğü için).
 
   pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id])
   user     User?     @relation(fields: [userId], references: [id])

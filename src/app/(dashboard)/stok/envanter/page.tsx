@@ -16,9 +16,6 @@ import {
   Legend,
 } from "recharts";
 
-// recharts v3 Tooltip formatter tipi intersection kullanıyor — any cast gerekli
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyFormatter = (...args: any[]) => any;
 import FileUploadWithReview from "@/components/file-upload/FileUploadWithReview";
 import {
   parseInventoryRows,
@@ -32,6 +29,7 @@ import {
   type InventoryColumnMap,
 } from "@/lib/utils/inventory-analysis";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { ChartFormatter } from "@/lib/utils/chartTypes";
 
 interface ParsedRow {
   rowIndex: number;
@@ -148,7 +146,7 @@ function TopSellersChart({ data, lang, onProductClick }: { data: InventoryRow[];
                 `${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units" : "adet"} · ${formatCurrency(p?.gelir ?? 0)}`,
                 en ? "Sales" : "Satış",
               ];
-            }) as AnyFormatter}
+            }) as ChartFormatter}
             contentStyle={{
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
@@ -196,7 +194,7 @@ function SoldUnsoldPieChart({ sold, unsold, lang }: { sold: number; unsold: numb
             ))}
           </Pie>
           <Tooltip
-            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (en ? " products" : " ürün")]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (en ? " products" : " ürün")]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Legend />
@@ -228,7 +226,7 @@ function ProfitChart({ data, lang, onProductClick }: { data: Array<{ name: strin
               return String(name) === "kar"
                 ? [formatCurrency(v), en ? "Profit" : "Kâr"]
                 : [v + "%", en ? "Profit Margin" : "Kâr Marjı"];
-            }) as AnyFormatter}
+            }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -271,7 +269,7 @@ function StockValueChart({ data, lang, onProductClick }: { data: Array<{ name: s
                 `${formatCurrency(p?.deger ?? 0)} (${(p?.adet ?? 0).toLocaleString("tr-TR")} ${en ? "units in stock" : "adet stokta"})`,
                 en ? "Stock Value" : "Stok Değeri",
               ];
-            }) as AnyFormatter}
+            }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -330,7 +328,7 @@ function CategoryValuePieChart({ data, lang, onCategoryClick }: { data: Array<{ 
             ))}
           </Pie>
           <Tooltip
-            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Stock Value" : "Stok Değeri"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [formatCurrency(Number(value ?? 0)), en ? "Stock Value" : "Stok Değeri"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Legend wrapperStyle={{ fontSize: "11px" }} />
@@ -363,7 +361,7 @@ function StockLevelChart({ data, lang, onBucketClick }: { data: InventoryRow[]; 
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text)" }} />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} allowDecimals={false} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -407,7 +405,7 @@ function MarginDistributionChart({ data, lang, onBucketClick }: { data: Inventor
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text)" }} />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} allowDecimals={false} />
           <Tooltip
-            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as AnyFormatter}
+            formatter={((value: string | number | undefined) => [Number(value ?? 0).toLocaleString("tr-TR") + (lang === "en" ? " products" : " ürün"), lang === "en" ? "Product Count" : "Ürün Sayısı"]) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
           <Bar
@@ -665,7 +663,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
                     const v = Number(value ?? 0);
                     if (hasSalesData) return String(name) === "revenue" ? [formatCurrency(v), en ? "Revenue" : "Gelir"] : [formatCurrency(v), en ? "Profit" : "Kâr"];
                     return String(name) === "revenue" ? [formatCurrency(v), en ? "Stock Value" : "Stok Değeri"] : [formatCurrency(v), en ? "Stock Cost" : "Stok Maliyeti"];
-                  }) as AnyFormatter}
+                  }) as ChartFormatter}
                   contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
                 />
                 <Legend formatter={(v) => {

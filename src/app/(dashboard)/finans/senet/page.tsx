@@ -50,8 +50,6 @@ export default function SenetPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  useEffect(() => { fetchNotes(); }, []);
-
   const fetchNotes = async () => {
     try {
       const res = await fetch("/api/v1/finans/senet", { headers: { "Accept-Language": lang } });
@@ -63,6 +61,12 @@ export default function SenetPage() {
       setLoading(false);
     }
   };
+
+  // Mount üzerinde tek seferlik async veri çekimi — setState çağrısı fetch tamamlandıktan
+  // sonra (await sonrası) gerçekleşir, senkron değildir; bu yüzden kural burada
+  // yanlış pozitif üretir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchNotes(); }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;

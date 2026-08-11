@@ -128,13 +128,22 @@ export default function AiDestek() {
   const [displayedText, setDisplayedText] = useState("");
   const pendingRef = useRef("");
   const isAnimatingRef = useRef(false);
+  const followUpIndexRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Update welcome message when lang changes
-  useEffect(() => {
+  // Update welcome message when lang changes (React'in "render sırasında state
+  // sıfırlama" deseni — effect yerine, çünkü bu bir prop değişimine tepki verir).
+  const [prevLang, setPrevLang] = useState(lang);
+  if (lang !== prevLang) {
+    setPrevLang(lang);
     setMessages([{ id: "welcome", role: "assistant", content: UI_TEXT[lang].welcome }]);
     setDisplayedText("");
+  }
+
+  // Typewriter yardımcı ref'leri, dil değiştiğinde effect içinde sıfırlanır
+  // (ref güncellemeleri render sırasında değil, effect içinde yapılmalı).
+  useEffect(() => {
     pendingRef.current = "";
     isAnimatingRef.current = false;
   }, [lang]);
@@ -160,7 +169,7 @@ export default function AiDestek() {
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text.trim() };
+    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text.trim() };
     const history = [...messages, userMsg];
     setMessages(history);
     setInput("");
@@ -212,11 +221,14 @@ export default function AiDestek() {
         }, 50);
       });
 
-      // Pick random follow-up set
-      const followUpSet = FOLLOW_UP_SUGGESTIONS[lang][Math.floor(Math.random() * FOLLOW_UP_SUGGESTIONS[lang].length)];
+      // Pick next follow-up set (deterministic rotation — Math.random() render sırasında
+      // saf olmayan bir çağrı olduğu için kullanılmıyor, bkz. react-hooks/purity kuralı)
+      const followUpOptions = FOLLOW_UP_SUGGESTIONS[lang];
+      followUpIndexRef.current = (followUpIndexRef.current + 1) % followUpOptions.length;
+      const followUpSet = followUpOptions[followUpIndexRef.current];
 
       setMessages((prev) => [...prev, {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         role: "assistant",
         content: accumulated,
         followUps: followUpSet,
@@ -226,7 +238,7 @@ export default function AiDestek() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : (lang === "tr" ? "Bağlantı hatası" : "Connection error");
       setMessages((prev) => [...prev, {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         role: "assistant",
         content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}`,
       }]);

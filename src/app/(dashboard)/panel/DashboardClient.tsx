@@ -8,6 +8,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
+import type { ChartFormatter } from "@/lib/utils/chartTypes";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface DashboardData {
@@ -67,8 +68,6 @@ export interface DashboardData {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyFmt = (...args: any[]) => any;
 
 const GREEN = "#4e7c3f";
 const GREEN_LIGHT = "#9fe870";
@@ -415,7 +414,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />
                 <Legend formatter={(v) => v === "gelir" ? tx(d.income, lang) : v === "gider" ? tx(d.expense, lang) : tx(d.profit, lang)} />
                 <Area type="monotone" dataKey="gelir" stroke={GREEN} fill="url(#gGelir)" strokeWidth={2} />
                 <Area type="monotone" dataKey="gider" stroke={RED} fill="url(#gGider)" strokeWidth={2} />
@@ -450,7 +449,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                       <Cell fill={BLUE} />
                       <Cell fill={ORANGE} />
                     </Pie>
-                    <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />
                     <Legend wrapperStyle={{ fontSize: "11px" }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -474,7 +473,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                   <YAxis type="category" dataKey="platformName" width={90} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                  <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />
                   <Bar dataKey="amount" fill={GREEN_LIGHT} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -531,7 +530,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                       <Cell key={i} fill={[RED, ORANGE, BLUE][i % 3]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={((v: number) => formatCurrency(v)) as AnyFmt} contentStyle={TOOLTIP_STYLE} />
+                  <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />
                   <Legend wrapperStyle={{ fontSize: "11px" }} formatter={(v) => v} />
                 </PieChart>
               </ResponsiveContainer>

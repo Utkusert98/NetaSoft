@@ -1,7 +1,7 @@
 "use client";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 
@@ -41,7 +41,7 @@ export default function KasaPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = async () => {
     try {
       const res = await fetch("/api/v1/finans/kasa", { headers: { "Accept-Language": lang } });
       const json = await res.json();
@@ -51,9 +51,11 @@ export default function KasaPage() {
     } finally {
       setLoading(false);
     }
-  }, [lang]);
+  };
 
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchRecords(); }, [lang]);
 
   const calcTotal = (d: typeof emptyForm | Register) =>
     [Number(d.posAmount) || 0, Number(d.cashAmount) || 0, Number(d.wireAmount) || 0].reduce((a, b) => a + b, 0);

@@ -2,7 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 
@@ -57,7 +57,7 @@ export default function PlatformGelirPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  const fetchIncomes = useCallback(async () => {
+  const fetchIncomes = async () => {
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : "";
       const res = await fetch(`/api/v1/finans/platform-gelir${qs}`, { headers: { "Accept-Language": lang } });
@@ -68,9 +68,11 @@ export default function PlatformGelirPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  };
 
-  useEffect(() => { fetchIncomes(); }, [fetchIncomes]);
+  // Async veri çekimi — setState await sonrası çalışır, senkron değildir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchIncomes(); }, [statusFilter]);
 
   // +15 gün önizlemesi
   const previewPaymentDate = formData.incomeDate
@@ -216,7 +218,7 @@ export default function PlatformGelirPage() {
           {[
             { label: lang === "en" ? "Pending Total" : "Bekleyen Toplam", value: totalPending, color: "#d97706" },
             { label: lang === "en" ? "Total Records" : "Toplam Kayıt", value: incomes.length, isCnt: true, color: "var(--color-primary)" },
-            { label: lang === "en" ? "Pending Records" : "Yatacak Kayıt", value: incomes.filter(i => i.status === "PENDING").length, isCnt: true, color: "#7c3aed" },
+            { label: lang === "en" ? "Pending Records" : "Yatacak Kayıt", value: incomes.filter(i => i.status === "PENDING").length, isCnt: true, color: "var(--color-accent-purple)" },
           ].map((s, i) => (
             <div key={i} className="card" style={{ padding: "16px 20px" }}>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.label}</div>
@@ -267,10 +269,10 @@ export default function PlatformGelirPage() {
               background: "linear-gradient(135deg, rgba(124,58,237,0.08), rgba(109,40,217,0.05))",
               border: "1px solid rgba(124,58,237,0.25)",
             }}>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+              <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-accent-purple)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
                 ⏳ {lang === "en" ? "Estimated Payment Date (+15 Days)" : "Tahmini Ödeme Tarihi (+15 Gün)"}
               </p>
-              <p style={{ fontSize: "20px", fontWeight: 700, color: "#7c3aed" }}>
+              <p style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-accent-purple)" }}>
                 {previewPaymentDate}
               </p>
             </div>
@@ -514,7 +516,7 @@ export default function PlatformGelirPage() {
                 <input type="date" className="form-input" name="incomeDate" value={editForm.incomeDate} onChange={handleEditChange} required />
               </div>
               <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", fontSize: "13px" }}>
-                ⏳ {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "#7c3aed" }}>{editPreviewDate}</strong>
+                ⏳ {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "var(--color-accent-purple)" }}>{editPreviewDate}</strong>
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>

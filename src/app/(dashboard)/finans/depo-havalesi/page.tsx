@@ -38,8 +38,6 @@ export default function DepoHavalesiPage() {
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
-  useEffect(() => { void fetchTransfers(); }, []);
-
   const fetchTransfers = async () => {
     try {
       const res = await fetch("/api/v1/finans/depo-havalesi", { headers: { "Accept-Language": lang } });
@@ -48,6 +46,12 @@ export default function DepoHavalesiPage() {
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+
+  // Mount üzerinde tek seferlik async veri çekimi — setState çağrısı fetch tamamlandıktan
+  // sonra (await sonrası) gerçekleşir, senkron değildir; bu yüzden kural burada
+  // yanlış pozitif üretir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchTransfers(); }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));

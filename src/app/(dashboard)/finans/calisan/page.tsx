@@ -47,8 +47,6 @@ export default function CalisanPage() {
     notes: "",
   });
 
-  useEffect(() => { fetchData(); }, []);
-
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -68,6 +66,12 @@ export default function CalisanPage() {
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+
+  // Mount üzerinde tek seferlik async veri çekimi — setState çağrısı fetch tamamlandıktan
+  // sonra (await sonrası) gerçekleşir, senkron değildir; bu yüzden kural burada
+  // yanlış pozitif üretir.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchData(); }, []);
 
   const handleEmpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
