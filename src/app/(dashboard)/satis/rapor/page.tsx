@@ -87,7 +87,7 @@ function DrillDownModal({ title, records, lang, onClose }: {
             {en ? "Close" : "Kapat"}
           </button>
         </div>
-        <div style={{ overflowY: "auto", flex: 1 }}>
+        <div style={{ overflowY: "auto", flex: 1, WebkitOverflowScrolling: "touch" }}>
           <table className="table" style={{ width: "100%", fontSize: "13px" }}>
             <thead style={{ position: "sticky", top: 0, background: "var(--color-surface)" }}>
               <tr>
@@ -1249,7 +1249,7 @@ export default function SatisRaporPage() {
                       : (lang === "en" ? "Show details" : "Detayı göster")}
                   </button>
                   {showInvalidDateDetail && (
-                    <div style={{ marginTop: "8px", maxHeight: "180px", overflowY: "auto", border: "1px solid #fed7aa", borderRadius: "var(--radius-sm)" }}>
+                    <div style={{ marginTop: "8px", maxHeight: "180px", overflowY: "auto", WebkitOverflowScrolling: "touch", border: "1px solid #fed7aa", borderRadius: "var(--radius-sm)" }}>
                       <table className="table" style={{ width: "100%", fontSize: "12px" }}>
                         <thead>
                           <tr>
@@ -1308,7 +1308,7 @@ export default function SatisRaporPage() {
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", fontWeight: 700, fontSize: "14px" }}>
                   {lang === "en" ? "Preview — First 50 Rows" : "Önizleme — İlk 50 Satır"}
                 </div>
-                <div style={{ overflowX: "auto", maxHeight: "480px", overflowY: "auto" }}>
+                <div style={{ overflowX: "auto", maxHeight: "480px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                   <table className="table" style={{ width: "100%", fontSize: "13px" }}>
                     <thead style={{ position: "sticky", top: 0, background: "var(--color-surface)" }}>
                       <tr>
@@ -1690,7 +1690,7 @@ export default function SatisRaporPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ overflowX: "auto", maxHeight: "520px", overflowY: "auto" }}>
+              <div style={{ overflowX: "auto", maxHeight: "520px", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table className="table" style={{ width: "100%", fontSize: "13px" }}>
                   <thead style={{ position: "sticky", top: 0, background: "var(--color-surface)" }}>
                     <tr>
