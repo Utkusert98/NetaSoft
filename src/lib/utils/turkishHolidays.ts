@@ -86,3 +86,28 @@ export function countHolidaysInRange(start: Date, end: Date): number {
   }
   return count;
 }
+
+/**
+ * Verilen (dahil) tarih aralığındaki KAPALI GÜN sayısını döner: resmi
+ * tatiller ile Pazar günlerinin BİRLEŞİMİ (aynı güne denk gelirlerse tekrar
+ * sayılmaz). Eczane haftada 6 gün çalışıyor, Pazar günleri nöbetçi olmadığı
+ * sürece kapalı — bu yüzden ay sonu ciro tahmininde kalan çalışma günü
+ * hesabı yalnızca resmi tatilleri değil Pazar günlerini de düşmeli.
+ */
+export function countClosedDaysInRange(start: Date, end: Date): number {
+  if (start > end) return 0;
+  const years = new Set<number>();
+  for (let y = start.getUTCFullYear(); y <= end.getUTCFullYear(); y++) years.add(y);
+
+  const holidayDates = new Set<string>();
+  for (const y of years) {
+    for (const h of getHolidaysForYear(y)) holidayDates.add(h.date);
+  }
+
+  let count = 0;
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const isSunday = d.getUTCDay() === 0;
+    if (isSunday || holidayDates.has(toDateKey(d))) count++;
+  }
+  return count;
+}
