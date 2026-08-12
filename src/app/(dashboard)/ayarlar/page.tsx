@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  Sun, Moon, Monitor, Building2, User, KeyRound, Users, ShieldCheck,
+  CreditCard, Palette, Sparkles, Globe, type LucideIcon,
+} from "lucide-react";
 import { useTheme, type Theme } from "@/lib/hooks/useTheme";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
@@ -56,10 +60,10 @@ function Field({ label, name, value, onChange, type = "text", placeholder }: {
 function ThemePicker() {
   const { theme, setTheme } = useTheme();
   const { lang } = useLangContext();
-  const THEME_OPTIONS: { value: Theme; label: string; icon: string; desc: string }[] = [
-    { value: "light", label: tx(t.settings.lightTheme, lang), icon: "☀️", desc: tx(t.settings.lightDesc, lang) },
-    { value: "dark", label: tx(t.settings.darkTheme, lang), icon: "🌙", desc: tx(t.settings.darkDesc, lang) },
-    { value: "system", label: tx(t.settings.systemTheme, lang), icon: "💻", desc: tx(t.settings.systemDesc, lang) },
+  const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon; desc: string }[] = [
+    { value: "light", label: tx(t.settings.lightTheme, lang), icon: Sun, desc: tx(t.settings.lightDesc, lang) },
+    { value: "dark", label: tx(t.settings.darkTheme, lang), icon: Moon, desc: tx(t.settings.darkDesc, lang) },
+    { value: "system", label: tx(t.settings.systemTheme, lang), icon: Monitor, desc: tx(t.settings.systemDesc, lang) },
   ];
   return (
     <div className="card">
@@ -83,7 +87,7 @@ function ThemePicker() {
                 cursor: "pointer", textAlign: "left", transition: "all 0.15s ease",
               }}
             >
-              <span style={{ fontSize: "28px", flexShrink: 0 }}>{opt.icon}</span>
+              <opt.icon size={24} strokeWidth={1.75} style={{ flexShrink: 0, color: active ? "var(--color-primary)" : "var(--color-text-muted)" }} />
               <div style={{ flex: 1 }}>
                 <p style={{ fontWeight: active ? 700 : 500, color: "var(--color-text)", fontSize: "var(--font-size-sm)", marginBottom: "2px" }}>
                   {opt.label}
@@ -826,16 +830,16 @@ export default function AyarlarPage() {
     finally { setSaving(false); }
   };
 
-  const TABS: { key: Tab; label: string; icon: string }[] = [
-    { key: "eczane", label: tx(t.settings.pharmacyTab, lang), icon: "🏥" },
-    { key: "profil", label: tx(t.settings.profileTab, lang), icon: "👤" },
-    { key: "sifre", label: tx(t.settings.passwordTab, lang), icon: "🔑" },
-    { key: "ekip", label: tx(t.settings.teamTab, lang), icon: "👥" },
-    { key: "guvenlik", label: tx(t.settings.securityTab, lang), icon: "🛡️" },
-    { key: "faturalama", label: tx(t.settings.billingTab, lang), icon: "💳" },
-    { key: "tema", label: tx(t.settings.themeTab, lang), icon: "🎨" },
-    { key: "netai", label: tx(t.settings.netaiTab, lang), icon: "✨" },
-    { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: "🌐" },
+  const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+    { key: "eczane", label: tx(t.settings.pharmacyTab, lang), icon: Building2 },
+    { key: "profil", label: tx(t.settings.profileTab, lang), icon: User },
+    { key: "sifre", label: tx(t.settings.passwordTab, lang), icon: KeyRound },
+    { key: "ekip", label: tx(t.settings.teamTab, lang), icon: Users },
+    { key: "guvenlik", label: tx(t.settings.securityTab, lang), icon: ShieldCheck },
+    { key: "faturalama", label: tx(t.settings.billingTab, lang), icon: CreditCard },
+    { key: "tema", label: tx(t.settings.themeTab, lang), icon: Palette },
+    { key: "netai", label: tx(t.settings.netaiTab, lang), icon: Sparkles },
+    { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: Globe },
   ];
 
   return (
@@ -862,7 +866,7 @@ export default function AyarlarPage() {
               marginBottom: "-2px", display: "flex", alignItems: "center", gap: "6px",
               whiteSpace: "nowrap",
             }}>
-            {t.icon} {t.label}
+            <t.icon size={16} strokeWidth={2} /> {t.label}
           </button>
         ))}
       </div>
