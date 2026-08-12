@@ -666,7 +666,10 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
                   }) as ChartFormatter}
                   contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
                 />
-                <Legend formatter={(v) => {
+                {/* Legend, açılı X ekseni etiketleriyle (angle=-30) aynı alt bölgede
+                    render edilince üst üste biniyordu (gerçek bir kullanıcı geri
+                    bildirimiyle tespit edildi) — üste taşındı, artık asla çakışmıyor. */}
+                <Legend verticalAlign="top" height={28} formatter={(v) => {
                   if (hasSalesData) return v === "revenue" ? (en ? "Revenue" : "Gelir") : (en ? "Profit" : "Kâr");
                   return v === "revenue" ? (en ? "Stock Value" : "Stok Değeri") : (en ? "Stock Cost" : "Stok Maliyeti");
                 }} />

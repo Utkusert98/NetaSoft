@@ -308,7 +308,10 @@ function GroupRevenueQuantityChart({ data, lang, onBarClick }: {
             }) as ChartFormatter}
             contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
           />
-          <Legend formatter={(value: string) => value === "adet" ? (en ? "Quantity" : "Adet") : (en ? "Revenue" : "Gelir")} />
+          {/* Legend üste taşındı — açılı X ekseni etiketleriyle (angle=-20) aynı alt
+              bölgede render edilince dar ekranlarda üst üste binebiliyordu (bkz.
+              Envanter Analizi'ndeki aynı desendeki gerçek kullanıcı bulgusu). */}
+          <Legend verticalAlign="top" height={28} formatter={(value: string) => value === "adet" ? (en ? "Quantity" : "Adet") : (en ? "Revenue" : "Gelir")} />
           <Bar yAxisId="left" dataKey="ciro" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} style={{ cursor: "pointer" }}
             onClick={(entry: unknown) => { const e = entry as { fullName?: string }; if (e?.fullName) onBarClick(e.fullName); }}
           />

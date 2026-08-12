@@ -215,7 +215,7 @@ export default function CalisanPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--spacing-8)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
 
         {/* Left: Forms */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>

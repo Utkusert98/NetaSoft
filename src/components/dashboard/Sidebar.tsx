@@ -127,6 +127,28 @@ export default function Sidebar() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  // Mobil menü açıkken arka plandaki sayfa içeriğinin kaymasını/kaydırılmasını
+  // engelle — menü bir overlay olarak render edilse de `body` scroll edilebilir
+  // kalıyordu, bu yüzden menüyü kaydırırken arkadaki sayfa da birlikte kayıyor,
+  // yazılar/grafikler "titriyor" gibi görünüyordu (gerçek bir kullanıcı geri
+  // bildirimiyle tespit edildi).
+  useEffect(() => {
+    if (!open) return;
+    const { overflow, position, top, width } = document.body.style;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.overflow = overflow;
+      document.body.style.position = position;
+      document.body.style.top = top;
+      document.body.style.width = width;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   const isActive = (href: string) => {
     if (href === "/panel") return pathname === "/panel";
     return pathname.startsWith(href);

@@ -91,7 +91,7 @@ function StatCard({ label, value, change, icon, accent }: {
       border: "1px solid var(--color-border)",
       padding: "var(--spacing-6)",
       display: "flex", flexDirection: "column", gap: "var(--spacing-2)",
-      borderTop: `3px solid ${colors[accent]}`,
+      borderTop: `3px solid ${colors[accent]}`, minWidth: 0,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", fontWeight: 500 }}>{label}</span>
@@ -101,7 +101,7 @@ function StatCard({ label, value, change, icon, accent }: {
           background: bgs[accent], borderRadius: "var(--radius-md)",
         }}>{icon}</span>
       </div>
-      <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color: colors[accent], lineHeight: 1.1 }}>{value}</p>
+      <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color: colors[accent], lineHeight: 1.1, overflowWrap: "anywhere" }}>{value}</p>
       {change !== undefined && change !== 0 && (
         <p style={{ fontSize: "var(--font-size-xs)", color: change > 0 ? GREEN : RED, fontWeight: 500 }}>
           {change > 0 ? "▲" : "▼"} %{Math.abs(change).toFixed(1)} {tx(t.dashboard.vsLastMonth, lang)}
@@ -399,7 +399,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       </div>
 
       {/* ── Özet Kartlar ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
+      <div className="responsive-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
         <StatCard label={tx(d.totalIncome, lang)} value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon="📈" accent="income" />
         <StatCard label={tx(d.totalExpense, lang)} value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon="📉" accent="expense" />
         <StatCard label={tx(d.netProfit, lang)} value={formatCurrency(summary.netProfit)} icon="💰" accent="profit" />
