@@ -19,6 +19,8 @@ const rowSchema = z.object({
   rawTransactionType: z.string().optional(),
   customerName: z.string().optional(),
   loyaltyPoints: z.number().optional(),
+  saleHour: z.number().int().min(0).max(23).optional(),
+  stockAtSale: z.number().optional(),
 });
 
 const confirmSchema = z.object({
@@ -54,6 +56,8 @@ export async function POST(req: Request): Promise<Response> {
       rawTransactionType: r.rawTransactionType ?? null,
       customerName: r.customerName ?? null,
       loyaltyPoints: r.loyaltyPoints ?? null,
+      saleHour: r.saleHour ?? null,
+      stockAtSale: r.stockAtSale ?? null,
       importBatchId: batchId,
     }));
 
@@ -120,9 +124,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     const retailRevenue = records.filter(r => r.saleType === "RETAIL").reduce((s, r) => s + getNet(r), 0);
 
     const byGroup: Record<string, number> = {};
+    const byGroupQuantity: Record<string, number> = {};
     records.forEach(r => {
       const g = r.productGroup ?? "Genel";
       byGroup[g] = (byGroup[g] ?? 0) + getNet(r);
+      byGroupQuantity[g] = (byGroupQuantity[g] ?? 0) + r.quantity;
     });
 
     return apiResponse({
@@ -140,6 +146,8 @@ export async function GET(req: NextRequest): Promise<Response> {
         rawTransactionType: r.rawTransactionType ?? undefined,
         customerName: r.customerName ?? undefined,
         loyaltyPoints: r.loyaltyPoints !== null && r.loyaltyPoints !== undefined ? Number(r.loyaltyPoints) : undefined,
+        saleHour: r.saleHour ?? undefined,
+        stockAtSale: r.stockAtSale ?? undefined,
       })),
       summary: {
         totalRecords: records.length,
@@ -149,6 +157,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         prescriptionRevenue,
         retailRevenue,
         byGroup,
+        byGroupQuantity,
       },
     });
   } catch {
