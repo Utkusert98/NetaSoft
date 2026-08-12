@@ -59,6 +59,8 @@ export default function KayitPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [kvkkAccepted, setKvkkAccepted] = useState(false);
+  const [kvkkError, setKvkkError] = useState("");
 
   const passwordStrength = calculatePasswordStrength(formData.password);
 
@@ -81,8 +83,17 @@ export default function KayitPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setErrors({});
+    setKvkkError("");
+
+    if (!kvkkAccepted) {
+      setKvkkError(lang === "en"
+        ? "You must accept the GDPR/Personal Data Protection Notice to create an account."
+        : "Hesap oluşturmak için KVKK Aydınlatma Metni'ni kabul etmelisiniz.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const response = await fetch("/api/v1/auth/kayit", {
@@ -353,11 +364,34 @@ export default function KayitPage() {
               )}
             </div>
 
+            <div className="form-group" style={{ marginTop: "var(--spacing-5)" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                <input
+                  type="checkbox"
+                  id="kvkkAccepted"
+                  checked={kvkkAccepted}
+                  onChange={(e) => { setKvkkAccepted(e.target.checked); setKvkkError(""); }}
+                  disabled={loading}
+                  style={{ marginTop: "2px", width: "16px", height: "16px", flexShrink: 0, cursor: "pointer" }}
+                />
+                <span>
+                  {lang === "en" ? "I have read and accept the " : "Kaydolmak için "}
+                  <Link href="/kvkk" target="_blank" className="auth-link" onClick={(e) => e.stopPropagation()}>
+                    {lang === "en" ? "GDPR/Personal Data Protection Notice" : "KVKK Aydınlatma Metni'ni"}
+                  </Link>
+                  {lang === "en" ? "." : " okudum ve kabul ediyorum."}
+                </span>
+              </label>
+              {kvkkError && (
+                <span className="form-error" role="alert">⚠ {kvkkError}</span>
+              )}
+            </div>
+
             <button
               type="submit"
               id="btn-register-submit"
               className="btn btn-primary btn-lg btn-full"
-              style={{ marginTop: "var(--spacing-6)" }}
+              style={{ marginTop: "var(--spacing-4)" }}
               disabled={loading}
             >
               {loading ? (
@@ -390,8 +424,8 @@ export default function KayitPage() {
               {lang === "en" ? "Terms of Service" : "Kullanım Koşullarını"}
             </Link>{" "}
             {lang === "en" ? "and" : "ve"}{" "}
-            <Link href="/gizlilik-politikasi" className="auth-link">
-              {lang === "en" ? "Privacy Policy" : "Gizlilik Politikasını"}
+            <Link href="/kvkk" className="auth-link">
+              {lang === "en" ? "GDPR/Personal Data Protection Notice" : "KVKK Aydınlatma Metni'ni"}
             </Link>
             {lang === "en" ? "." : " kabul etmiş olursunuz."}
           </p>
