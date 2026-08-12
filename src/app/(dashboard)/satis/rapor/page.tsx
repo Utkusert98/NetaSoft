@@ -878,8 +878,38 @@ export default function SatisRaporPage() {
   // Yalnızca ilk yüklemede otomatik fetch yapılır — sonrasında tarih/tip
   // seçimi "Filtrele" butonuna basılana kadar fetch tetiklemez (bkz.
   // handleApplyFilters).
+  //
+  // Varsayılan aralık daha önce HER ZAMAN "içinde bulunulan takvim ayı"
+  // olarak sabitlenmişti — eczanenin gerçekte yüklediği veri (ör. Temmuz +
+  // Ağustos'un ilk 11 günü) farklı bir ayda/aralıkta olsa bile. Sayfa
+  // açıldığında önce bu eczaneye ait TÜM kayıtların gerçek min/max
+  // `saleDate` aralığı hafif bir agregat sorgusuyla (`/api/v1/satis/date-range`)
+  // çekilir ve varsayılan aralık ona göre ayarlanır; hiç kayıt yoksa
+  // (`count === 0`, gerçekten yeni kullanıcı) sabit "bu ay" varsayılanı
+  // olduğu gibi korunur. Kaydetme/preset sonrası otomatik genişletme mantığı
+  // (`saleRowsDateSpan` — bkz. handleConfirm) burada DEĞİŞTİRİLMEDİ, yalnızca
+  // İLK açılıştaki varsayılan aynı desenle (pending + uygulanmış state'i
+  // birlikte güncelleyip ardından fetch tetikleyerek) belirleniyor.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void fetchRecordsWith(startDate, endDate, filterType); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/satis/date-range", { headers: { "Accept-Language": lang } });
+        const json = await res.json() as { success: boolean; data?: { minDate: string | null; maxDate: string | null; count: number } };
+        if (json.success && json.data && json.data.count > 0 && json.data.minDate && json.data.maxDate) {
+          const actualStart = json.data.minDate.slice(0, 10);
+          const actualEnd = json.data.maxDate.slice(0, 10);
+          setStartDate(actualStart);
+          setEndDate(actualEnd);
+          setPendingStartDate(actualStart);
+          setPendingEndDate(actualEnd);
+          await fetchRecordsWith(actualStart, actualEnd, filterType);
+          return;
+        }
+      } catch { /* silent — sabit "bu ay" varsayılanıyla devam edilir */ }
+      await fetchRecordsWith(startDate, endDate, filterType);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApplyFilters = () => {
     setStartDate(pendingStartDate);
