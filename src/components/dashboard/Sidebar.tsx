@@ -4,6 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
+import {
+  LayoutDashboard, Sparkles, Banknote, Landmark, TrendingUp, FileText,
+  CircleDollarSign, Users, ArrowLeftRight, CalendarDays, Receipt, Package,
+  History, Settings, LogOut, type LucideIcon,
+} from "lucide-react";
 import { NetaSoftIcon, NetaSoftLogoFull } from "@/components/ui/NetaSoftLogo";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
@@ -18,7 +23,7 @@ interface PharmacyOption {
 interface NavItem {
   href: string;
   labelKey: keyof typeof t.sidebar;
-  icon: string;
+  icon: LucideIcon;
 }
 
 interface NavSection {
@@ -30,35 +35,35 @@ const NAV_SECTIONS: NavSection[] = [
   {
     titleKey: "general",
     items: [
-      { href: "/panel", labelKey: "dashboard", icon: "📊" },
-      { href: "/ai-destek", labelKey: "aiAssistant", icon: "✨" },
+      { href: "/panel", labelKey: "dashboard", icon: LayoutDashboard },
+      { href: "/ai-destek", labelKey: "aiAssistant", icon: Sparkles },
     ],
   },
   {
     titleKey: "finance",
     items: [
-      { href: "/finans/kasa", labelKey: "dailyCash", icon: "🏦" },
-      { href: "/finans/sgk-fatura", labelKey: "sgkInvoice", icon: "🏥" },
-      { href: "/finans/platform-gelir", labelKey: "platformIncome", icon: "📈" },
-      { href: "/finans/senet", labelKey: "promissoryNote", icon: "📄" },
-      { href: "/finans/sabit-gider", labelKey: "fixedExpense", icon: "💸" },
-      { href: "/finans/calisan", labelKey: "staffExpense", icon: "👥" },
+      { href: "/finans/kasa", labelKey: "dailyCash", icon: Banknote },
+      { href: "/finans/sgk-fatura", labelKey: "sgkInvoice", icon: Landmark },
+      { href: "/finans/platform-gelir", labelKey: "platformIncome", icon: TrendingUp },
+      { href: "/finans/senet", labelKey: "promissoryNote", icon: FileText },
+      { href: "/finans/sabit-gider", labelKey: "fixedExpense", icon: CircleDollarSign },
+      { href: "/finans/calisan", labelKey: "staffExpense", icon: Users },
     ],
   },
   {
     titleKey: "reports",
     items: [
-      { href: "/raporlar/gelir-gider", labelKey: "incomeExpense", icon: "📉" },
-      { href: "/raporlar/aylik", labelKey: "monthlySummary", icon: "📅" },
-      { href: "/satis/rapor", labelKey: "salesReport", icon: "🧾" },
-      { href: "/stok/envanter", labelKey: "inventory", icon: "📦" },
-      { href: "/raporlar/denetim", labelKey: "auditLog", icon: "🕵️" },
+      { href: "/raporlar/gelir-gider", labelKey: "incomeExpense", icon: ArrowLeftRight },
+      { href: "/raporlar/aylik", labelKey: "monthlySummary", icon: CalendarDays },
+      { href: "/satis/rapor", labelKey: "salesReport", icon: Receipt },
+      { href: "/stok/envanter", labelKey: "inventory", icon: Package },
+      { href: "/raporlar/denetim", labelKey: "auditLog", icon: History },
     ],
   },
   {
     titleKey: "system",
     items: [
-      { href: "/ayarlar", labelKey: "settings", icon: "⚙️" },
+      { href: "/ayarlar", labelKey: "settings", icon: Settings },
     ],
   },
 ];
@@ -257,7 +262,7 @@ export default function Sidebar() {
                   aria-current={isActive(item.href) ? "page" : undefined}
                 >
                   <span className="sidebar-item-icon" aria-hidden="true">
-                    {item.icon}
+                    <item.icon size={18} strokeWidth={2} />
                   </span>
                   {item.href === "/ai-destek"
                     ? <span className="netai-brand-text" style={{ letterSpacing: "-0.01em" }}>NetAI</span>
@@ -295,7 +300,7 @@ export default function Sidebar() {
                 e.currentTarget.style.opacity = "1";
               }}
             >
-              <span style={{ fontSize: "18px" }}>🚪</span>
+              <LogOut size={18} />
               {tx(t.sidebar.logout, lang)}
             </button>
           </div>
