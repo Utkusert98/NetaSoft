@@ -348,19 +348,36 @@ h6 { font-size: var(--font-size-base); }
 
 /* Sayfanın kendi koyu zemini — çok koyu, hafif mavi-mor alt tonlu gri
    (saf siyah değil, Gemini'nin karakteristik #0b0c10 civarı tonu). */
+/* Gemini/AI-stüdyosu tarzı TAM GENİŞLİK koyu zemin — önceki sürümde bu alan
+   `page-content`'in max-width'ini miras alan, kenarlarda uygulamanın normal
+   (açık) `.main-content` zeminini çıplak bırakan dar bir "kart" görünümündeydi
+   (kullanıcı geri bildirimi: "yan tarafı beyaz kalmış, Windows 7 diyalog
+   kutusu gibi"). Artık `.netai-page` sınıfı `page-content`'in KENDİSİ değil,
+   `main-content`'i tam genişlikte kaplayan dış sarmalayıcı; iç içerik ise
+   `.netai-inner` ile ayrı bir yerde ortalanır (bkz. ai-destek/page.tsx).
+   Böylece koyu zemin sidebar'dan viewport'un sonuna kadar kesintisiz sürer. */
 .netai-page {
   background: radial-gradient(circle at 18% -10%, rgba(159, 232, 112, 0.07), transparent 45%),
     radial-gradient(circle at 100% 0%, rgba(22, 51, 0, 0.35), transparent 55%),
     #0b0c10;
   color: #e7e9ee;
-  border-radius: var(--radius-lg);
+  margin: calc(var(--spacing-8) * -1);
   padding: var(--spacing-5) var(--spacing-5) 0;
+  width: calc(100% + var(--spacing-8) * 2);
+}
+.netai-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 @media (max-width: 768px) {
   .netai-page {
-    border-radius: 0;
     margin: calc(var(--spacing-4) * -1);
     padding: var(--spacing-4) var(--spacing-4) 0;
+    width: calc(100% + var(--spacing-4) * 2);
   }
 }
 
@@ -463,6 +480,9 @@ h6 { font-size: var(--font-size-base); }
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+.netai-input-pill:focus-within {
+  border-color: #9fe870;
+}
 .netai-mic-btn {
   transition: background 0.15s, color 0.15s, transform 0.15s;
 }

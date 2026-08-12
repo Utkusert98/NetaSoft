@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Mic, Send, Sparkles, Globe, Volume2, VolumeX } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
 import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
@@ -61,7 +62,7 @@ const UI_TEXT: Record<Lang, {
     title: "NetAI",
     subtitle: "Eczane finansı hakkında sorularınızı sorun — tüm kayıtlarınıza göre analiz yapar. Sesli de konuşabilirsiniz.",
     placeholder: "Eczane finansı hakkında sorunuzu yazın... (Enter ile gönder)",
-    send: "Gönder ➤",
+    send: "Gönder",
     welcome: "Merhaba! Ben NetAI, NetaSoft'un eczane asistanınım.\n\nSGK takibi, senet vadeleri, kârlılık analizi ve tüm finansal geçmişiniz hakkında sorularınızı yanıtlayabilirim.\n\nNasıl yardımcı olabilirim?",
     thinking: "NetAI analiz ediyor...",
     suggestions: "Bunları da sorabilirsiniz:",
@@ -75,7 +76,7 @@ const UI_TEXT: Record<Lang, {
     title: "NetAI",
     subtitle: "Ask questions about your pharmacy finances — analyzes all your records. You can also talk by voice.",
     placeholder: "Type your question about pharmacy finance... (Enter to send)",
-    send: "Send ➤",
+    send: "Send",
     welcome: "Hello! I'm NetAI, NetaSoft's pharmacy assistant.\n\nI can answer questions about SGK tracking, promissory note due dates, profitability analysis, and your complete financial history.\n\nHow can I assist you?",
     thinking: "NetAI is analyzing...",
     suggestions: "You can also ask:",
@@ -126,13 +127,13 @@ function AssistantMessage({
               title={speakLabel}
               aria-label={speakLabel}
               style={{
-                display: "inline-flex", alignItems: "center", gap: "4px",
+                display: "inline-flex", alignItems: "center", gap: "5px",
                 background: "none", border: "none", cursor: "pointer",
                 color: speaking ? "#9fe870" : "rgba(231,233,238,0.55)",
                 fontSize: "12px", fontWeight: 600, padding: 0,
               }}
             >
-              {speaking ? "🔊" : "🔈"} {speakLabel}
+              {speaking ? <Volume2 size={14} /> : <VolumeX size={14} />} {speakLabel}
             </button>
           </div>
         )}
@@ -438,7 +439,8 @@ export default function AiDestek() {
   };
 
   return (
-    <main className="page-content ai-destek-main netai-page" style={{ display: "flex", flexDirection: "column", maxWidth: 900 }}>
+    <main className="page-content ai-destek-main netai-page">
+    <div className="netai-inner">
       {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız */}
       <div className={`netai-glow ${(listening || loading) ? "netai-glow-active" : ""}`} aria-hidden="true" />
 
@@ -471,7 +473,7 @@ export default function AiDestek() {
               opacity: loading ? 0.6 : 1,
             }}
           >
-            ✨ {lang === "tr" ? "Yeni Sohbet" : "New Chat"}
+            <Sparkles size={14} /> {lang === "tr" ? "Yeni Sohbet" : "New Chat"}
           </button>
 
           <a
@@ -485,7 +487,7 @@ export default function AiDestek() {
               fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
             }}
           >
-            🌐 {lang.toUpperCase()}
+            <Globe size={14} /> {lang.toUpperCase()}
           </a>
         </div>
       </div>
@@ -592,8 +594,15 @@ export default function AiDestek() {
         </div>
       )}
 
-      {/* Input */}
-      <div style={{ display: "flex", gap: "var(--spacing-3)", alignItems: "flex-end", paddingBottom: "var(--spacing-5)" }}>
+      {/* Input — Gemini benzeri tek "hap" (pill) kutu: metin alanı + ikon butonlar aynı zeminde */}
+      <div style={{
+        display: "flex", alignItems: "flex-end", gap: "6px",
+        padding: "8px 8px 8px 18px", marginBottom: "var(--spacing-5)",
+        borderRadius: "28px", border: "1px solid rgba(255,255,255,0.14)",
+        background: "rgba(255,255,255,0.05)", transition: "border-color var(--transition-fast)",
+      }}
+      className="netai-input-pill"
+      >
         <textarea
           ref={inputRef}
           value={input}
@@ -601,18 +610,15 @@ export default function AiDestek() {
           onKeyDown={handleKeyDown}
           placeholder={ui.placeholder}
           disabled={loading}
-          rows={2}
+          rows={1}
           className="ai-chat-input"
           style={{
-            flex: 1, resize: "none", padding: "12px 16px",
-            borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.04)", fontFamily: "var(--font-family)",
+            flex: 1, resize: "none", padding: "10px 0",
+            border: "none", background: "transparent", fontFamily: "var(--font-family)",
             color: "#e7e9ee",
             fontSize: "var(--font-size-sm)", lineHeight: 1.6,
-            outline: "none", transition: "border-color var(--transition-fast)",
+            outline: "none", maxHeight: "120px",
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "#9fe870"; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
         />
         {micSupported && (
           <button
@@ -623,30 +629,31 @@ export default function AiDestek() {
             aria-label={listening ? ui.micStop : ui.micStart}
             className={`netai-mic-btn ${listening ? "netai-mic-listening" : ""}`}
             style={{
-              height: 48, width: 48, flexShrink: 0, borderRadius: "var(--radius-lg)",
-              border: `1px solid ${listening ? "#9fe870" : "rgba(255,255,255,0.12)"}`,
-              background: listening ? "linear-gradient(135deg, #163300, #4e9b3f)" : "rgba(255,255,255,0.04)",
-              color: listening ? "white" : "#e7e9ee",
-              cursor: loading ? "not-allowed" : "pointer", fontSize: "18px",
+              height: 40, width: 40, flexShrink: 0, borderRadius: "50%", border: "none",
+              background: listening ? "linear-gradient(135deg, #163300, #4e9b3f)" : "transparent",
+              color: listening ? "#9fe870" : "rgba(231,233,238,0.75)",
+              cursor: loading ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: loading ? 0.6 : 1,
+              opacity: loading ? 0.6 : 1, transition: "background 0.15s, color 0.15s",
             }}
           >
-            🎙️
+            <Mic size={18} />
           </button>
         )}
         <button
           onClick={() => void sendMessage(input)}
           disabled={loading || !input.trim()}
+          aria-label={ui.send}
+          title={ui.send}
           style={{
-            height: 48, paddingInline: "var(--spacing-5)", flexShrink: 0,
-            borderRadius: "var(--radius-lg)", border: "none",
+            height: 40, width: 40, flexShrink: 0, borderRadius: "50%", border: "none",
             background: loading || !input.trim() ? "rgba(159,232,112,0.25)" : "linear-gradient(120deg, #9fe870, #4e9b3f)",
-            color: "#0b0c10", fontWeight: 700, fontSize: "var(--font-size-sm)",
+            color: "#0b0c10",
             cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          {loading ? "..." : ui.send}
+          <Send size={17} />
         </button>
       </div>
 
@@ -656,6 +663,7 @@ export default function AiDestek() {
           40% { transform: scale(1); }
         }
       `}</style>
+    </div>
     </main>
   );
 }
