@@ -363,9 +363,11 @@ h6 { font-size: var(--font-size-base); }
    ve kenarlarda kırpılmış/yamuk bir görünüme yol açıyordu (kullanıcı
    bildirimi: "tasarımın yarısı var yarısı yok"). Doğru kurulum: `.netai-page`
    `main-content`'in TÜM genişliğini/yüksekliğini dolduran, padding'siz, hiç
-   negatif margin içermeyen dış kap; iç içerik `.netai-inner` içinde kendi
-   padding'i ve max-width'iyle ayrıca ortalanır (bkz. ai-destek/page.tsx —
-   `<main className="ai-destek-main netai-page">`, `page-content` YOK). */
+   negatif margin içermeyen dış kap; iç sohbet içeriği `.netai-chat-col` >
+   `.netai-chat-inner` içinde kendi padding'i ve max-width'iyle ayrıca
+   ortalanır, geçmiş paneli ise ayrı bir `.netai-history-panel` kolonudur
+   (bkz. ai-destek/page.tsx — `<main className="ai-destek-main netai-page">`,
+   `page-content` YOK). */
 .netai-page {
   background: radial-gradient(circle at 18% -10%, rgba(159, 232, 112, 0.07), transparent 45%),
     radial-gradient(circle at 100% 0%, rgba(22, 51, 0, 0.35), transparent 55%),
