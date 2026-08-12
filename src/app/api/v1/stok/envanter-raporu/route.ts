@@ -16,6 +16,10 @@ const envanterRaporuSchema = z.object({
     totalCost: z.number(),
     totalProfit: z.number(),
     profitMargin: z.number(),
+    // Satış verisi olmayan (sadece stok değerleme) dosyalarda totalRevenue 0
+    // çıkar — stok değeri her zaman anlamlı olduğu için ayrı saklanır. Eski
+    // istemcilerle geriye dönük uyum için opsiyonel, eksikse 0 varsayılır.
+    totalStockValue: z.number().optional(),
   }),
 });
 
@@ -29,6 +33,7 @@ const HISTORY_SELECT = {
   totalCost: true,
   totalProfit: true,
   profitMargin: true,
+  totalStockValue: true,
   createdAt: true,
 } as const;
 
@@ -88,6 +93,7 @@ export async function POST(req: Request): Promise<Response> {
         totalCost: validated.summary.totalCost,
         totalProfit: validated.summary.totalProfit,
         profitMargin: validated.summary.profitMargin,
+        totalStockValue: validated.summary.totalStockValue ?? 0,
         items: validated.items as object,
       },
     });

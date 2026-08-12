@@ -849,6 +849,14 @@ model InventoryReport {
   totalProducts Int     @map("total_products")
   soldProducts  Int     @map("sold_products")
   totalRevenue  Decimal @map("total_revenue") @db.Decimal(15, 2)
+  // Stok değeri: mevcut stoktaki ürünlerin (adet × satış fiyatı) toplamı — dönem
+  // içi satış adedi verisi olmasa BİLE her zaman anlamlıdır (bkz. inventory-analysis.ts).
+  // totalRevenue'dan farklıdır: totalRevenue sadece o dönem SATILAN ürünlerin cirosudur,
+  // ve satış verisi içermeyen (sadece stok değerleme) dosyalarda 0 çıkar — Gösterge
+  // Paneli'nde "Toplam Stok Değeri" etiketiyle yanlışlıkla totalRevenue gösterildiği
+  // için her zaman ₺0 görünüyordu (gerçek bir kullanıcı geri bildirimiyle tespit
+  // edildi). Eski kayıtlar için varsayılan 0.
+  totalStockValue Decimal @default(0) @map("total_stock_value") @db.Decimal(15, 2)
   totalCost     Decimal @map("total_cost") @db.Decimal(15, 2)
   totalProfit   Decimal @map("total_profit") @db.Decimal(15, 2)
   profitMargin  Decimal @map("profit_margin") @db.Decimal(6, 2)
