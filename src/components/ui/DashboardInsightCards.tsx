@@ -97,6 +97,7 @@ type InventoryReportLite = {
   totalProfit: number | string;
   profitMargin: number | string;
   totalStockValue: number | string;
+  potentialMargin: number | string;
   createdAt: string;
 };
 
@@ -152,9 +153,9 @@ function LastInventorySummaryCard(): React.JSX.Element {
             <span style={{ fontWeight: 700, fontSize: "15px" }}>{formatCurrency(report.totalStockValue)}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{en ? "Profit Margin" : "Kâr Marjı"}</span>
-            <span style={{ fontWeight: 700, fontSize: "15px", color: Number(report.profitMargin) >= 0 ? "var(--color-income-green)" : "#e74c3c" }}>
-              %{Number(report.profitMargin).toFixed(1)}
+            <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{en ? "Potential Margin (on stock)" : "Potansiyel Kâr Marjı (stok üzerinden)"}</span>
+            <span style={{ fontWeight: 700, fontSize: "15px", color: Number(report.potentialMargin) >= 0 ? "var(--color-income-green)" : "#e74c3c" }}>
+              %{Number(report.potentialMargin).toFixed(1)}
             </span>
           </div>
           <p style={{ fontSize: "11px", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

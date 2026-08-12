@@ -16,10 +16,12 @@ const envanterRaporuSchema = z.object({
     totalCost: z.number(),
     totalProfit: z.number(),
     profitMargin: z.number(),
-    // Satış verisi olmayan (sadece stok değerleme) dosyalarda totalRevenue 0
-    // çıkar — stok değeri her zaman anlamlı olduğu için ayrı saklanır. Eski
-    // istemcilerle geriye dönük uyum için opsiyonel, eksikse 0 varsayılır.
+    // Satış verisi olmayan (sadece stok değerleme) dosyalarda totalRevenue ve
+    // profitMargin 0 çıkar — stok değeri/marjı her zaman anlamlı olduğu için
+    // ayrı saklanır. Eski istemcilerle geriye dönük uyum için opsiyonel,
+    // eksikse 0 varsayılır.
     totalStockValue: z.number().optional(),
+    potentialMargin: z.number().optional(),
   }),
 });
 
@@ -34,6 +36,7 @@ const HISTORY_SELECT = {
   totalProfit: true,
   profitMargin: true,
   totalStockValue: true,
+  potentialMargin: true,
   createdAt: true,
 } as const;
 
@@ -94,6 +97,7 @@ export async function POST(req: Request): Promise<Response> {
         totalProfit: validated.summary.totalProfit,
         profitMargin: validated.summary.profitMargin,
         totalStockValue: validated.summary.totalStockValue ?? 0,
+        potentialMargin: validated.summary.potentialMargin ?? 0,
         items: validated.items as object,
       },
     });

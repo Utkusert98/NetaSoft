@@ -612,6 +612,7 @@ export default function SatisRaporPage() {
   // İçe Aktarma Geçmişi (Part B)
   interface ImportBatch {
     importBatchId: string | null;
+    fileName: string | null;
     importDate: string | null;
     recordCount: number;
     dateRangeStart: string | null;
@@ -1133,7 +1134,7 @@ export default function SatisRaporPage() {
         const res = await fetch("/api/v1/satis", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Accept-Language": lang },
-          body: JSON.stringify({ rows: chunks[i], importBatchId: batchId }),
+          body: JSON.stringify({ rows: chunks[i], importBatchId: batchId, fileName: file?.name }),
         });
         let json: { success: boolean; count?: number; error?: string };
         try {
@@ -2098,6 +2099,7 @@ export default function SatisRaporPage() {
                 <thead>
                   <tr>
                     <th>{lang === "en" ? "Import Date" : "Yükleme Tarihi"}</th>
+                    <th>{lang === "en" ? "File Name" : "Dosya Adı"}</th>
                     <th>{lang === "en" ? "Date Range" : "Tarih Aralığı"}</th>
                     <th>{lang === "en" ? "Record Count" : "Kayıt Sayısı"}</th>
                     <th>{lang === "en" ? "Total Revenue" : "Toplam Ciro"}</th>
@@ -2106,11 +2108,14 @@ export default function SatisRaporPage() {
                 </thead>
                 <tbody>
                   {batches.map(b => (
-                    <tr key={b.importBatchId ?? "_none_"}>
+                    <tr key={`${b.importBatchId ?? "_none_"}_${b.fileName ?? ""}`}>
                       <td style={{ whiteSpace: "nowrap" }}>
                         {b.importBatchId === null
                           ? (lang === "en" ? "Legacy records without import info" : "Toplu içe aktarma bilgisi olmayan eski kayıtlar")
                           : (b.importDate ? format(new Date(b.importDate), "dd MMM yyyy HH:mm", { locale: lang === "en" ? enUS : tr }) : "—")}
+                      </td>
+                      <td style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.fileName ?? undefined}>
+                        {b.fileName ?? "—"}
                       </td>
                       <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-text-muted)" }}>
                         {b.dateRangeStart && b.dateRangeEnd

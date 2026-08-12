@@ -35,6 +35,7 @@ const ENTITY_LABELS: Record<string, string> = {
 
 interface SalesBatchRow {
   importBatchId: string | null;
+  fileName: string | null;
   importDate: string | null;
   recordCount: number;
   dateRangeStart: string | null;
@@ -269,6 +270,7 @@ export default function DenetimKayitlariPage() {
                 <thead>
                   <tr>
                     <th>{lang === "en" ? "Upload Date" : "Yükleme Tarihi"}</th>
+                    <th>{lang === "en" ? "File Name" : "Dosya Adı"}</th>
                     <th>{lang === "en" ? "Date Range" : "Tarih Aralığı"}</th>
                     <th>{lang === "en" ? "Records" : "Kayıt Sayısı"}</th>
                     <th>{lang === "en" ? "Revenue" : "Ciro"}</th>
@@ -281,6 +283,9 @@ export default function DenetimKayitlariPage() {
                     return (
                       <tr key={key}>
                         <td>{fmtDate(b.importDate)}</td>
+                        <td style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.fileName ?? undefined}>
+                          {b.fileName ?? "—"}
+                        </td>
                         <td>{fmtDate(b.dateRangeStart)} – {fmtDate(b.dateRangeEnd)}</td>
                         <td>{b.recordCount}</td>
                         <td>{fmtCurrency(b.totalRevenue)}</td>
@@ -294,8 +299,8 @@ export default function DenetimKayitlariPage() {
                               kind: "sales",
                               key,
                               label: lang === "en"
-                                ? `${b.recordCount} sales records (${fmtDate(b.dateRangeStart)} – ${fmtDate(b.dateRangeEnd)})`
-                                : `${b.recordCount} satış kaydı (${fmtDate(b.dateRangeStart)} – ${fmtDate(b.dateRangeEnd)})`,
+                                ? `${b.recordCount} sales records${b.fileName ? ` (${b.fileName})` : ""} (${fmtDate(b.dateRangeStart)} – ${fmtDate(b.dateRangeEnd)})`
+                                : `${b.recordCount} satış kaydı${b.fileName ? ` (${b.fileName})` : ""} (${fmtDate(b.dateRangeStart)} – ${fmtDate(b.dateRangeEnd)})`,
                             })}
                           >
                             🗑 {lang === "en" ? "Delete" : "Sil"}

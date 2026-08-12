@@ -820,6 +820,11 @@ model SaleRecord {
   stockAtSale    Int?     @map("stock_at_sale") // "Stok Adet" — satış anındaki stok anlık görüntüsü, CANLI stok değildir
 
   importBatchId String? @map("import_batch_id") // Grup yüklemeleri eşleştirme
+  // Yüklenen orijinal dosyanın adı — İçe Aktarma Geçmişi ve Denetim Kayıtları
+  // sayfalarında gösterilir, kullanıcı "bu dosyayı yükledim mi" diye
+  // düşünmesin diye eklendi (gerçek bir kullanıcı geri bildirimiyle tespit
+  // edildi). Eski kayıtlarda yok, nullable.
+  fileName String? @map("file_name")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -859,7 +864,15 @@ model InventoryReport {
   totalStockValue Decimal @default(0) @map("total_stock_value") @db.Decimal(15, 2)
   totalCost     Decimal @map("total_cost") @db.Decimal(15, 2)
   totalProfit   Decimal @map("total_profit") @db.Decimal(15, 2)
-  profitMargin  Decimal @map("profit_margin") @db.Decimal(6, 2)
+  // profitMargin: dönem içi SATILAN ürünlerin kâr marjı — totalRevenue gibi
+  // satış verisi olmayan dosyalarda 0 çıkar. potentialMargin ise mevcut
+  // STOK üzerinden (totalStockValue'ya göre) hesaplanır, satış verisi olmasa
+  // bile her zaman anlamlıdır — Gösterge Paneli'nde "Kâr Marjı" etiketiyle
+  // yanlışlıkla profitMargin gösterildiği için satışsız dosyalarda hep %0
+  // görünüyordu (gerçek bir kullanıcı geri bildirimiyle tespit edildi,
+  // totalStockValue ile aynı kök sebep). Eski kayıtlar için varsayılan 0.
+  profitMargin    Decimal @map("profit_margin") @db.Decimal(6, 2)
+  potentialMargin Decimal @default(0) @map("potential_margin") @db.Decimal(6, 2)
 
   items Json // Onaylanmış InventoryRow[] — ürün bazlı analiz satırları
 

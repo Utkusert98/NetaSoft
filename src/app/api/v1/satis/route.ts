@@ -27,6 +27,10 @@ const rowSchema = z.object({
 const confirmSchema = z.object({
   rows: z.array(rowSchema),
   importBatchId: z.string().optional(),
+  // Yüklenen orijinal dosyanın adı — İçe Aktarma Geçmişi/Denetim
+  // Kayıtları'nda gösterilir, kullanıcı "bu dosyayı yükledim mi" diye
+  // düşünmesin diye eklendi.
+  fileName: z.string().max(255).optional(),
 });
 
 // POST /api/v1/satis  — onaylanan satışları kaydet
@@ -39,7 +43,7 @@ export async function POST(req: Request): Promise<Response> {
     if (!pharmacyId) return NextResponse.json({ success: false, error: m("noPharmacy", lang), code: "NO_PHARMACY" }, { status: 404 });
 
     const body = await req.json();
-    const { rows, importBatchId } = confirmSchema.parse(body);
+    const { rows, importBatchId, fileName } = confirmSchema.parse(body);
 
     const batchId = importBatchId ?? `batch_${Date.now()}`;
 
@@ -60,10 +64,11 @@ export async function POST(req: Request): Promise<Response> {
       saleHour: r.saleHour ?? null,
       stockAtSale: r.stockAtSale ?? null,
       importBatchId: batchId,
+      fileName: fileName ?? null,
     }));
 
-    // PostgreSQL max 65535 parametre — 9 alan × 7000 = 63000 < limit
-    const CHUNK = 7000;
+    // PostgreSQL max 65535 parametre — 10 alan × 6000 = 60000 < limit
+    const CHUNK = 6000;
     for (let i = 0; i < mapped.length; i += CHUNK) {
       await prisma.saleRecord.createMany({ data: mapped.slice(i, i + CHUNK) });
     }
@@ -77,7 +82,7 @@ export async function POST(req: Request): Promise<Response> {
       action: "CREATE",
       entityType: "SaleRecordBatch",
       entityId: batchId,
-      newData: { recordCount: rows.length },
+      newData: { recordCount: rows.length, fileName: fileName ?? null },
     });
 
     return NextResponse.json({ success: true, count: rows.length, batchId }, { status: 201 });

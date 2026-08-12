@@ -16,8 +16,12 @@ export async function GET(req: Request): Promise<Response> {
     const pharmacyId = await getActivePharmacyId(session.user.id);
     if (!pharmacyId) return apiError(m("noPharmacy", lang), "NO_PHARMACY", 404);
 
+    // `fileName` `by` içine dahil edilir — aynı importBatchId'ye ait tüm
+    // satırlar aynı yükleme çağrısından geldiği için her zaman aynı dosya
+    // adını taşır, bu yüzden gruplamayı BÖLMEZ (fiilen importBatchId ile
+    // birebir aynı gruplara ayrışır), sadece dosya adını da döndürür.
     const grouped = await prisma.saleRecord.groupBy({
-      by: ["importBatchId"],
+      by: ["importBatchId", "fileName"],
       where: { pharmacyId, deletedAt: null },
       _count: { _all: true },
       _min: { createdAt: true, saleDate: true },
@@ -28,6 +32,7 @@ export async function GET(req: Request): Promise<Response> {
     const batches = grouped
       .map(g => ({
         importBatchId: g.importBatchId,
+        fileName: g.fileName,
         importDate: g._min.createdAt?.toISOString() ?? null,
         recordCount: g._count._all,
         dateRangeStart: g._min.saleDate?.toISOString() ?? null,
