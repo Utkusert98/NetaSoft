@@ -671,6 +671,21 @@ export default function SatisRaporPage() {
   const [showInvalidDateDetail, setShowInvalidDateDetail] = useState(false);
   const [lastSaveExcludedCount, setLastSaveExcludedCount] = useState(0);
 
+  // Çakışma (overlap) tespiti — kaydedilecek dosyanın tarih aralığı zaten
+  // kayıtlı satışlarla çakışıyorsa (bkz. handleConfirm), kullanıcı üç seçenekten
+  // birini seçene kadar kayıt BEKLETİLİR. `checkingOverlap`, "Onayla ve Kaydet"
+  // butonuna basıldıktan sonra kontrol sorgusu sürerken (henüz modal açılmadan
+  // önceki kısa an) gösterilen ayrı bir "kontrol ediliyor" durumudur.
+  const [checkingOverlap, setCheckingOverlap] = useState(false);
+  const [overlapCheck, setOverlapCheck] = useState<{
+    span: { start: string; end: string };
+    rowsToSave: ParsedSaleRow[];
+    excludedCount: number;
+    count: number;
+    batchCount: number;
+  } | null>(null);
+  const [overlapBusy, setOverlapBusy] = useState<"delete" | null>(null);
+
   // List state
   const now = new Date();
   const [startDate, setStartDate] = useState(toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)));
@@ -878,8 +893,38 @@ export default function SatisRaporPage() {
   // Yalnızca ilk yüklemede otomatik fetch yapılır — sonrasında tarih/tip
   // seçimi "Filtrele" butonuna basılana kadar fetch tetiklemez (bkz.
   // handleApplyFilters).
+  //
+  // Varsayılan aralık daha önce HER ZAMAN "içinde bulunulan takvim ayı"
+  // olarak sabitlenmişti — eczanenin gerçekte yüklediği veri (ör. Temmuz +
+  // Ağustos'un ilk 11 günü) farklı bir ayda/aralıkta olsa bile. Sayfa
+  // açıldığında önce bu eczaneye ait TÜM kayıtların gerçek min/max
+  // `saleDate` aralığı hafif bir agregat sorgusuyla (`/api/v1/satis/date-range`)
+  // çekilir ve varsayılan aralık ona göre ayarlanır; hiç kayıt yoksa
+  // (`count === 0`, gerçekten yeni kullanıcı) sabit "bu ay" varsayılanı
+  // olduğu gibi korunur. Kaydetme/preset sonrası otomatik genişletme mantığı
+  // (`saleRowsDateSpan` — bkz. handleConfirm) burada DEĞİŞTİRİLMEDİ, yalnızca
+  // İLK açılıştaki varsayılan aynı desenle (pending + uygulanmış state'i
+  // birlikte güncelleyip ardından fetch tetikleyerek) belirleniyor.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void fetchRecordsWith(startDate, endDate, filterType); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/satis/date-range", { headers: { "Accept-Language": lang } });
+        const json = await res.json() as { success: boolean; data?: { minDate: string | null; maxDate: string | null; count: number } };
+        if (json.success && json.data && json.data.count > 0 && json.data.minDate && json.data.maxDate) {
+          const actualStart = json.data.minDate.slice(0, 10);
+          const actualEnd = json.data.maxDate.slice(0, 10);
+          setStartDate(actualStart);
+          setEndDate(actualEnd);
+          setPendingStartDate(actualStart);
+          setPendingEndDate(actualEnd);
+          await fetchRecordsWith(actualStart, actualEnd, filterType);
+          return;
+        }
+      } catch { /* silent — sabit "bu ay" varsayılanıyla devam edilir */ }
+      await fetchRecordsWith(startDate, endDate, filterType);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApplyFilters = () => {
     setStartDate(pendingStartDate);
@@ -1055,16 +1100,14 @@ export default function SatisRaporPage() {
     .filter(({ r }) => r.dateInvalid);
   const validPreviewRows = previewRows.filter(r => !r.dateInvalid);
 
-  const handleConfirm = async () => {
+  // Asıl kayıt işlemi — önceden `handleConfirm`'in tamamıydı; şimdi ayrı bir
+  // fonksiyona çıkarıldı çünkü artık İKİ farklı noktadan tetiklenebiliyor:
+  // (1) çakışma YOKSA handleConfirm doğrudan çağırır, (2) çakışma VARSA
+  // kullanıcı overlap modal'ında "sil ve kaydet" ya da "yine de ekle"yi
+  // seçtikten SONRA çağrılır (bkz. handleOverlapDeleteAndSave / handleOverlapAddAnyway).
+  const performSave = async (rowsToSave: ParsedSaleRow[], excludedCount: number) => {
     setSaving(true); setParseError(""); setSaveProgress(null);
     try {
-      const rowsToSave = previewRows.filter(r => !r.dateInvalid);
-      const excludedCount = previewRows.length - rowsToSave.length;
-      if (rowsToSave.length === 0) {
-        throw new Error(lang === "en"
-          ? `None of the ${excludedCount} rows in this file have a parseable date — nothing was saved. Please check your source file.`
-          : `Bu dosyadaki ${excludedCount} satırın hiçbirinde tarih ayrıştırılamadı — hiçbir şey kaydedilmedi. Lütfen kaynak dosyanızı kontrol edin.`);
-      }
       const batchId = `batch_${Date.now()}`;
       const chunks: ParsedSaleRow[][] = [];
       for (let i = 0; i < rowsToSave.length; i += SAVE_CHUNK_SIZE) {
@@ -1117,6 +1160,80 @@ export default function SatisRaporPage() {
     } catch (err: unknown) {
       setParseError(err instanceof Error ? err.message : (lang === "en" ? "Save failed" : "Kayıt başarısız"));
     } finally { setSaving(false); setSaveProgress(null); }
+  };
+
+  // "Onayla ve Kaydet"e basıldığında çalışır. Asıl kaydetmeden ÖNCE, dosyanın
+  // gerçek tarih aralığı (`saleRowsDateSpan`) zaten kayıtlı satışlarla
+  // çakışıyor mu diye hafif bir kontrol sorgusu (`/api/v1/satis/overlap-check`)
+  // yapılır — çakışma varsa kayıt HEMEN yapılmaz, kullanıcıya üç seçenekli bir
+  // onay diyaloğu gösterilir (bkz. overlapCheck state + modal JSX'i). Bu, aynı
+  // dönemin iki farklı dosyadan gelen satışlarla ÇİFT SAYILMASINI önlemek
+  // içindir (AGENTS.md görev notu #3 — finansal doğruluk riski).
+  const handleConfirm = async () => {
+    setParseError("");
+    const rowsToSave = previewRows.filter(r => !r.dateInvalid);
+    const excludedCount = previewRows.length - rowsToSave.length;
+    if (rowsToSave.length === 0) {
+      setParseError(lang === "en"
+        ? `None of the ${excludedCount} rows in this file have a parseable date — nothing was saved. Please check your source file.`
+        : `Bu dosyadaki ${excludedCount} satırın hiçbirinde tarih ayrıştırılamadı — hiçbir şey kaydedilmedi. Lütfen kaynak dosyanızı kontrol edin.`);
+      return;
+    }
+
+    const span = saleRowsDateSpan(rowsToSave);
+    if (span) {
+      setCheckingOverlap(true);
+      try {
+        const p = new URLSearchParams({ start: span.start, end: span.end });
+        const res = await fetch(`/api/v1/satis/overlap-check?${p}`, { headers: { "Accept-Language": lang } });
+        const json = await res.json() as { success: boolean; data?: { count: number; batchCount: number } };
+        if (json.success && json.data && json.data.count > 0) {
+          setCheckingOverlap(false);
+          setOverlapCheck({ span, rowsToSave, excludedCount, count: json.data.count, batchCount: json.data.batchCount });
+          return; // kullanıcı modal'da bir seçim yapana kadar kayıt BEKLER
+        }
+      } catch { /* kontrol sorgusu başarısız olursa sessizce normal kayda devam edilir */ }
+      setCheckingOverlap(false);
+    }
+
+    await performSave(rowsToSave, excludedCount);
+  };
+
+  // Overlap modal — Seçenek 1: "Bu aralıktaki eski kayıtları sil, yeni dosyayı kaydet"
+  const handleOverlapDeleteAndSave = async () => {
+    if (!overlapCheck) return;
+    setOverlapBusy("delete");
+    try {
+      const p = new URLSearchParams({ start: overlapCheck.span.start, end: overlapCheck.span.end });
+      const res = await fetch(`/api/v1/satis/overlap?${p}`, { method: "DELETE", headers: { "Accept-Language": lang } });
+      const json = await res.json() as { success: boolean; error?: string };
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? (lang === "en" ? "Delete failed" : "Silme başarısız oldu"));
+      }
+      const { rowsToSave, excludedCount } = overlapCheck;
+      setOverlapCheck(null);
+      await performSave(rowsToSave, excludedCount);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : (lang === "en" ? "Delete failed" : "Silme başarısız oldu"));
+      setOverlapCheck(null);
+    } finally {
+      setOverlapBusy(null);
+    }
+  };
+
+  // Overlap modal — Seçenek 2: "Yine de ekle (çift sayılabilir)" — hiçbir şey
+  // silinmez, kullanıcı çift sayım riskini bilerek kabul eder.
+  const handleOverlapAddAnyway = async () => {
+    if (!overlapCheck) return;
+    const { rowsToSave, excludedCount } = overlapCheck;
+    setOverlapCheck(null);
+    await performSave(rowsToSave, excludedCount);
+  };
+
+  // Overlap modal — Seçenek 3: "İptal" — hiçbir şey kaydedilmez/silinmez,
+  // kullanıcı önizleme ekranında kalır.
+  const handleOverlapCancel = () => {
+    setOverlapCheck(null);
   };
 
   const handleDelete = async () => {
@@ -1445,8 +1562,10 @@ export default function SatisRaporPage() {
 
               <div style={{ display: "flex", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)", flexWrap: "wrap" }}>
                 <button className="btn" onClick={() => setStep("mapping")}>{lang === "en" ? "← Edit Columns" : "← Kolonları Düzenle"}</button>
-                <button className="btn btn-primary" disabled={saving || validPreviewRows.length === 0} onClick={() => void handleConfirm()} style={{ minWidth: "240px" }}>
-                  {saving
+                <button className="btn btn-primary" disabled={saving || checkingOverlap || validPreviewRows.length === 0} onClick={() => void handleConfirm()} style={{ minWidth: "240px" }}>
+                  {checkingOverlap
+                    ? (lang === "en" ? "Checking for overlapping data..." : "Çakışan veri kontrol ediliyor...")
+                    : saving
                     ? (saveProgress
                         ? (lang === "en"
                             ? `Saving... (${saveProgress.done}/${saveProgress.total})`
@@ -1999,6 +2118,45 @@ export default function SatisRaporPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {overlapCheck && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "480px", padding: "var(--spacing-6)" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px", textAlign: "center" }}>⚠️</div>
+            <h3 style={{ fontWeight: 700, marginBottom: "8px", textAlign: "center" }}>
+              {lang === "en" ? "Overlapping Date Range Detected" : "Çakışan Tarih Aralığı Tespit Edildi"}
+            </h3>
+            <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)", fontSize: "14px", lineHeight: 1.5 }}>
+              {lang === "en"
+                ? <>The file you are about to save covers <strong>{format(parseDateOnlyLocal(overlapCheck.span.start), "dd MMM yyyy", { locale: enUS })} – {format(parseDateOnlyLocal(overlapCheck.span.end), "dd MMM yyyy", { locale: enUS })}</strong>. This range already contains <strong>{overlapCheck.count.toLocaleString("en-US")}</strong> saved record(s) from <strong>{overlapCheck.batchCount}</strong> prior upload{overlapCheck.batchCount === 1 ? "" : "s"}.</>
+                : <>Kaydetmek üzere olduğunuz dosya <strong>{format(parseDateOnlyLocal(overlapCheck.span.start), "dd MMM yyyy", { locale: tr })} – {format(parseDateOnlyLocal(overlapCheck.span.end), "dd MMM yyyy", { locale: tr })}</strong> aralığını kapsıyor. Bu aralıkta zaten <strong>{overlapCheck.batchCount}</strong> önceki yüklemeden gelen <strong>{overlapCheck.count.toLocaleString("tr-TR")}</strong> kayıt bulunuyor.</>}
+            </p>
+            <p style={{ color: "var(--color-warning)", marginBottom: "var(--spacing-5)", fontSize: "13px", fontWeight: 600, lineHeight: 1.5 }}>
+              {lang === "en"
+                ? "Keeping both sets of records risks double-counting the same sales in every report, chart and AI summary."
+                : "İkisini birlikte tutmak, aynı satışların her raporda, grafikte ve yapay zekâ özetinde ÇİFT SAYILMASINA yol açabilir."}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+              <button className="btn btn-primary" onClick={() => void handleOverlapDeleteAndSave()} disabled={overlapBusy !== null || saving}>
+                {overlapBusy === "delete"
+                  ? (lang === "en" ? "Deleting old records..." : "Eski kayıtlar siliniyor...")
+                  : (lang === "en" ? "Delete old records in this range, save new file" : "Bu aralıktaki eski kayıtları sil, yeni dosyayı kaydet")}
+              </button>
+              <button
+                className="btn"
+                style={{ background: "var(--color-warning-bg)", color: "var(--color-warning)", border: "1px solid var(--color-warning-border)", fontWeight: 600 }}
+                onClick={() => void handleOverlapAddAnyway()}
+                disabled={overlapBusy !== null || saving}
+              >
+                {lang === "en" ? "Add anyway (may be double-counted)" : "Yine de ekle (çift sayılabilir)"}
+              </button>
+              <button className="btn btn-secondary" onClick={handleOverlapCancel} disabled={overlapBusy !== null || saving}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

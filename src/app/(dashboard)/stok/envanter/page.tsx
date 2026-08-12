@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import {
   BarChart,
@@ -911,6 +911,16 @@ export default function EnvanterPage() {
   const [lastReport, setLastReport] = useState<InventoryReportSummary | null>(null);
   const [lastReportLoaded, setLastReportLoaded] = useState(false);
 
+  // `phase`'in en güncel değerini, effect'in mount anındaki (stale olabilecek)
+  // closure'ından bağımsız okuyabilmek için ayna (mirror) bir ref. Otomatik
+  // yükleme yalnızca kullanıcı henüz bir işlem başlatmamışsa (hâlâ "upload"
+  // aşamasındaysa) tetiklenmeli — bu ref, o kontrolü güvenilir kılar.
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  // Otomatik yükleme yalnızca sayfa ömrü boyunca BİR KEZ denenir (lang
+  // değişimiyle effect yeniden çalışsa bile tekrar tetiklenmemesi için).
+  const autoLoadAttemptedRef = useRef(false);
+
   const runAnalysis = (headers: string[], rows: ParsedRow[], override: Partial<InventoryColumnMap>): void => {
     const parsed = parseInventoryRows(headers, rows, override);
     const result = analyzeInventory(parsed);
@@ -1007,10 +1017,52 @@ export default function EnvanterPage() {
     }
   };
 
+  // Geçmişten bir raporu tam analizi ile yükler — hem kullanıcının "Geçmiş
+  // Raporlar" listesinden bir satıra tıklamasında (bkz. handleSelectHistoryReport)
+  // HEM DE sayfa ilk açıldığında otomatik olarak (bkz. aşağıdaki mount effect'i)
+  // kullanılan tek, paylaşılan yükleme mantığı. `silent` true olduğunda hata
+  // durumunda kullanıcıya görünür bir uyarı göstermez — otomatik yükleme
+  // sessizce başarısız olursa kullanıcı sadece boş yükleme ekranını görür,
+  // bu da zaten fallback davranışın kendisidir.
+  const loadHistoryReport = async (id: string, opts?: { silent?: boolean }): Promise<void> => {
+    if (!opts?.silent) setHistoryError("");
+    try {
+      const res = await fetch(`/api/v1/stok/envanter-raporu?id=${id}`, { headers: { "Accept-Language": lang } });
+      const data = (await res.json()) as { success: boolean; data?: InventoryReportFull; error?: string };
+      if (!res.ok || !data.success || !data.data) {
+        throw new Error(data.error ?? (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
+      }
+      const report = data.data;
+      const items = Array.isArray(report.items) ? report.items : [];
+      const result = analyzeInventory(items);
+      setInventoryRows(items);
+      setAnalysis(result);
+      setFileName(report.fileName);
+      // Geçmişten yüklenen rapor zaten kayıtlı — tekrar kaydedip mükerrer kayıt oluşmasın diye buton kilitlenir.
+      setSaveState("saved");
+      setSaveMessage("");
+      setViewMode("new");
+      setPhase("analysis");
+    } catch (err) {
+      if (!opts?.silent) {
+        setHistoryError(err instanceof Error ? err.message : (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
+      }
+    }
+  };
+
   // Son yükleme özetini sayfa ilk açıldığında bir kez çeker (tam listeyi ayrıca
   // "Geçmiş Raporlar" sekmesi kendi fetchHistory'siyle yükler — burada gereksiz
   // yere tekrar tam liste istemiyoruz, ama API zaten hafif bir özet listesi
   // döndürdüğü için en yeni kaydı almak için aynı endpoint yeterli).
+  //
+  // Daha önce bu kart yalnızca BİLGİLENDİRME amaçlıydı — boş yükleme ekranı her
+  // zaman gösteriliyordu. Kullanıcı isteği: önceden kaydedilmiş bir rapor varsa,
+  // sayfa ilk açıldığında doğrudan o raporun TAM analiz görünümü gösterilsin
+  // (sanki "Geçmiş Raporlar"dan en yeni raporu seçmiş gibi) — boş yükleme
+  // istemi yerine. Bu, kullanıcı henüz açıkça bir işlem BAŞLATMADIYSA
+  // (hâlâ "upload" aşamasındaysa) ve otomatik yükleme daha önce denenmediyse
+  // yapılır; aksi halde (yeni kullanıcı, hiç rapor yok) mevcut davranış
+  // (boş yükleme ekranı) korunur.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     let cancelled = false;
@@ -1020,12 +1072,16 @@ export default function EnvanterPage() {
         const data = (await res.json()) as { success: boolean; data?: InventoryReportSummary[] };
         if (!cancelled && res.ok && data.success && data.data && data.data.length > 0) {
           setLastReport(data.data[0]);
+          if (!autoLoadAttemptedRef.current && phaseRef.current === "upload") {
+            autoLoadAttemptedRef.current = true;
+            void loadHistoryReport(data.data[0].id, { silent: true });
+          }
         }
       } catch { /* silent — sadece bilgilendirme amaçlı bir özet */ }
       finally { if (!cancelled) setLastReportLoaded(true); }
     })();
     return () => { cancelled = true; };
-  }, [lang]);
+  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteReport = async (): Promise<void> => {
     if (!deleteTarget) return;
@@ -1054,29 +1110,7 @@ export default function EnvanterPage() {
     if (mode === "history") void fetchHistory();
   };
 
-  const handleSelectHistoryReport = async (id: string): Promise<void> => {
-    setHistoryError("");
-    try {
-      const res = await fetch(`/api/v1/stok/envanter-raporu?id=${id}`, { headers: { "Accept-Language": lang } });
-      const data = (await res.json()) as { success: boolean; data?: InventoryReportFull; error?: string };
-      if (!res.ok || !data.success || !data.data) {
-        throw new Error(data.error ?? (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
-      }
-      const report = data.data;
-      const items = Array.isArray(report.items) ? report.items : [];
-      const result = analyzeInventory(items);
-      setInventoryRows(items);
-      setAnalysis(result);
-      setFileName(report.fileName);
-      // Geçmişten yüklenen rapor zaten kayıtlı — tekrar kaydedip mükerrer kayıt oluşmasın diye buton kilitlenir.
-      setSaveState("saved");
-      setSaveMessage("");
-      setViewMode("new");
-      setPhase("analysis");
-    } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : (en ? "Report could not be loaded" : "Rapor yüklenemedi"));
-    }
-  };
+  const handleSelectHistoryReport = (id: string): Promise<void> => loadHistoryReport(id);
 
   if (viewMode === "history") {
     return (
