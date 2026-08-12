@@ -200,7 +200,7 @@ export default function SenetPage() {
   });
 
   return (
-    <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
+    <div className="page-content">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "var(--spacing-6)" }}>
         <div>
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.senet.title, lang)}</h1>

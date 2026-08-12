@@ -197,7 +197,7 @@ export default function PlatformGelirPage() {
   });
 
   return (
-    <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
+    <div className="page-content">
       <div style={{ marginBottom: "var(--spacing-6)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700 }}>{tx(t.platform.title, lang)}</h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginTop: "4px" }}>
