@@ -553,7 +553,7 @@ export default function DashboardClient({ data, pharmacistName }: {
                   <Pie data={expenseBreakdown.map(e => ({ ...e, name: lang === "en" ? e.nameEn : e.name }))}
                     cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
                     {expenseBreakdown.map((_, i) => (
-                      <Cell key={i} fill={[RED, ORANGE, BLUE][i % 3]} />
+                      <Cell key={i} fill={[RED, ORANGE, BLUE, "#9b59b6"][i % 4]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />

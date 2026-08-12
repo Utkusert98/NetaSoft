@@ -52,6 +52,8 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     prevEmpExp,
     currentNotes,
     prevNotes,
+    currentSupplierTransfers,
+    prevSupplierTransfers,
     promissoryNotes,
     upcomingSgk,
     monthlyTrend,
@@ -119,6 +121,21 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
     // Promissory notes due prev month
     prisma.promissoryNote.findMany({
       where: { pharmacyId, deletedAt: null, dueDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+      select: { amount: true },
+    }),
+    // Depo Havalesi (SupplierTransfer) current month — daha önce bu sayfada
+    // HİÇ sorgulanmıyordu, bu yüzden Gösterge Paneli'nin "Toplam Gider" ve
+    // "Net Kâr" rakamları Depo Havalesi ödemelerini tamamen atlıyordu (Aylık
+    // Özet/Gelir-Gider sayfalarındaki resmi toplamlarla TUTARSIZDI — gerçek
+    // kullanıcı geri bildirimiyle tespit edildi, AI sohbetindeki aynı sınıf
+    // hatayla aynı kök sebep).
+    prisma.supplierTransfer.findMany({
+      where: { pharmacyId, deletedAt: null, transferDate: { gte: startOfMonth, lte: endOfMonth } },
+      select: { amount: true },
+    }),
+    // Depo Havalesi prev month
+    prisma.supplierTransfer.findMany({
+      where: { pharmacyId, deletedAt: null, transferDate: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
       select: { amount: true },
     }),
     // Promissory notes upcoming 60 days
@@ -195,11 +212,13 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const totalExpense =
     sumDecimal(currentFixedExp, "amount") +
     sumDecimal(currentEmpExp, "totalAmount") +
-    sumDecimal(currentNotes, "amount");
+    sumDecimal(currentNotes, "amount") +
+    sumDecimal(currentSupplierTransfers, "amount");
   const prevExpense =
     sumDecimal(prevFixedExp, "amount") +
     sumDecimal(prevEmpExp, "totalAmount") +
-    sumDecimal(prevNotes, "amount");
+    sumDecimal(prevNotes, "amount") +
+    sumDecimal(prevSupplierTransfers, "amount");
 
   const pct = (cur: number, prev: number) =>
     prev === 0 ? 0 : ((cur - prev) / prev) * 100;
@@ -224,6 +243,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
   const fixedExpenseTotal = sumDecimal(currentFixedExp, "amount");
   const empExpenseTotal = sumDecimal(currentEmpExp, "totalAmount");
   const notesExpenseTotal = sumDecimal(currentNotes, "amount");
+  const supplierExpenseTotal = sumDecimal(currentSupplierTransfers, "amount");
 
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const urgentNotesCount = promissoryNotes.filter(
@@ -324,6 +344,7 @@ async function getDashboardData(pharmacyId: string): Promise<DashboardData> {
       { name: "Sabit Gider", nameEn: "Fixed", value: fixedExpenseTotal },
       { name: "Personel", nameEn: "Staff", value: empExpenseTotal },
       { name: "Senet", nameEn: "Notes", value: notesExpenseTotal },
+      { name: "Depo Havalesi", nameEn: "Warehouse Transfers", value: supplierExpenseTotal },
     ].filter(e => e.value > 0),
     urgentNotesCount,
     runway30,
