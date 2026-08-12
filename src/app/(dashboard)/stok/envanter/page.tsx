@@ -1114,7 +1114,7 @@ export default function EnvanterPage() {
 
   if (viewMode === "history") {
     return (
-      <main>
+      <main className="page-content">
         <div style={{ marginBottom: "var(--spacing-8)" }}>
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
             {en ? "Inventory Analysis" : "Envanter Analizi"}
@@ -1217,7 +1217,7 @@ export default function EnvanterPage() {
       .map((f) => (en ? f.en : f.tr));
 
     return (
-      <main>
+      <main className="page-content">
         <div style={{ marginBottom: "var(--spacing-8)" }}>
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
             {en ? "Column Mapping" : "Kolon Eşleştirme"}
@@ -1323,7 +1323,7 @@ export default function EnvanterPage() {
 
   if (phase === "analysis" && analysis) {
     return (
-      <main>
+      <main className="page-content">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-6)", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
           <div>
             <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-1)" }}>
@@ -1369,7 +1369,7 @@ export default function EnvanterPage() {
   }
 
   return (
-    <main>
+    <main className="page-content">
       <div style={{ marginBottom: "var(--spacing-8)" }}>
         <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "var(--spacing-2)" }}>
           {en ? "Upload Inventory Report" : "Envanter Raporu Yükle"}

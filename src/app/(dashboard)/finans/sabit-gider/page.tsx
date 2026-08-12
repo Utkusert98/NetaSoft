@@ -191,7 +191,7 @@ export default function SabitGiderPage() {
     ));
 
   return (
-    <div style={{ padding: "var(--spacing-8)", maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="page-content">
       <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, marginBottom: "var(--spacing-6)" }}>
         {tx(t.sabitGider.title, lang)}
       </h1>

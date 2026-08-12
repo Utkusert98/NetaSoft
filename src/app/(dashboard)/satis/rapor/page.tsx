@@ -1289,7 +1289,7 @@ export default function SatisRaporPage() {
     setOverride(prev => ({ ...prev, [key]: val }));
 
   return (
-    <div style={{ padding: "var(--spacing-8)", maxWidth: "1400px", margin: "0 auto" }}>
+    <div className="page-content">
 
       {/* Başlık + Sekmeler */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-6)", flexWrap: "wrap", gap: "12px" }}>
