@@ -254,7 +254,7 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
 
   // "adet"/"miktar"/"sayi"/"qty" bare kelimeleri yalnızca tam eşleşmede denenir —
   // bulanık eşleşmede "İskonto Adedi" gibi ilgisiz bir sütunu yakalayabilirler.
-  const qtyIdx   = gi(override.quantity, ["satis adedi", "satis miktari", "quantity"], ["adet", "miktar", "qty", "sayi"]);
+  const qtyIdx   = gi(override.quantity, ["satis adedi", "satis adet", "satis miktari", "quantity"], ["adet", "miktar", "qty", "sayi"]);
   const dateIdx  = gi(override.date,     ["tarih", "date", "satis tarihi", "sale date", "islem tarihi"]);
   // "adi"/"urun"/"stok"/"name"/"product" bare kelimeleri yalnızca tam eşleşmede
   // denenir — bulanık eşleşmede "Adisyon No" veya "Stok Kodu" gibi TAMAMEN
@@ -263,7 +263,7 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   // bazlı raporlarda (ör. sadece İşlem No/Cari Adı/İşlem Tipi/Tarih/Tutar
   // içeren dosyalar) ürün adı yerine kullanılabilecek en anlamlı kimlik alanı.
   const nameIdx  = gi(override.name,     ["urun adi", "ilac adi", "stok adi", "product name", "malzeme adi", "cari adi", "musteri adi", "hasta adi"], ["urun", "product", "adi", "name", "stok"]);
-  const groupIdx = gi(override.group,    ["urun grubu", "product group", "kategori", "category", "ana grup"], ["grup", "group"]);
+  const groupIdx = gi(override.group,    ["urun grubu", "urun grup", "product group", "kategori", "category", "ana grup"], ["grup", "group"]);
   // "islem tipi" — işlem/fiş bazlı raporlarda satış türünü (reçeteli/perakende)
   // taşıyan asıl sütun genelde budur.
   const typeIdx  = gi(override.type,     ["satis tipi", "satis turu", "islem tipi", "recete", "prescription"], ["tip", "type"]);
