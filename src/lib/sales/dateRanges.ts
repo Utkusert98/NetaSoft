@@ -108,3 +108,17 @@ export function saleRowsDateSpan(rows: Array<{ saleDate: string }>): DateRange |
   const days = rows.map(r => r.saleDate.slice(0, 10)).sort();
   return { start: days[0], end: days[days.length - 1] };
 }
+
+/**
+ * Bir "YYYY-MM-DD" başlangıç/bitiş tarih ÇİFTİNİ, o günlerin TAMAMINI kapsayan
+ * UTC gün sınırlarına (00:00:00.000Z / 23:59:59.999Z) çevirir — `saleDate`
+ * alanı üzerinde `{ gte, lte }` filtresi kuran API route'larında (satış listesi,
+ * çakışma kontrolü/silme) kullanılan tek, paylaşılan (DRY) dönüşüm. Geçersiz
+ * (ayrıştırılamayan) bir tarih dizesi verilirse `null` döner.
+ */
+export function dayRangeToUtcBounds(start: string, end: string): { start: Date; end: Date } | null {
+  const startDate = new Date(start.slice(0, 10) + "T00:00:00.000Z");
+  const endDate = new Date(end.slice(0, 10) + "T23:59:59.999Z");
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  return { start: startDate, end: endDate };
+}

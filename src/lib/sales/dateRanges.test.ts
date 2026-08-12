@@ -9,6 +9,7 @@ import {
   thisYearRange,
   matchPreset,
   saleRowsDateSpan,
+  dayRangeToUtcBounds,
 } from "./dateRanges";
 
 describe("todayRange", () => {
@@ -109,5 +110,32 @@ describe("saleRowsDateSpan", () => {
 
   it("tek satırlı dizide start ve end aynı olur", () => {
     expect(saleRowsDateSpan([{ saleDate: "2026-03-10T12:00:00.000Z" }])).toEqual({ start: "2026-03-10", end: "2026-03-10" });
+  });
+});
+
+describe("dayRangeToUtcBounds", () => {
+  it("YYYY-MM-DD çiftini o günlerin TAMAMINI kapsayan UTC sınırlarına çevirir", () => {
+    const bounds = dayRangeToUtcBounds("2026-08-01", "2026-08-11");
+    expect(bounds).not.toBeNull();
+    expect(bounds!.start.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(bounds!.end.toISOString()).toBe("2026-08-11T23:59:59.999Z");
+  });
+
+  it("tarih+saat içeren (ISO datetime) girdilerin yalnızca tarih kısmını kullanır", () => {
+    const bounds = dayRangeToUtcBounds("2026-08-01T15:30:00.000Z", "2026-08-11T09:00:00.000Z");
+    expect(bounds!.start.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(bounds!.end.toISOString()).toBe("2026-08-11T23:59:59.999Z");
+  });
+
+  it("tek günlük (start === end) bir aralık için de doğru sınırları döndürür", () => {
+    const bounds = dayRangeToUtcBounds("2026-08-05", "2026-08-05");
+    expect(bounds!.start.toISOString()).toBe("2026-08-05T00:00:00.000Z");
+    expect(bounds!.end.toISOString()).toBe("2026-08-05T23:59:59.999Z");
+  });
+
+  it("ayrıştırılamayan bir tarih verilirse null döner", () => {
+    expect(dayRangeToUtcBounds("not-a-date", "2026-08-11")).toBeNull();
+    expect(dayRangeToUtcBounds("2026-08-01", "also-not-a-date")).toBeNull();
+    expect(dayRangeToUtcBounds("", "")).toBeNull();
   });
 });
