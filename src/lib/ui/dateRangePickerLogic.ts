@@ -95,3 +95,17 @@ export function isInHoverPreview(dateStr: string, start: string | null, end: str
   const hi = hoverDateStr < start ? start : hoverDateStr;
   return dateStr >= lo && dateStr <= hi;
 }
+
+/**
+ * `SingleDatePicker` için saf seçim mantığı — tıklanan gün doğrudan tek
+ * seçili tarih olur (aralık durum makinesi gerekmez).
+ */
+export function nextSingleDateSelection(clickedDateStr: string): string {
+  return clickedDateStr;
+}
+
+/** Bir günün, tek seçili tarihe (SingleDatePicker) eşit olup olmadığını döndürür. */
+export function isSameDate(dateStr: string, selected: string | null): boolean {
+  if (!selected) return false;
+  return dateStr === selected;
+}

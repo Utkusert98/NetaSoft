@@ -4,6 +4,8 @@ import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import SingleDatePicker from "@/components/ui/SingleDatePicker";
 
 type Register = {
   id: string;
@@ -254,7 +256,7 @@ export default function KasaPage() {
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Date" : "Tarih"}</label>
-              <input type="date" className="form-input" name="registerDate" value={formData.registerDate} onChange={handleChange} required />
+              <SingleDatePicker value={formData.registerDate} onChange={(date) => setFormData(prev => ({ ...prev, registerDate: date }))} lang={lang} required />
             </div>
 
             <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px" }}>
@@ -333,11 +335,8 @@ export default function KasaPage() {
             {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
           </h2>
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
-            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
-            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <DateRangePicker startDate={histStart} endDate={histEnd} lang={lang}
+              onChange={(start, end) => { setHistStart(start); setHistEnd(end); }} />
             {(histStart || histEnd) && (
               <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
                 style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
@@ -374,7 +373,7 @@ export default function KasaPage() {
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Date" : "Tarih"}</label>
-                <input type="date" className="form-input" name="registerDate" value={editForm.registerDate} onChange={handleEditChange} required />
+                <SingleDatePicker value={editForm.registerDate} onChange={(date) => setEditForm(prev => ({ ...prev, registerDate: date }))} lang={lang} required />
               </div>
               {[
                 { name: "posAmount", label: "POS (₺)" },

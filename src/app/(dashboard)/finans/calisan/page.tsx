@@ -4,6 +4,8 @@ import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import SingleDatePicker from "@/components/ui/SingleDatePicker";
 
 type Employee = { id: string; firstName: string; lastName: string };
 type EmployeeExpense = {
@@ -236,7 +238,7 @@ export default function CalisanPage() {
 
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Expense Date / Month" : "Gider Tarihi / Ay"}</label>
-                <input type="date" className="form-input" name="expenseDate" value={expData.expenseDate} onChange={handleExpChange} required />
+                <SingleDatePicker value={expData.expenseDate} onChange={(date) => setExpData(prev => ({ ...prev, expenseDate: date }))} lang={lang} required />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4)" }}>
@@ -355,11 +357,8 @@ export default function CalisanPage() {
             {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
           </h2>
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
-            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
-            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <DateRangePicker startDate={histStart} endDate={histEnd} lang={lang}
+              onChange={(start, end) => { setHistStart(start); setHistEnd(end); }} />
             {(histStart || histEnd) && (
               <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
                 style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
@@ -431,7 +430,7 @@ export default function CalisanPage() {
             <form onSubmit={(e) => void handleEditExpSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Expense Date" : "Gider Tarihi"}</label>
-                <input type="date" className="form-input" value={editExpForm.expenseDate} onChange={e => setEditExpForm(p => ({ ...p, expenseDate: e.target.value }))} />
+                <SingleDatePicker value={editExpForm.expenseDate} onChange={(date) => setEditExpForm(p => ({ ...p, expenseDate: date }))} lang={lang} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-3)" }}>
                 {[

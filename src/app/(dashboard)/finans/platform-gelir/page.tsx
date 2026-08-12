@@ -5,6 +5,8 @@ import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import SingleDatePicker from "@/components/ui/SingleDatePicker";
 
 const PLATFORM_SUGGESTIONS = ["Farmazon", "Capsule", "Nora", "Pharmy", "ePlatform", "Diğer"];
 
@@ -260,7 +262,7 @@ export default function PlatformGelirPage() {
 
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</label>
-              <input type="date" className="form-input" name="incomeDate" value={formData.incomeDate} onChange={handleChange} required />
+              <SingleDatePicker value={formData.incomeDate} onChange={(date) => setFormData(prev => ({ ...prev, incomeDate: date }))} lang={lang} required />
             </div>
 
             <div style={{
@@ -397,11 +399,8 @@ export default function PlatformGelirPage() {
             {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
           </h2>
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
-            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
-            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <DateRangePicker startDate={histStart} endDate={histEnd} lang={lang}
+              onChange={(start, end) => { setHistStart(start); setHistEnd(end); }} />
             {(histStart || histEnd) && (
               <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
                 style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
@@ -513,7 +512,7 @@ export default function PlatformGelirPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Entry Date" : "Giriş Tarihi"}</label>
-                <input type="date" className="form-input" name="incomeDate" value={editForm.incomeDate} onChange={handleEditChange} required />
+                <SingleDatePicker value={editForm.incomeDate} onChange={(date) => setEditForm(prev => ({ ...prev, incomeDate: date }))} lang={lang} required />
               </div>
               <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", fontSize: "13px" }}>
                 ⏳ {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "var(--color-accent-purple)" }}>{editPreviewDate}</strong>

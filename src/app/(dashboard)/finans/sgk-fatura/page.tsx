@@ -6,6 +6,8 @@ import { useState, useEffect, useRef } from "react";
 import { format, addMonths } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import type { ParsedSgkInvoice } from "@/app/api/v1/finans/sgk-fatura/parse-pdf/route";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import SingleDatePicker from "@/components/ui/SingleDatePicker";
 
 // ── Çoklu PDF yükleme ve onay bileşeni ─────────────────────────────────────
 function PdfUploadReview({
@@ -146,9 +148,9 @@ function PdfUploadReview({
                   <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                     {lang === "en" ? "Invoice Date" : "Fatura Tarihi"}
                   </label>
-                  <input type="date" value={row.invoiceDate}
-                    onChange={(e) => updateRow(i, "invoiceDate", e.target.value)}
-                    style={{ width: "100%", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", fontSize: "13px", background: "var(--color-bg)" }} />
+                  <SingleDatePicker value={row.invoiceDate}
+                    onChange={(date) => updateRow(i, "invoiceDate", date)}
+                    lang={lang} />
                 </div>
 
                 <div>
@@ -466,7 +468,7 @@ export default function SgkFaturaPage() {
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</label>
-              <input type="date" className="form-input" name="invoiceDate" value={formData.invoiceDate} onChange={handleChange} required />
+              <SingleDatePicker value={formData.invoiceDate} onChange={(date) => setFormData(prev => ({ ...prev, invoiceDate: date }))} lang={lang} required />
             </div>
 
             <div className="form-group">
@@ -598,11 +600,8 @@ export default function SgkFaturaPage() {
             {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
           </h2>
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
-            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
-            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <DateRangePicker startDate={histStart} endDate={histEnd} lang={lang}
+              onChange={(start, end) => { setHistStart(start); setHistEnd(end); }} />
             {(histStart || histEnd) && (
               <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
                 style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
@@ -694,7 +693,7 @@ export default function SgkFaturaPage() {
             <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Invoice Date" : "Fatura Tarihi"}</label>
-                <input type="date" className="form-input" name="invoiceDate" value={editForm.invoiceDate} onChange={handleEditChange} required />
+                <SingleDatePicker value={editForm.invoiceDate} onChange={(date) => setEditForm(prev => ({ ...prev, invoiceDate: date }))} lang={lang} required />
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Invoice Type" : "Fatura Türü"}</label>

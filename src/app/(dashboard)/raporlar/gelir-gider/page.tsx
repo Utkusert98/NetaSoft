@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
 import PrescriptionRetailSplit from "@/components/ui/PrescriptionRetailSplit";
+import DateRangePicker from "@/components/ui/DateRangePicker";
 
 
 interface ReportData {
@@ -139,9 +140,8 @@ export default function GelirGiderPage() {
         </button>
         {showCustom && (
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center" }}>
-            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="form-input" style={{ width: 140, fontSize: "var(--font-size-sm)", padding: "8px" }} />
-            <span style={{ color: "var(--color-text-muted)" }}>—</span>
-            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="form-input" style={{ width: 140, fontSize: "var(--font-size-sm)", padding: "8px" }} />
+            <DateRangePicker startDate={customStart} endDate={customEnd} lang={lang}
+              onChange={(start, end) => { setCustomStart(start); setCustomEnd(end); }} />
             <button onClick={handleCustom} className="btn btn-primary" style={{ padding: "8px 14px", fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Apply" : "Uygula"}</button>
           </div>
         )}
