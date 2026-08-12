@@ -189,15 +189,30 @@ function NetAiVoicePanel() {
       setSupported(false);
       return;
     }
-    // Tarayıcı genelde onlarca dildeki TÜM sesleri döner ("bir sürü ses var"
-    // şikayeti) — kullanıcının arayüz diline uyan sesler öne/yalnız alınır,
-    // hiç eşleşme yoksa (bazı tarayıcılarda tr-TR sesi olmayabilir) tüm
-    // liste geri döner ki kullanıcı seçeneksiz kalmasın.
+    // Tarayıcı genelde onlarca dildeki TÜM sesleri döner ("bir sürü ses var,
+    // en beğenilen birkaç tane koy" şikayeti) — önce kullanıcının arayüz
+    // diline uyan sesler alınır, sonra bunlar arasından gerçeğe en yakın
+    // (genelde bulut tabanlı/"Natural"/"Enhanced" gibi işaretli, cihazda
+    // yerel kurulu olmayan) sesler öncelenip listeyi en fazla 5 seçenekle
+    // sınırlıyoruz. Eşleşme yoksa (bazı tarayıcılarda tr-TR sesi olmayabilir)
+    // tüm liste geri döner ki kullanıcı seçeneksiz kalmasın.
+    const QUALITY_HINTS = ["natural", "enhanced", "premium", "neural", "google", "microsoft"];
+    const rankVoice = (v: SpeechSynthesisVoice): number => {
+      const name = v.name.toLowerCase();
+      let score = 0;
+      if (QUALITY_HINTS.some((hint) => name.includes(hint))) score += 2;
+      if (!v.localService) score += 1;
+      return score;
+    };
     const loadVoices = () => {
       const all = window.speechSynthesis.getVoices();
       const langPrefix = lang === "tr" ? "tr" : "en";
       const matching = all.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
-      setVoices(matching.length > 0 ? matching : all);
+      const pool = matching.length > 0 ? matching : all;
+      const curated = [...pool]
+        .sort((a, b) => rankVoice(b) - rankVoice(a))
+        .slice(0, 5);
+      setVoices(curated);
     };
     loadVoices();
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
