@@ -439,7 +439,7 @@ export default function AiDestek() {
   };
 
   return (
-    <main className="page-content ai-destek-main netai-page">
+    <main className="ai-destek-main netai-page">
     <div className="netai-inner">
       {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız */}
       <div className={`netai-glow ${(listening || loading) ? "netai-glow-active" : ""}`} aria-hidden="true" />
