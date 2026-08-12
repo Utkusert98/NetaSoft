@@ -136,7 +136,7 @@ export default function AylikOzetPage() {
           <select value={month} onChange={e => setMonth(Number(e.target.value))} className="form-input" style={{ width: 130 }}>
             {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select value={year} onChange={e => setYear(Number(e.target.value))} className="form-input" style={{ width: 90 }}>
+          <select value={year} onChange={e => setYear(Number(e.target.value))} className="form-input" style={{ width: 110 }}>
             {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
