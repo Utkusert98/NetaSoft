@@ -800,6 +800,8 @@ model SaleRecord {
   rawTransactionType String? @map("raw_transaction_type") // "İşlem Tipi" ham metni (ör. "P.SATIŞ (K.K.)") — saleType binary sınıflandırmasından ayrı
   customerName   String?  @map("customer_name") // Cari Adı/Müşteri Adı/Hasta Adı — productName fallback'inden bağımsız
   loyaltyPoints  Decimal? @map("loyalty_points") @db.Decimal(15, 2) // "Puan Tutar" (sadakat puanı) — opsiyonel
+  saleHour       Int?     @map("sale_hour") // "Saat" sütunundan çıkarılan saat bileşeni (0-23) — opsiyonel
+  stockAtSale    Int?     @map("stock_at_sale") // "Stok Adet" — satış anındaki stok anlık görüntüsü, CANLI stok değildir
 
   importBatchId String? @map("import_batch_id") // Grup yüklemeleri eşleştirme
 

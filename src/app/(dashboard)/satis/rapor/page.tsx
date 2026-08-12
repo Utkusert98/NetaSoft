@@ -43,6 +43,7 @@ interface SaleSummary {
   prescriptionRevenue: number;
   retailRevenue: number;
   byGroup: Record<string, number>;
+  byGroupQuantity?: Record<string, number>;
 }
 
 const fmt = (v: number) => v.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
@@ -276,6 +277,102 @@ function TopProductsChart({ data, lang, onBarClick }: {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+function GroupRevenueQuantityChart({ data, lang, onBarClick }: {
+  data: Array<{ group: string; revenue: number; quantity: number }>;
+  lang: string;
+  onBarClick: (group: string) => void;
+}) {
+  const en = lang === "en";
+  const chartData = data.map(d => ({
+    name: d.group.length > 16 ? d.group.slice(0, 14) + "…" : d.group,
+    fullName: d.group,
+    ciro: d.revenue,
+    adet: d.quantity,
+  }));
+  return (
+    <div style={{ height: 340 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} interval={0} angle={-20} textAnchor="end" height={60} />
+          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => v.toLocaleString("tr-TR")} />
+          <Tooltip
+            formatter={((value: string | number | undefined, name: string | number | undefined) => {
+              if (name === "adet") return [Number(value ?? 0).toLocaleString("tr-TR"), en ? "Quantity" : "Adet"];
+              return [formatCurrency(Number(value ?? 0)), en ? "Revenue" : "Gelir"];
+            }) as ChartFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Legend formatter={(value: string) => value === "adet" ? (en ? "Quantity" : "Adet") : (en ? "Revenue" : "Gelir")} />
+          <Bar yAxisId="left" dataKey="ciro" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} style={{ cursor: "pointer" }}
+            onClick={(entry: unknown) => { const e = entry as { fullName?: string }; if (e?.fullName) onBarClick(e.fullName); }}
+          />
+          <Bar yAxisId="right" dataKey="adet" fill={CHART_COLORS[5]} radius={[4, 4, 0, 0]} style={{ cursor: "pointer" }}
+            onClick={(entry: unknown) => { const e = entry as { fullName?: string }; if (e?.fullName) onBarClick(e.fullName); }}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function HourlyDensityChart({ data, lang }: {
+  data: Array<{ hour: number; revenue: number; count: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  const chartData = data.map(d => ({ label: `${String(d.hour).padStart(2, "0")}:00`, revenue: d.revenue, count: d.count }));
+  return (
+    <div style={{ height: 300 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => formatCurrency(v)} />
+          <Tooltip
+            formatter={((_value: string | number | undefined, _name: string | number | undefined, item: { payload?: { revenue: number; count: number } }) => {
+              const p = item?.payload;
+              return [`${formatCurrency(p?.revenue ?? 0)} (${(p?.count ?? 0).toLocaleString("tr-TR")} ${en ? "sales" : "satış"})`, en ? "Revenue" : "Gelir"];
+            }) as ChartFormatter}
+            contentStyle={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "8px", fontSize: "12px" }}
+          />
+          <Bar dataKey="revenue" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function FastMovingStockTable({ data, lang }: {
+  data: Array<{ productName: string; stockAtSale: number; soldQuantity: number }>;
+  lang: string;
+}) {
+  const en = lang === "en";
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+        <thead>
+          <tr>
+            <th>{en ? "Product" : "Ürün"}</th>
+            <th>{en ? "Last Known Stock" : "Son Bilinen Stok"}</th>
+            <th>{en ? "Sold in Period" : "Dönemde Satılan"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(row => (
+            <tr key={row.productName}>
+              <td style={{ fontWeight: 600 }}>{row.productName}</td>
+              <td style={{ fontWeight: 700, color: row.stockAtSale <= 0 ? "var(--color-danger)" : "var(--color-warning)" }}>{row.stockAtSale.toLocaleString("tr-TR")}</td>
+              <td>{row.soldQuantity.toLocaleString("tr-TR")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -640,6 +737,63 @@ export default function SatisRaporPage() {
 
   // #6 Haftanın Günlerine Göre Perakende Satış Yoğunluğu — SADECE perakende.
   const dayOfWeekRetailData = useMemo(() => aggregateByDayOfWeek(records, lang === "en" ? "en" : "tr", "RETAIL"), [records, lang]);
+
+  // Kategori Bazında Ciro/Adet Dağılımı — "Ürün Grup" sütunu gerçek çeşitlilik
+  // taşıyorsa (tek "Genel" kovasına düşmüyorsa) hem ciro hem adet gösterilir.
+  const groupRevenueQuantityData = useMemo(() => {
+    const byGroup = new Map<string, { revenue: number; quantity: number }>();
+    for (const r of records) {
+      const g = r.productGroup || "Genel";
+      const cur = byGroup.get(g) ?? { revenue: 0, quantity: 0 };
+      cur.revenue += r.netRevenue;
+      cur.quantity += r.quantity;
+      byGroup.set(g, cur);
+    }
+    const sorted = Array.from(byGroup.entries()).sort(([, a], [, b]) => b.revenue - a.revenue);
+    const top = sorted.slice(0, 10).map(([group, v]) => ({ group, ...v }));
+    const rest = sorted.slice(10);
+    if (rest.length > 0) {
+      const other = rest.reduce((acc, [, v]) => ({ revenue: acc.revenue + v.revenue, quantity: acc.quantity + v.quantity }), { revenue: 0, quantity: 0 });
+      top.push({ group: lang === "en" ? "Other" : "Diğer", ...other });
+    }
+    return top;
+  }, [records, lang]);
+  const hasRealGroupData = useMemo(() => new Set(records.map(r => r.productGroup || "Genel")).size > 1, [records]);
+
+  // Saat Bazlı Yoğunluk Analizi — SADECE `saleHour` alanı ayrıştırılabilen satırlar
+  // (dosyada "Saat" sütunu yoksa veya değer ayrıştırılamadıysa dahil edilmez).
+  const hourlyDensityData = useMemo(() => {
+    const byHour = new Map<number, { revenue: number; count: number }>();
+    for (const r of records) {
+      if (r.saleHour === undefined || r.saleHour === null) continue;
+      const cur = byHour.get(r.saleHour) ?? { revenue: 0, count: 0 };
+      cur.revenue += r.netRevenue;
+      cur.count += 1;
+      byHour.set(r.saleHour, cur);
+    }
+    return Array.from(byHour.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([hour, v]) => ({ hour, ...v }));
+  }, [records]);
+
+  // Hızlı Tükenen Ürünler Sinyali — dosyadaki "Stok Adet" satır anlık görüntülerinden
+  // ürün başına EN SON bilinen stok + dönem içi satılan toplam adet. CANLI stok
+  // takibi DEĞİLDİR, yalnızca satış dosyasına dayalı bir sinyaldir.
+  const fastMovingStockData = useMemo(() => {
+    const byProduct = new Map<string, { lastStock: number; lastDate: string; soldQuantity: number }>();
+    for (const r of records) {
+      if (r.stockAtSale === undefined || r.stockAtSale === null) continue;
+      const cur = byProduct.get(r.productName) ?? { lastStock: r.stockAtSale, lastDate: r.saleDate, soldQuantity: 0 };
+      cur.soldQuantity += r.quantity;
+      if (r.saleDate >= cur.lastDate) { cur.lastStock = r.stockAtSale; cur.lastDate = r.saleDate; }
+      byProduct.set(r.productName, cur);
+    }
+    return Array.from(byProduct.entries())
+      .map(([productName, v]) => ({ productName, stockAtSale: v.lastStock, soldQuantity: v.soldQuantity }))
+      .sort((a, b) => a.stockAtSale - b.stockAtSale)
+      .slice(0, 15);
+  }, [records]);
+  const hasStockData = useMemo(() => records.some(r => r.stockAtSale !== undefined && r.stockAtSale !== null), [records]);
 
   const topProductsData = useMemo(() => {
     const byProduct = new Map<string, { quantity: number; revenue: number }>();
@@ -1567,6 +1721,36 @@ export default function SatisRaporPage() {
                 </section>
               </div>
 
+              {groupRevenueQuantityData.length > 0 && (
+                <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Revenue/Quantity by Product Category" : "Kategori Bazında Ciro/Adet Dağılımı"}</h3>
+                  {!hasRealGroupData ? (
+                    <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                      {lang === "en"
+                        ? "This file has no product group/category information, so a category breakdown cannot be shown."
+                        : "Bu dosyada ürün grubu bilgisi yok."}
+                    </div>
+                  ) : (
+                    <GroupRevenueQuantityChart
+                      data={groupRevenueQuantityData}
+                      lang={lang}
+                      onBarClick={(group) => {
+                        const otherLabel = lang === "en" ? "Other" : "Diğer";
+                        const isOtherBucket = group === otherLabel;
+                        const topGroupNames = new Set(groupRevenueQuantityData.filter(g => g.group !== otherLabel).map(g => g.group));
+                        const filtered = isOtherBucket
+                          ? records.filter(r => !topGroupNames.has(r.productGroup || "Genel"))
+                          : records.filter(r => (r.productGroup || "Genel") === group);
+                        setDrillDown({
+                          title: lang === "en" ? `${group} — ${filtered.length} sales` : `${group} — ${filtered.length} satış`,
+                          records: filtered,
+                        });
+                      }}
+                    />
+                  )}
+                </section>
+              )}
+
               {topProductsData.length > 0 && (
                 <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
                   <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Top 10 Best-Selling Products" : "En Çok Satan 10 Ürün"}</h3>
@@ -1669,6 +1853,46 @@ export default function SatisRaporPage() {
                   {lang === "en" ? "Same metric as above, but scoped to RETAIL sales only (excludes prescription/SGK)." : "Yukarıdakiyle aynı metrik, ancak SADECE perakende satışlar (reçeteli/SGK hariç)."}
                 </p>
                 <DayOfWeekChart data={dayOfWeekRetailData} lang={lang} />
+              </section>
+
+              {/* Saat Bazlı Yoğunluk Analizi */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Hour-of-Day Sales Density" : "Saat Bazlı Yoğunluk Analizi"}</h3>
+                {hourlyDensityData.length > 0 ? (
+                  <>
+                    <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                      {lang === "en" ? "Total revenue by transaction hour (only hours with data are shown)." : "İşlem saatine göre toplam ciro (yalnızca veri içeren saatler gösteriliyor)."}
+                    </p>
+                    <HourlyDensityChart data={hourlyDensityData} lang={lang} />
+                  </>
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en"
+                      ? "This file has no time information, hourly density cannot be shown."
+                      : "Bu dosyada saat bilgisi yok, saatlik yoğunluk gösterilemiyor."}
+                  </div>
+                )}
+              </section>
+
+              {/* Hızlı Tükenen Ürünler Sinyali */}
+              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
+                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Fast-Moving / Low-Stock Signal" : "Hızlı Tükenen Ürünler Sinyali"}</h3>
+                {hasStockData ? (
+                  <>
+                    <p style={{ fontSize: "11px", fontStyle: "italic", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
+                      {lang === "en"
+                        ? "This list is based on the point-in-time stock value in the sales file — for real-time stock tracking, use the Stock Inventory module."
+                        : "Bu liste satış dosyasındaki anlık stok bilgisine dayanır, gerçek zamanlı stok takibi için Stok Envanteri modülünü kullanın."}
+                    </p>
+                    <FastMovingStockTable data={fastMovingStockData} lang={lang} />
+                  </>
+                ) : (
+                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
+                    {lang === "en"
+                      ? "This file has no stock quantity column, this signal cannot be shown."
+                      : "Bu dosyada stok adet sütunu yok, bu sinyal gösterilemiyor."}
+                  </div>
+                )}
               </section>
 
             </div>
