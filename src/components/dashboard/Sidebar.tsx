@@ -140,7 +140,9 @@ export default function Sidebar() {
     <>
       {/* Mobile topbar — logo sol, hamburger sağ */}
       <header className="mobile-topbar">
-        <NetaSoftLogoFull size={28} variant="white" />
+        <Link href="/panel" aria-label={lang === "en" ? "Go to Dashboard" : "Ana Menüye Dön"} style={{ display: "inline-flex" }}>
+          <NetaSoftLogoFull size={28} variant="white" />
+        </Link>
         <button
           className="sidebar-toggle"
           onClick={() => setOpen((o) => !o)}
@@ -161,12 +163,18 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside className={`sidebar ${open ? "open" : ""}`} role="navigation" aria-label={lang === "en" ? "Main Menu" : "Ana Menü"}>
         {/* Logo */}
-        <div className="sidebar-logo">
+        <Link
+          href="/panel"
+          className="sidebar-logo"
+          aria-label={lang === "en" ? "Go to Dashboard" : "Ana Menüye Dön"}
+          onClick={() => setOpen(false)}
+          style={{ textDecoration: "none", cursor: "pointer" }}
+        >
           <NetaSoftIcon size={32} />
           <span className="sidebar-logo-text">
             Neta<span>Soft</span>
           </span>
-        </div>
+        </Link>
 
         {/* Eczane Değiştirici */}
         {pharmacies.length > 1 && (
