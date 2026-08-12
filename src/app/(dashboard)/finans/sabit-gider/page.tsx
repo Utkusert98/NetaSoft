@@ -4,6 +4,8 @@ import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import SingleDatePicker from "@/components/ui/SingleDatePicker";
 
 type Expense = {
   id: string;
@@ -233,7 +235,7 @@ export default function SabitGiderPage() {
 
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Expense Date" : "Gider Tarihi"}</label>
-              <input type="date" className="form-input" name="expenseDate" value={formData.expenseDate} onChange={handleChange} required />
+              <SingleDatePicker value={formData.expenseDate} onChange={(date) => setFormData(prev => ({ ...prev, expenseDate: date }))} lang={lang} required />
             </div>
 
             <div className="form-group">
@@ -287,11 +289,8 @@ export default function SabitGiderPage() {
             {lang === "en" ? "All Records" : "Geçmiş Kayıtlar"}
           </h2>
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" value={histStart} onChange={e => setHistStart(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
-            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>—</span>
-            <input type="date" value={histEnd} onChange={e => setHistEnd(e.target.value)}
-              className="form-input" style={{ width: "150px", fontSize: "13px" }} />
+            <DateRangePicker startDate={histStart} endDate={histEnd} lang={lang}
+              onChange={(start, end) => { setHistStart(start); setHistEnd(end); }} />
             {(histStart || histEnd) && (
               <button onClick={() => { setHistStart(""); setHistEnd(""); }} className="btn"
                 style={{ fontSize: "12px", padding: "4px 10px", border: "1px solid var(--color-border)" }}>
@@ -348,7 +347,7 @@ export default function SabitGiderPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Expense Date" : "Gider Tarihi"}</label>
-                <input type="date" className="form-input" value={editForm.expenseDate} onChange={e => setEditForm(p => ({ ...p, expenseDate: e.target.value }))} required />
+                <SingleDatePicker value={editForm.expenseDate} onChange={(date) => setEditForm(p => ({ ...p, expenseDate: date }))} lang={lang} required />
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildMonthGrid, nextRangeSelection, isInRange, isInHoverPreview } from "./dateRangePickerLogic";
+import { buildMonthGrid, nextRangeSelection, isInRange, isInHoverPreview, nextSingleDateSelection, isSameDate } from "./dateRangePickerLogic";
 
 describe("buildMonthGrid — takvim grid üretimi", () => {
   it("42 gün (6 hafta) döner, hafta Pazartesi'den başlar", () => {
@@ -67,5 +67,21 @@ describe("isInRange / isInHoverPreview", () => {
     expect(isInHoverPreview("2026-06-20", "2026-07-01", null, "2026-06-15")).toBe(true);
     // end zaten seçiliyse önizleme uygulanmaz (tamamlanmış aralık isInRange ile gösterilir)
     expect(isInHoverPreview("2026-07-10", "2026-07-01", "2026-07-15", "2026-07-20")).toBe(false);
+  });
+});
+
+describe("nextSingleDateSelection — tek tarih seçim mantığı", () => {
+  it("tıklanan gün doğrudan seçili tarih olur", () => {
+    expect(nextSingleDateSelection("2026-07-01")).toBe("2026-07-01");
+  });
+});
+
+describe("isSameDate", () => {
+  it("seçili tarih ile eşleşen günde true döner", () => {
+    expect(isSameDate("2026-07-01", "2026-07-01")).toBe(true);
+  });
+  it("seçili tarih yoksa veya farklıysa false döner", () => {
+    expect(isSameDate("2026-07-01", null)).toBe(false);
+    expect(isSameDate("2026-07-01", "2026-07-02")).toBe(false);
   });
 });
