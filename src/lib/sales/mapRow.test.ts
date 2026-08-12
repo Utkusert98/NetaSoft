@@ -242,6 +242,38 @@ describe("mapRow — tek satırlık bozuk tarih, sessizce bugüne düşmez ve i�
   });
 });
 
+describe("mapRow — 'Satış Adet'/'Ürün Grup' (tekil) başlık varyantları (gerçek üretim dosyası)", () => {
+  // Gerçek hata: bazı POS dosyalarında adet sütunu "Satış Adedi" değil "Satış
+  // Adet" (sonda 'i' yok), grup sütunu da "Ürün Grubu" değil "Ürün Grup"
+  // (sonda 'u' yok) olarak geçiyor. Eski alias listeleri bu tekil biçimleri
+  // tanımıyordu — adet bulunamayınca her satır miktar=1 varsayıyordu, bu da
+  // birden fazla adet satılan satırlarda ciroyu ciddi şekilde (bu dosyada
+  // ~%264) düşük hesaplıyordu.
+  const headers = ["İşlem No", "Tarih", "İşlem Tipi", "Ürün Grup", "Ürün Adı", "Satış Adet", "Birim Fiyat", "Toplam Tutar", "İskonto Tutar", "Net Tutar", "Personel"];
+  const row = ["22803", "01/08/2026", "P.SATIŞ (K.K.)", "İLAÇ", "RENNIE 680 80 MG 48 CIGNEME TB.", "2", "298.63", "597.26", "0.00", "597.26", "KASA"];
+
+  it("'Satış Adet' (tekil) sütunu adet olarak doğru bulunur", () => {
+    const { colMap } = mapRow(headers, row, {});
+    expect(colMap.quantity).toBe("Satış Adet");
+  });
+
+  it("'Ürün Grup' (tekil) sütunu grup olarak doğru bulunur", () => {
+    const { colMap } = mapRow(headers, row, {});
+    expect(colMap.group).toBe("Ürün Grup");
+  });
+
+  it("adet doğru okunduğu için ciro (fiyat×adet) doğru hesaplanır, 1 varsayılmaz", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.quantity).toBe(2);
+    expect(mapped.netRevenue).toBeCloseTo(597.26, 2);
+  });
+
+  it("bu eşleştirme manuel müdahale gerektirmeden güvenilir sayılır", () => {
+    const { colMap } = mapRow(headers, row, {});
+    expect(isColumnMapConfident(colMap)).toBe(true);
+  });
+});
+
 describe("isGenericWalkInCustomer — anonim müşteri yer tutucusu tespiti", () => {
   it("'PERAKENDE MÜŞTERİ' değerini genel/anonim olarak işaretler", () => {
     expect(isGenericWalkInCustomer("PERAKENDE MÜŞTERİ")).toBe(true);
