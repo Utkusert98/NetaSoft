@@ -208,8 +208,6 @@ function TypeDistributionPieChart({ prescriptionRevenue, retailRevenue, lang, on
             outerRadius={100}
             paddingAngle={4}
             dataKey="value"
-            label={((entry: { name?: string; pct?: number }) => `${entry.name} %${entry.pct}`) as unknown as ChartFormatter}
-            labelLine={false}
             onClick={(entry: unknown) => {
               const e = entry as { type?: "PRESCRIPTION" | "RETAIL" };
               if (e?.type) onSliceClick(e.type);
