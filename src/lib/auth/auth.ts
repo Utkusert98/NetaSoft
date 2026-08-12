@@ -72,10 +72,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           data: { lastLoginAt: new Date() },
         });
 
-        // Audit log
+        // Audit log — `pharmacyId` MUTLAKA doldurulmalı: Denetim Kayıtları
+        // sayfası (bkz. /api/v1/raporlar/denetim-kayitlari) sorguyu
+        // `pharmacyId`'ye göre filtreliyor, bu alan boş bırakılırsa LOGIN
+        // kayıtları veritabanına düşer ama ekranda HİÇBİR ZAMAN görünmez
+        // (gerçek bir kullanıcı denetimiyle tespit edilen bir hata).
+        // `getActivePharmacyId` burada KULLANILMAZ — o `cookies()`'e bağlıdır
+        // ve NextAuth'un `authorize()` callback'i içinde güvenilir şekilde
+        // çalışacağı garanti değildir; bunun yerine kullanıcının ilk (en eski)
+        // eczane rolü doğrudan sorgulanır.
+        const primaryRole = await prisma.userPharmacyRole.findFirst({
+          where: { userId: user.id },
+          orderBy: { createdAt: "asc" },
+          select: { pharmacyId: true },
+        });
         await prisma.auditLog.create({
           data: {
             userId: user.id,
+            pharmacyId: primaryRole?.pharmacyId ?? null,
             action: "LOGIN",
             entityType: "User",
             entityId: user.id,
