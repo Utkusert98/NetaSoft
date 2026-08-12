@@ -5,6 +5,7 @@ import { z } from "zod";
 import { apiError, apiResponse } from "@/lib/utils";
 import { getLang, m, translateZod } from "@/lib/i18n/api-messages";
 import { getActivePharmacyId } from "@/lib/pharmacy";
+import { logAudit } from "@/lib/audit";
 
 const rowSchema = z.object({
   productGroup: z.string().default("Genel"),
@@ -66,6 +67,18 @@ export async function POST(req: Request): Promise<Response> {
     for (let i = 0; i < mapped.length; i += CHUNK) {
       await prisma.saleRecord.createMany({ data: mapped.slice(i, i + CHUNK) });
     }
+
+    // Toplu dosya içe aktarma kritik bir veri değişikliğidir (AGENTS.md
+    // madde 5) — daha önce audit_logs'a hiç yazılmıyordu, bu bir kullanıcı
+    // denetimiyle tespit edilen gerçek bir eksikti.
+    await logAudit({
+      userId: session.user.id,
+      pharmacyId,
+      action: "CREATE",
+      entityType: "SaleRecordBatch",
+      entityId: batchId,
+      newData: { recordCount: rows.length },
+    });
 
     return NextResponse.json({ success: true, count: rows.length, batchId }, { status: 201 });
   } catch (error) {
