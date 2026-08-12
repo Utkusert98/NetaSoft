@@ -338,57 +338,105 @@ h6 { font-size: var(--font-size-base); }
   position: relative;
 }
 
-/* NetAI hero başlığı — light modda dahi koyu/atmosferik bir vurgu, genel
-   light/dark tema tercihini bozmadan sadece bu sayfanın header alanına
-   uygulanır (marka renkleri: --color-primary koyu yeşil + açık yeşil accent). */
-.netai-hero {
-  background: linear-gradient(135deg, #0d2000 0%, #163300 55%, #234d0a 100%);
+/* ================================
+   NETAI — "AI Stüdyosu" koyu tema
+   Bu blok SADECE /ai-destek sayfasına özeldir; kullanıcının uygulama
+   genelindeki light/dark tema tercihiyle bağlantısı yoktur — sayfa her
+   zaman Gemini benzeri, neredeyse siyah, atmosferik bir stüdyo olarak
+   render edilir (bilinçli bir tasarım kararı, bkz. AGENTS.md turu notları).
+   ================================ */
+
+/* Sayfanın kendi koyu zemini — çok koyu, hafif mavi-mor alt tonlu gri
+   (saf siyah değil, Gemini'nin karakteristik #0b0c10 civarı tonu). */
+.netai-page {
+  background: radial-gradient(circle at 18% -10%, rgba(159, 232, 112, 0.07), transparent 45%),
+    radial-gradient(circle at 100% 0%, rgba(22, 51, 0, 0.35), transparent 55%),
+    #0b0c10;
+  color: #e7e9ee;
   border-radius: var(--radius-lg);
-  padding: var(--spacing-5) var(--spacing-6);
+  padding: var(--spacing-5) var(--spacing-5) 0;
+}
+@media (max-width: 768px) {
+  .netai-page {
+    border-radius: 0;
+    margin: calc(var(--spacing-4) * -1);
+    padding: var(--spacing-4) var(--spacing-4) 0;
+  }
+}
+
+/* NetAI marka yazısı — gradyan dolgulu metin, marka yeşilleri arasında.
+   Sidebar'da da aynı sınıf küçük ölçekte kullanılır (letter-spacing biraz
+   daraltılır orada okunaklılık için). */
+.netai-brand-text {
+  background: linear-gradient(120deg, #d9ffb0 0%, #9fe870 45%, #4e9b3f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #9fe870;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* NetAI hero başlığı — koyu stüdyo zemininin içinde ince bir üst şerit,
+   marka rengi radial vurgularla. */
+.netai-hero {
   position: relative;
   overflow: hidden;
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid rgba(159, 232, 112, 0.12);
 }
 .netai-hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 85% 0%, rgba(159, 232, 112, 0.25), transparent 60%);
+  background: radial-gradient(circle at 85% 0%, rgba(159, 232, 112, 0.16), transparent 60%);
   pointer-events: none;
 }
 
-/* "Hey Siri" tarzı kenar parıltısı — sadece aktif durumlarda (dinlerken/
-   düşünürken) çalışır, boşta dururken tamamen kapalı olmalı (performans). */
+/* "Hey Siri" tarzı kenar parıltısı. Ekranın dört kenarında yumuşak, nabız
+   atan bir ışık şeridi — çok katmanlı `inset box-shadow` ile: filter:blur()
+   gerektirmez (daha performanslı), zaten kenarlara doğru yumuşak bir geçiş
+   verir. İki durumu var:
+   - idle: çok soluk, yavaş (8-15s) bir "nefes alma" — asla tam kaybolmaz
+   - active (dinlerken/düşünürken): belirgin, hızlı (1.8s) nabız
+   z-index sayfanın header/nav'ının üzerine çıkmaması için sidebar'ın altında
+   tutulur (sidebar z-index'i genelde daha yüksektir; sadece görsel bir kenar
+   çerçevesi olduğu için bu sorun yaratmaz). */
 .netai-glow {
   pointer-events: none;
   position: fixed;
   inset: 0;
-  z-index: 40;
-  opacity: 0;
-  transition: opacity 0.25s ease;
+  z-index: 5;
+  will-change: box-shadow;
+  animation: netai-breathe 9s ease-in-out infinite;
 }
 .netai-glow.netai-glow-active {
-  opacity: 1;
+  animation: netai-pulse 1.8s ease-in-out infinite;
 }
-.netai-glow::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  box-shadow:
-    inset 0 0 40px 6px rgba(159, 232, 112, 0.55),
-    inset 0 0 90px 18px rgba(22, 51, 0, 0.5);
-  animation: netai-pulse 2.2s ease-in-out infinite;
-  will-change: opacity, box-shadow;
+@keyframes netai-breathe {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 60px 4px rgba(159, 232, 112, 0.05),
+      inset 0 0 120px 10px rgba(22, 51, 0, 0.08);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 70px 8px rgba(159, 232, 112, 0.11),
+      inset 0 0 140px 16px rgba(22, 51, 0, 0.14);
+  }
 }
 @keyframes netai-pulse {
   0%, 100% {
     box-shadow:
-      inset 0 0 30px 4px rgba(159, 232, 112, 0.4),
-      inset 0 0 70px 14px rgba(22, 51, 0, 0.35);
+      inset 0 0 60px 10px rgba(159, 232, 112, 0.55),
+      inset 0 0 130px 26px rgba(78, 155, 63, 0.4),
+      inset 0 0 200px 40px rgba(22, 51, 0, 0.35);
   }
   50% {
     box-shadow:
-      inset 0 0 55px 10px rgba(159, 232, 112, 0.75),
-      inset 0 0 110px 24px rgba(22, 51, 0, 0.55);
+      inset 0 0 90px 18px rgba(159, 232, 112, 0.9),
+      inset 0 0 170px 38px rgba(78, 155, 63, 0.6),
+      inset 0 0 260px 55px rgba(22, 51, 0, 0.5);
   }
 }
 

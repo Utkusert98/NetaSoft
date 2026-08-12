@@ -112,9 +112,10 @@ function AssistantMessage({
     <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
       <NetAiOrb active={speaking} />
       <div style={{
-        background: "var(--color-surface)", border: "1px solid var(--color-border)",
+        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
         borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
         fontSize: "var(--font-size-sm)", lineHeight: 1.7, whiteSpace: "pre-wrap",
+        color: "#e7e9ee",
       }}>
         {content}
         {canSpeak && (
@@ -127,7 +128,7 @@ function AssistantMessage({
               style={{
                 display: "inline-flex", alignItems: "center", gap: "4px",
                 background: "none", border: "none", cursor: "pointer",
-                color: speaking ? "var(--color-primary)" : "var(--color-text-muted)",
+                color: speaking ? "#9fe870" : "rgba(231,233,238,0.55)",
                 fontSize: "12px", fontWeight: 600, padding: 0,
               }}
             >
@@ -145,14 +146,14 @@ function UserMessage({ content }: { content: string }) {
     <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", flexDirection: "row-reverse" }}>
       <div style={{
         width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-        background: "var(--color-primary)", color: "white",
+        background: "linear-gradient(135deg, #163300, #4e9b3f)", color: "white",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontWeight: 700, fontSize: "14px",
       }}>
         S
       </div>
       <div style={{
-        background: "var(--color-primary)", color: "white",
+        background: "linear-gradient(135deg, #234d0a, #163300)", color: "white",
         borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
         fontSize: "var(--font-size-sm)", lineHeight: 1.7, whiteSpace: "pre-wrap",
       }}>
@@ -437,8 +438,8 @@ export default function AiDestek() {
   };
 
   return (
-    <main className="page-content ai-destek-main" style={{ display: "flex", flexDirection: "column", maxWidth: 900 }}>
-      {/* Kenar parıltısı — sadece dinlerken/düşünürken aktif */}
+    <main className="page-content ai-destek-main netai-page" style={{ display: "flex", flexDirection: "column", maxWidth: 900 }}>
+      {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız */}
       <div className={`netai-glow ${(listening || loading) ? "netai-glow-active" : ""}`} aria-hidden="true" />
 
       {/* Header */}
@@ -446,10 +447,10 @@ export default function AiDestek() {
         <div style={{ display: "flex", alignItems: "center", gap: "14px", position: "relative", zIndex: 1 }}>
           <NetAiOrb size={44} active={listening || loading} />
           <div>
-            <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "4px", color: "white", letterSpacing: "-0.02em" }}>
+            <h1 className="netai-brand-text" style={{ fontSize: "var(--font-size-3xl)", marginBottom: "4px", lineHeight: 1.1 }}>
               {ui.title}
             </h1>
-            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "var(--font-size-sm)" }}>
+            <p style={{ color: "rgba(231,233,238,0.65)", fontSize: "var(--font-size-sm)" }}>
               {ui.subtitle}
             </p>
           </div>
@@ -464,8 +465,8 @@ export default function AiDestek() {
             style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)",
-              color: "white", cursor: loading ? "not-allowed" : "pointer",
+              border: "1px solid rgba(159,232,112,0.3)", background: "rgba(159,232,112,0.08)",
+              color: "#e7e9ee", cursor: loading ? "not-allowed" : "pointer",
               fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
               opacity: loading ? 0.6 : 1,
             }}
@@ -479,8 +480,8 @@ export default function AiDestek() {
             style={{
               display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
               padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)",
-              textDecoration: "none", color: "rgba(255,255,255,0.85)",
+              border: "1px solid rgba(255,255,255,0.16)", background: "rgba(255,255,255,0.05)",
+              textDecoration: "none", color: "rgba(231,233,238,0.85)",
               fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
             }}
           >
@@ -489,11 +490,11 @@ export default function AiDestek() {
         </div>
       </div>
 
-      {/* Chat area — atmosferik, light modda dahi hafif koyu bir zemin */}
+      {/* Chat area — koyu stüdyo zeminiyle uyumlu, ferah bir mesaj akışı */}
       <div style={{
         flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
-        padding: "var(--spacing-5)", background: "var(--color-bg-alt)",
-        borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",
+        padding: "var(--spacing-5)", background: "rgba(255,255,255,0.015)",
+        borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.06)",
         marginBottom: "var(--spacing-4)",
       }}>
         {messages.map((msg) => (
@@ -513,7 +514,7 @@ export default function AiDestek() {
             {/* Follow-up suggestions after assistant message */}
             {msg.role === "assistant" && msg.followUps && msg.followUps.length > 0 && !loading && (
               <div style={{ marginTop: "10px", marginLeft: "48px" }}>
-                <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "6px", fontWeight: 500 }}>
+                <p style={{ fontSize: "11px", color: "rgba(231,233,238,0.5)", marginBottom: "6px", fontWeight: 500 }}>
                   {ui.suggestions}
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -524,14 +525,14 @@ export default function AiDestek() {
                       style={{
                         fontSize: "12px", padding: "5px 12px",
                         borderRadius: "var(--radius-full)",
-                        border: "1px solid var(--color-primary)",
+                        border: "1px solid rgba(159,232,112,0.4)",
                         background: "transparent",
-                        color: "var(--color-primary)",
+                        color: "#9fe870",
                         cursor: "pointer", fontWeight: 500,
                         transition: "background 0.15s, color 0.15s",
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "white"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--color-primary)"; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "#9fe870"; e.currentTarget.style.color = "#0b0c10"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9fe870"; }}
                     >
                       {q}
                     </button>
@@ -549,17 +550,17 @@ export default function AiDestek() {
         {loading && !displayedText && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <NetAiOrb active />
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(255,255,255,0.04)", borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ display: "flex", gap: "5px" }}>
                 {[0, 1, 2].map((i) => (
                   <div key={i} style={{
                     width: 8, height: 8, borderRadius: "50%",
-                    background: "var(--color-primary)", opacity: 0.6,
+                    background: "#9fe870", opacity: 0.6,
                     animation: `bounce 1s ${i * 0.15}s infinite`,
                   }} />
                 ))}
               </div>
-              <span style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 500 }}>{ui.thinking}</span>
+              <span style={{ fontSize: "12px", color: "rgba(231,233,238,0.6)", fontWeight: 500 }}>{ui.thinking}</span>
             </div>
           </div>
         )}
@@ -574,8 +575,16 @@ export default function AiDestek() {
             <button
               key={q}
               onClick={() => void sendMessage(q)}
-              className="btn btn-ghost"
-              style={{ fontSize: "var(--font-size-xs)", padding: "6px 12px" }}
+              style={{
+                fontSize: "var(--font-size-xs)", padding: "6px 12px",
+                borderRadius: "var(--radius-full)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.04)",
+                color: "rgba(231,233,238,0.85)", cursor: "pointer", fontWeight: 500,
+                transition: "background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(159,232,112,0.1)"; e.currentTarget.style.borderColor = "rgba(159,232,112,0.4)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
             >
               {q}
             </button>
@@ -584,7 +593,7 @@ export default function AiDestek() {
       )}
 
       {/* Input */}
-      <div style={{ display: "flex", gap: "var(--spacing-3)", alignItems: "flex-end" }}>
+      <div style={{ display: "flex", gap: "var(--spacing-3)", alignItems: "flex-end", paddingBottom: "var(--spacing-5)" }}>
         <textarea
           ref={inputRef}
           value={input}
@@ -596,13 +605,14 @@ export default function AiDestek() {
           className="ai-chat-input"
           style={{
             flex: 1, resize: "none", padding: "12px 16px",
-            borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",
-            background: "var(--color-surface)", fontFamily: "var(--font-family)",
+            borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.04)", fontFamily: "var(--font-family)",
+            color: "#e7e9ee",
             fontSize: "var(--font-size-sm)", lineHeight: 1.6,
             outline: "none", transition: "border-color var(--transition-fast)",
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = "var(--color-border)"; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = "#9fe870"; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
         />
         {micSupported && (
           <button
@@ -614,9 +624,9 @@ export default function AiDestek() {
             className={`netai-mic-btn ${listening ? "netai-mic-listening" : ""}`}
             style={{
               height: 48, width: 48, flexShrink: 0, borderRadius: "var(--radius-lg)",
-              border: `1px solid ${listening ? "var(--color-primary)" : "var(--color-border)"}`,
-              background: listening ? "var(--color-primary)" : "var(--color-surface)",
-              color: listening ? "white" : "var(--color-text)",
+              border: `1px solid ${listening ? "#9fe870" : "rgba(255,255,255,0.12)"}`,
+              background: listening ? "linear-gradient(135deg, #163300, #4e9b3f)" : "rgba(255,255,255,0.04)",
+              color: listening ? "white" : "#e7e9ee",
               cursor: loading ? "not-allowed" : "pointer", fontSize: "18px",
               display: "flex", alignItems: "center", justifyContent: "center",
               opacity: loading ? 0.6 : 1,
@@ -628,8 +638,13 @@ export default function AiDestek() {
         <button
           onClick={() => void sendMessage(input)}
           disabled={loading || !input.trim()}
-          className="btn btn-primary"
-          style={{ height: 48, paddingInline: "var(--spacing-5)", flexShrink: 0 }}
+          style={{
+            height: 48, paddingInline: "var(--spacing-5)", flexShrink: 0,
+            borderRadius: "var(--radius-lg)", border: "none",
+            background: loading || !input.trim() ? "rgba(159,232,112,0.25)" : "linear-gradient(120deg, #9fe870, #4e9b3f)",
+            color: "#0b0c10", fontWeight: 700, fontSize: "var(--font-size-sm)",
+            cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+          }}
         >
           {loading ? "..." : ui.send}
         </button>

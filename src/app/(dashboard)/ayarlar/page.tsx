@@ -221,9 +221,15 @@ function NetAiVoicePanel() {
   if (!mounted) return null;
 
   return (
-    <div className="card">
+    <div className="card" style={{ position: "relative", overflow: "hidden" }}>
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+        background: "linear-gradient(120deg, #9fe870, #4e9b3f, #163300)",
+      }} aria-hidden="true" />
       <div style={{ marginBottom: "var(--spacing-5)" }}>
-        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.netaiTitle, lang)}</h2>
+        <h2 className="netai-brand-text" style={{ fontSize: "var(--font-size-lg)" }}>
+          {tx(t.settings.netaiTitle, lang)}
+        </h2>
         <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "4px" }}>
           {tx(t.settings.netaiDesc, lang)}
         </p>
