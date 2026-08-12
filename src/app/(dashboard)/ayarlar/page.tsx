@@ -5,6 +5,7 @@ import { useTheme, type Theme } from "@/lib/hooks/useTheme";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { getInitials } from "@/lib/utils";
+import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
 
 interface PharmacyData {
   id: string; name: string; taxNumber: string | null; licenseNumber: string | null;
@@ -20,7 +21,7 @@ interface TeamMember {
   userId: string; name: string | null; email: string; role: string; isActive: boolean;
 }
 
-type Tab = "eczane" | "profil" | "sifre" | "ekip" | "guvenlik" | "faturalama" | "tema" | "dil";
+type Tab = "eczane" | "profil" | "sifre" | "ekip" | "guvenlik" | "faturalama" | "tema" | "netai" | "dil";
 
 function SuccessBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
   return (
@@ -171,6 +172,153 @@ function LangPicker() {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function NetAiVoicePanel() {
+  const { lang } = useLangContext();
+  const { settings, setSettings, mounted } = useVoiceSettings();
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [supported, setSupported] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSupported(false);
+      return;
+    }
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
+
+  const handleTest = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(tx(t.settings.netaiTestText, lang));
+    utterance.lang = lang === "tr" ? "tr-TR" : "en-US";
+    utterance.rate = settings.rate;
+    utterance.pitch = settings.pitch;
+    if (settings.voiceURI) {
+      const voice = voices.find((v) => v.voiceURI === settings.voiceURI);
+      if (voice) utterance.voice = voice;
+    }
+    window.speechSynthesis.speak(utterance);
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <div className="card">
+      <div style={{ marginBottom: "var(--spacing-5)" }}>
+        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.netaiTitle, lang)}</h2>
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "4px" }}>
+          {tx(t.settings.netaiDesc, lang)}
+        </p>
+      </div>
+
+      {!supported && (
+        <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-danger)", marginBottom: "var(--spacing-4)" }}>
+          {tx(t.settings.netaiUnsupported, lang)}
+        </p>
+      )}
+
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--spacing-4)",
+        padding: "var(--spacing-4)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)",
+        marginBottom: "var(--spacing-5)",
+      }}>
+        <div>
+          <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{tx(t.settings.netaiEnable, lang)}</p>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>{tx(t.settings.netaiEnableDesc, lang)}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={settings.enabled}
+          onClick={() => setSettings({ enabled: !settings.enabled })}
+          style={{
+            width: 46, height: 26, borderRadius: "var(--radius-full)", flexShrink: 0,
+            border: "none", cursor: "pointer", position: "relative",
+            background: settings.enabled ? "var(--color-primary)" : "var(--color-border)",
+            transition: "background 0.15s",
+          }}
+        >
+          <span style={{
+            position: "absolute", top: 3, left: settings.enabled ? 23 : 3,
+            width: 20, height: 20, borderRadius: "50%", background: "white",
+            transition: "left 0.15s",
+          }} />
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-5)", opacity: settings.enabled ? 1 : 0.5 }}>
+        <div>
+          <label style={{ display: "block", fontWeight: 600, fontSize: "var(--font-size-sm)", marginBottom: "6px" }}>
+            {tx(t.settings.netaiVoice, lang)}
+          </label>
+          <select
+            disabled={!settings.enabled}
+            value={settings.voiceURI ?? ""}
+            onChange={(e) => setSettings({ voiceURI: e.target.value || null })}
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: "var(--radius-md)",
+              border: "1px solid var(--color-border)", background: "var(--color-bg)",
+              color: "var(--color-text)", fontSize: "var(--font-size-sm)",
+            }}
+          >
+            <option value="">{tx(t.settings.netaiVoiceDefault, lang)}</option>
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name} ({v.lang})
+              </option>
+            ))}
+          </select>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "6px" }}>
+            {tx(t.settings.netaiVoiceHint, lang)}
+          </p>
+        </div>
+
+        <div>
+          <label style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, fontSize: "var(--font-size-sm)", marginBottom: "6px" }}>
+            <span>{tx(t.settings.netaiRate, lang)}</span>
+            <span style={{ color: "var(--color-text-muted)", fontWeight: 500 }}>{settings.rate.toFixed(1)}x</span>
+          </label>
+          <input
+            type="range" min={0.5} max={2} step={0.1}
+            disabled={!settings.enabled}
+            value={settings.rate}
+            onChange={(e) => setSettings({ rate: Number(e.target.value) })}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, fontSize: "var(--font-size-sm)", marginBottom: "6px" }}>
+            <span>{tx(t.settings.netaiPitch, lang)}</span>
+            <span style={{ color: "var(--color-text-muted)", fontWeight: 500 }}>{settings.pitch.toFixed(1)}</span>
+          </label>
+          <input
+            type="range" min={0} max={2} step={0.1}
+            disabled={!settings.enabled}
+            value={settings.pitch}
+            onChange={(e) => setSettings({ pitch: Number(e.target.value) })}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={!settings.enabled || !supported}
+          className="btn btn-ghost"
+          style={{ alignSelf: "flex-start" }}
+        >
+          {tx(t.settings.netaiTest, lang)}
+        </button>
       </div>
     </div>
   );
@@ -656,6 +804,7 @@ export default function AyarlarPage() {
     { key: "guvenlik", label: tx(t.settings.securityTab, lang), icon: "🛡️" },
     { key: "faturalama", label: tx(t.settings.billingTab, lang), icon: "💳" },
     { key: "tema", label: tx(t.settings.themeTab, lang), icon: "🎨" },
+    { key: "netai", label: tx(t.settings.netaiTab, lang), icon: "🎙️" },
     { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: "🌐" },
   ];
 
@@ -821,6 +970,9 @@ export default function AyarlarPage() {
 
       {/* ── Tema ── */}
       {tab === "tema" && <ThemePicker />}
+
+      {/* ── NetAI ── */}
+      {tab === "netai" && <NetAiVoicePanel />}
 
       {/* ── Dil ── */}
       {tab === "dil" && <LangPicker />}

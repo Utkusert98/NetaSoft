@@ -335,6 +335,95 @@ h6 { font-size: var(--font-size-base); }
 .ai-destek-main {
   height: calc(100vh - var(--header-height));
   height: calc(100dvh - var(--header-height));
+  position: relative;
+}
+
+/* NetAI hero başlığı — light modda dahi koyu/atmosferik bir vurgu, genel
+   light/dark tema tercihini bozmadan sadece bu sayfanın header alanına
+   uygulanır (marka renkleri: --color-primary koyu yeşil + açık yeşil accent). */
+.netai-hero {
+  background: linear-gradient(135deg, #0d2000 0%, #163300 55%, #234d0a 100%);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5) var(--spacing-6);
+  position: relative;
+  overflow: hidden;
+}
+.netai-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 0%, rgba(159, 232, 112, 0.25), transparent 60%);
+  pointer-events: none;
+}
+
+/* "Hey Siri" tarzı kenar parıltısı — sadece aktif durumlarda (dinlerken/
+   düşünürken) çalışır, boşta dururken tamamen kapalı olmalı (performans). */
+.netai-glow {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.netai-glow.netai-glow-active {
+  opacity: 1;
+}
+.netai-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 0 40px 6px rgba(159, 232, 112, 0.55),
+    inset 0 0 90px 18px rgba(22, 51, 0, 0.5);
+  animation: netai-pulse 2.2s ease-in-out infinite;
+  will-change: opacity, box-shadow;
+}
+@keyframes netai-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 30px 4px rgba(159, 232, 112, 0.4),
+      inset 0 0 70px 14px rgba(22, 51, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 55px 10px rgba(159, 232, 112, 0.75),
+      inset 0 0 110px 24px rgba(22, 51, 0, 0.55);
+  }
+}
+
+/* NetAI orb — mikrofon dinlerken/AI konuşurken nabız atan marka rengi halka */
+.netai-orb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.netai-orb-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary-light);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.netai-orb.netai-orb-active .netai-orb-ring {
+  animation: netai-orb-ping 1.6s ease-out infinite;
+}
+@keyframes netai-orb-ping {
+  0% { transform: scale(0.9); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.netai-mic-btn {
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.netai-mic-btn.netai-mic-listening {
+  animation: netai-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes netai-mic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }
 @media (max-width: 768px) {
   .ai-destek-main {
