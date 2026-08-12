@@ -259,7 +259,9 @@ export default function Sidebar() {
                   <span className="sidebar-item-icon" aria-hidden="true">
                     {item.icon}
                   </span>
-                  {tx(t.sidebar[item.labelKey], lang)}
+                  {item.href === "/ai-destek"
+                    ? <span className="netai-brand-text" style={{ letterSpacing: "-0.01em" }}>NetAI</span>
+                    : tx(t.sidebar[item.labelKey], lang)}
                 </Link>
               ))}
             </div>

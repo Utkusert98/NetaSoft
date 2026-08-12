@@ -189,15 +189,30 @@ function NetAiVoicePanel() {
       setSupported(false);
       return;
     }
-    // Tarayıcı genelde onlarca dildeki TÜM sesleri döner ("bir sürü ses var"
-    // şikayeti) — kullanıcının arayüz diline uyan sesler öne/yalnız alınır,
-    // hiç eşleşme yoksa (bazı tarayıcılarda tr-TR sesi olmayabilir) tüm
-    // liste geri döner ki kullanıcı seçeneksiz kalmasın.
+    // Tarayıcı genelde onlarca dildeki TÜM sesleri döner ("bir sürü ses var,
+    // en beğenilen birkaç tane koy" şikayeti) — önce kullanıcının arayüz
+    // diline uyan sesler alınır, sonra bunlar arasından gerçeğe en yakın
+    // (genelde bulut tabanlı/"Natural"/"Enhanced" gibi işaretli, cihazda
+    // yerel kurulu olmayan) sesler öncelenip listeyi en fazla 5 seçenekle
+    // sınırlıyoruz. Eşleşme yoksa (bazı tarayıcılarda tr-TR sesi olmayabilir)
+    // tüm liste geri döner ki kullanıcı seçeneksiz kalmasın.
+    const QUALITY_HINTS = ["natural", "enhanced", "premium", "neural", "google", "microsoft"];
+    const rankVoice = (v: SpeechSynthesisVoice): number => {
+      const name = v.name.toLowerCase();
+      let score = 0;
+      if (QUALITY_HINTS.some((hint) => name.includes(hint))) score += 2;
+      if (!v.localService) score += 1;
+      return score;
+    };
     const loadVoices = () => {
       const all = window.speechSynthesis.getVoices();
       const langPrefix = lang === "tr" ? "tr" : "en";
       const matching = all.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
-      setVoices(matching.length > 0 ? matching : all);
+      const pool = matching.length > 0 ? matching : all;
+      const curated = [...pool]
+        .sort((a, b) => rankVoice(b) - rankVoice(a))
+        .slice(0, 5);
+      setVoices(curated);
     };
     loadVoices();
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
@@ -221,9 +236,15 @@ function NetAiVoicePanel() {
   if (!mounted) return null;
 
   return (
-    <div className="card">
+    <div className="card" style={{ position: "relative", overflow: "hidden" }}>
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+        background: "linear-gradient(120deg, #9fe870, #4e9b3f, #163300)",
+      }} aria-hidden="true" />
       <div style={{ marginBottom: "var(--spacing-5)" }}>
-        <h2 style={{ fontWeight: 700 }}>{tx(t.settings.netaiTitle, lang)}</h2>
+        <h2 className="netai-brand-text" style={{ fontSize: "var(--font-size-lg)" }}>
+          {tx(t.settings.netaiTitle, lang)}
+        </h2>
         <p style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", marginTop: "4px" }}>
           {tx(t.settings.netaiDesc, lang)}
         </p>
