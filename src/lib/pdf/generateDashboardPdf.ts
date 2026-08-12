@@ -170,7 +170,7 @@ function buildPage1(data: DashboardData, subtitle: string): string {
         </div>`).join("")}
     </div>
   `;
-  return pageShell("Finansal Özet Raporu", subtitle, body, "Sayfa 1/3 — Finansal Özet");
+  return pageShell("Finansal Özet Raporu", subtitle, body, "Sayfa 1/4 — Finansal Özet");
 }
 
 function buildPage2(data: DashboardData, subtitle: string): string {
@@ -220,7 +220,7 @@ function buildPage2(data: DashboardData, subtitle: string): string {
     ${sectionTitle("Platform Gelirleri")}
     ${platformSection}
   `;
-  return pageShell("Senet & SGK & Platform Raporu", subtitle, body, "Sayfa 2/3 — Ödemeler");
+  return pageShell("Senet & SGK & Platform Raporu", subtitle, body, "Sayfa 2/4 — Ödemeler");
 }
 
 function buildPage3(data: DashboardData, subtitle: string): string {
@@ -256,15 +256,132 @@ function buildPage3(data: DashboardData, subtitle: string): string {
         </div>`).join("")}
     </div>
   `;
-  return pageShell("Kârlılık Analizi & Eylem Planı", subtitle, body, "Sayfa 3/3 — Analiz");
+  return pageShell("Kârlılık Analizi & Eylem Planı", subtitle, body, "Sayfa 3/4 — Analiz");
+}
+
+// ── Satış Raporu & Envanter Özeti (Sayfa 4) ──────────────────────────────────
+// Dashboard'a sonradan eklenen "Bu Ayın En Çok Satan Ürünleri", "Reçeteli/
+// Perakende Dağılımı" ve "Son Envanter Özeti" kartları PDF raporuna hiç
+// yansımıyordu — kullanıcı geri bildirimiyle tespit edildi ("yeni bölümler
+// yeni grafikler geldi, PDF'i güncelleyelim"). Bu veriler `DashboardData`
+// içinde yer almaz (kartlar kendi verisini bağımsız çeker), bu yüzden PDF
+// üretilirken burada AYRICA çekilir. SADECE bilgilendirme amaçlıdır — diğer
+// sayfalardaki resmi Toplam Gelir/Net Kâr rakamlarını beslemez (uygulama
+// genelindeki aynı kural, bkz. PrescriptionRetailSplit/DashboardInsightCards).
+interface SatisSummaryLite { prescriptionRevenue: number; retailRevenue: number; totalRecords: number }
+interface SatisRecordLite { productName: string; netRevenue: number; quantity: number }
+interface InventoryReportLite {
+  fileName: string;
+  totalStockValue: number | string;
+  totalStockCost: number | string;
+  potentialMargin: number | string;
+  createdAt: string;
+}
+
+async function fetchSatisAndEnvanterForPdf(): Promise<{
+  satisSummary: SatisSummaryLite | null;
+  topProducts: Array<{ productName: string; revenue: number; quantity: number }>;
+  inventory: InventoryReportLite | null;
+}> {
+  const now = new Date();
+  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const end = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const [satisRes, invRes] = await Promise.all([
+    fetch(`/api/v1/satis?${new URLSearchParams({ start, end })}`).catch(() => null),
+    fetch("/api/v1/stok/envanter-raporu").catch(() => null),
+  ]);
+
+  let satisSummary: SatisSummaryLite | null = null;
+  let topProducts: Array<{ productName: string; revenue: number; quantity: number }> = [];
+  if (satisRes?.ok) {
+    const json = await satisRes.json().catch(() => null) as {
+      success: boolean;
+      data?: { summary: SatisSummaryLite; records: SatisRecordLite[] };
+    } | null;
+    if (json?.success && json.data) {
+      satisSummary = json.data.summary;
+      const { topProductsByRevenue } = await import("@/lib/sales/aggregations");
+      topProducts = topProductsByRevenue(json.data.records, 5);
+    }
+  }
+
+  let inventory: InventoryReportLite | null = null;
+  if (invRes?.ok) {
+    const json = await invRes.json().catch(() => null) as { success: boolean; data?: InventoryReportLite[] } | null;
+    if (json?.success && json.data && json.data.length > 0) inventory = json.data[0];
+  }
+
+  return { satisSummary, topProducts, inventory };
+}
+
+function buildPage4(
+  satisSummary: SatisSummaryLite | null,
+  topProducts: Array<{ productName: string; revenue: number; quantity: number }>,
+  inventory: InventoryReportLite | null,
+  subtitle: string,
+): string {
+  const totalSatis = satisSummary ? satisSummary.prescriptionRevenue + satisSummary.retailRevenue : 0;
+  const rxPct = totalSatis > 0 && satisSummary ? (satisSummary.prescriptionRevenue / totalSatis) * 100 : 0;
+  const retailPct = 100 - rxPct;
+
+  const satisSection = !satisSummary || totalSatis <= 0
+    ? emptyState("Bu ay için Satış Raporu verisi yüklenmemiş.")
+    : `
+      <div style="background:${COLORS.bg};border-radius:8px;padding:12px 16px;margin-bottom:14px;">
+        <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:10px;">
+          <div style="width:${rxPct}%;background:${COLORS.primary};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;">${rxPct > 12 ? `Reçeteli %${rxPct.toFixed(0)}` : ""}</div>
+          <div style="width:${retailPct}%;background:${COLORS.blue};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;">${retailPct > 12 ? `Perakende %${retailPct.toFixed(0)}` : ""}</div>
+        </div>
+        <div style="display:flex;gap:20px;font-size:11px;">
+          <span><span style="display:inline-block;width:9px;height:9px;background:${COLORS.primary};border-radius:2px;margin-right:5px;"></span>Reçeteli: ${fmtTL(satisSummary.prescriptionRevenue)}</span>
+          <span><span style="display:inline-block;width:9px;height:9px;background:${COLORS.blue};border-radius:2px;margin-right:5px;"></span>Perakende: ${fmtTL(satisSummary.retailRevenue)}</span>
+        </div>
+      </div>
+      <div style="font-size:10px;color:${COLORS.muted};margin-bottom:14px;">
+        ℹ️ Sadece bilgilendirme amaçlıdır, Satış Raporu'ndan kaynaklanır. Bu sayfadaki hiçbir resmi toplamı (Kasa, Toplam Gelir, SGK Fatura) beslemez.
+      </div>`;
+
+  const maxProductRevenue = topProducts.length > 0 ? topProducts[0].revenue : 0;
+  const topProductsSection = topProducts.length === 0
+    ? emptyState("Bu ay için Satış Raporu verisi yüklenmemiş.")
+    : topProducts.map((p, i) => horizontalBar(
+        `${i + 1}. ${p.productName}`, p.revenue, maxProductRevenue,
+        [COLORS.primary, COLORS.blue, COLORS.purple, COLORS.accent, "#f5a623"][i % 5],
+        fmtTL(p.revenue),
+      )).join("");
+
+  const inventorySection = !inventory
+    ? emptyState("Henüz yüklenmiş bir Envanter Raporu yok.")
+    : `
+      <div style="display:flex;gap:10px;margin-bottom:8px;">
+        ${statCard("Toplam Stok Değeri", fmtTL(Number(inventory.totalStockValue)), COLORS.primary)}
+        ${statCard("Potansiyel Kâr Marjı", `%${Number(inventory.potentialMargin).toFixed(1)}`, Number(inventory.potentialMargin) >= 0 ? COLORS.primary : COLORS.danger)}
+      </div>
+      <div style="font-size:10px;color:${COLORS.muted};">
+        📄 ${esc(inventory.fileName)} · Son yüklenen envanter raporuna göre (${new Date(inventory.createdAt).toLocaleDateString("tr-TR")})
+      </div>`;
+
+  const body = `
+    ${sectionTitle("Satış Raporu: Reçeteli / Perakende Dağılımı (Bu Ay)")}
+    ${satisSection}
+
+    ${sectionTitle("Bu Ayın En Çok Satan Ürünleri")}
+    ${topProductsSection}
+
+    ${sectionTitle("Son Envanter Özeti")}
+    ${inventorySection}
+  `;
+  return pageShell("Satış Raporu & Envanter Özeti", subtitle, body, "Sayfa 4/4 — Satış & Envanter");
 }
 
 // ── Ana dışa aktarım fonksiyonu ─────────────────────────────────────────────
 
 export async function generateDashboardPdf(data: DashboardData, pharmacyName: string): Promise<void> {
-  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+  const [{ default: jsPDF }, { default: html2canvas }, pdfExtras] = await Promise.all([
     import("jspdf"),
     import("html2canvas"),
+    fetchSatisAndEnvanterForPdf(),
   ]);
 
   const now = new Date();
@@ -276,7 +393,8 @@ export async function generateDashboardPdf(data: DashboardData, pharmacyName: st
   wrapper.style.top = "0";
   wrapper.style.left = "-99999px";
   wrapper.style.zIndex = "-1";
-  wrapper.innerHTML = buildPage1(data, subtitle) + buildPage2(data, subtitle) + buildPage3(data, subtitle);
+  wrapper.innerHTML = buildPage1(data, subtitle) + buildPage2(data, subtitle) + buildPage3(data, subtitle)
+    + buildPage4(pdfExtras.satisSummary, pdfExtras.topProducts, pdfExtras.inventory, subtitle);
   document.body.appendChild(wrapper);
 
   try {
