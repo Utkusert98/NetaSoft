@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import SingleDatePicker from "@/components/ui/SingleDatePicker";
+import KasaBulkUploadModal from "@/components/finans/KasaBulkUploadModal";
 
 type Register = {
   id: string;
@@ -42,6 +43,8 @@ export default function KasaPage() {
 
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
+
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const fetchRecords = async () => {
     try {
@@ -250,9 +253,19 @@ export default function KasaPage() {
       <div className="responsive-grid form-list-grid" style={{ "--form-list-col": "340px", gap: "var(--spacing-8)", alignItems: "start" } as CSSProperties}>
         {/* FORM */}
         <div className="card">
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>
-            📅 {lang === "en" ? "New Register Entry" : "Yeni Kasa Girişi"}
-          </h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-5)" }}>
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>
+              📅 {lang === "en" ? "New Register Entry" : "Yeni Kasa Girişi"}
+            </h2>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: "13px", padding: "6px 12px" }}
+              onClick={() => setBulkOpen(true)}
+            >
+              📥 {lang === "en" ? "Bulk Upload (Excel)" : "Excel ile Toplu Yükle"}
+            </button>
+          </div>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
               <label className="form-label">{lang === "en" ? "Date" : "Tarih"}</label>
@@ -426,6 +439,14 @@ export default function KasaPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkOpen && (
+        <KasaBulkUploadModal
+          lang={lang}
+          onClose={() => setBulkOpen(false)}
+          onSaved={() => void fetchRecords()}
+        />
       )}
     </div>
   );
