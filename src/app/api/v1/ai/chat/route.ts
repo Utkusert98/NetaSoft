@@ -6,7 +6,7 @@ import { apiError } from "@/lib/utils";
 import { rateLimit } from "@/lib/utils/rate-limit";
 import { getLang, m } from "@/lib/i18n/api-messages";
 import { getActivePharmacyId } from "@/lib/pharmacy";
-import { countHolidaysInRange } from "@/lib/utils/turkishHolidays";
+import { countClosedDaysInRange } from "@/lib/utils/turkishHolidays";
 
 const AI_CHAT_RATE_LIMIT = 15;
 const AI_CHAT_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -251,7 +251,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     // sadece bugüne kadar gerçekleşen kısmi ay verisini net kâr/zarar diye
     // sunmak yanıltıcıydı (ay henüz bitmedi). Bunun yerine: fiilen kasa girişi
     // yapılan (çalışılan) günlere göre günlük ortalama ciro hesaplanır, ayın
-    // kalan günlerinden resmi tatiller düşülerek tahmini kalan çalışma günü
+    // kalan günlerinden Pazar günleri ve resmi tatiller düşülerek tahmini kalan çalışma günü
     // bulunur ve bu ortalamayla ay sonuna kadar projekte edilir. Sabit/personel
     // giderleri günlük bir kalem olmadığı için (runway30 ile aynı gerekçe)
     // ekstrapole edilmez, bu ana kadarki gerçek tutarları kullanılır.
@@ -267,8 +267,12 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     const todayDateNum = now.getUTCDate();
     const remainingCalendarDays = Math.max(0, lastDayNum - todayDateNum);
     const tomorrow = new Date(Date.UTC(y, mo - 1, todayDateNum + 1));
-    const remainingHolidays = remainingCalendarDays > 0 ? countHolidaysInRange(tomorrow, endOfMonth) : 0;
-    const projectedRemainingWorkingDays = Math.max(0, remainingCalendarDays - remainingHolidays);
+    // Eczane haftada 6 gün çalışıyor, Pazar günleri nöbetçi olmadığı sürece
+    // kapalı — kalan çalışma günü resmi tatillerin yanı sıra Pazar günlerini
+    // de düşmeli (gerçek kullanıcı geri bildirimiyle tespit edilen bir hata:
+    // yalnızca resmi tatil düşülüyordu, Pazarlar çalışılacak gün sayılıyordu).
+    const remainingClosedDays = remainingCalendarDays > 0 ? countClosedDaysInRange(tomorrow, endOfMonth) : 0;
+    const projectedRemainingWorkingDays = Math.max(0, remainingCalendarDays - remainingClosedDays);
     const projectedRemainingCash = avgCiroPerWorkedDay * projectedRemainingWorkingDays;
     const projectedMonthCash = cashIncome + projectedRemainingCash;
     const projectedTotalIncome = projectedMonthCash + thisMonthSgkTotal + platformTotal;
@@ -328,14 +332,14 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       forecastWorkedDays: isEn ? "Days worked so far (days with a register entry)" : "Bugüne kadar çalışılan gün sayısı (kasa girişi yapılan günler)",
       forecastAvgPerDay: isEn ? "Average register revenue per worked day" : "Çalışılan gün başına ortalama kasa cirosu",
       forecastRemainingDays: isEn ? "Remaining calendar days this month" : "Ayın kalan takvim günü",
-      forecastRemainingHolidays: isEn ? "Official holidays among remaining days" : "Kalan günler içindeki resmi tatil sayısı",
+      forecastRemainingHolidays: isEn ? "Closed days among remaining days (Sundays + official holidays)" : "Kalan günler içindeki kapalı gün sayısı (Pazarlar + resmi tatiller)",
       forecastRemainingWorkingDays: isEn ? "Estimated remaining working days" : "Tahmini kalan çalışma günü",
       forecastProjectedIncome: isEn ? "Projected total income (month-end)" : "Tahmini ay sonu toplam gelir",
       forecastProjectedExpense: isEn ? "Expenses used in forecast (fixed+staff, not extrapolated — see note)" : "Tahminde kullanılan gider (sabit+personel, ekstrapole edilmez — açıklamaya bakın)",
       forecastNet: isEn ? "PROJECTED NET PROFIT/LOSS (month-end estimate)" : "TAHMİNİ NET KAR/ZARAR (ay sonu tahmini)",
       forecastNote: isEn
-        ? "This is an ESTIMATE based on the average revenue of days actually worked so far, projected across the remaining working days (calendar days minus official Turkish holidays) until month-end. Fixed/staff expenses are usually one-time monthly entries, so they are NOT extrapolated — this month's actual amounts are used as-is. Always tell the user this is an estimate, not a guarantee."
-        : "Bu bir TAHMİNDİR: bugüne kadar fiilen çalışılan günlerin ortalama cirosu, ay sonuna kadar kalan çalışma günlerine (takvim günü eksi resmi tatiller) yansıtılarak hesaplanmıştır. Sabit/personel giderleri genelde ay içinde tek seferlik girildiği için ekstrapole EDİLMEZ, bu ayki gerçek tutarları kullanılır. Kullanıcıya bunun bir tahmin olduğunu, kesin bir garanti olmadığını her zaman belirt.",
+        ? "This is an ESTIMATE based on the average revenue of days actually worked so far, projected across the remaining working days (calendar days minus Sundays and official Turkish holidays — the pharmacy is closed Sundays unless on duty) until month-end. Fixed/staff expenses are usually one-time monthly entries, so they are NOT extrapolated — this month's actual amounts are used as-is. Always tell the user this is an estimate, not a guarantee."
+        : "Bu bir TAHMİNDİR: bugüne kadar fiilen çalışılan günlerin ortalama cirosu, ay sonuna kadar kalan çalışma günlerine (takvim günü eksi Pazar günleri ve resmi tatiller — eczane nöbetçi olmadığı sürece Pazar günleri kapalıdır) yansıtılarak hesaplanmıştır. Sabit/personel giderleri genelde ay içinde tek seferlik girildiği için ekstrapole EDİLMEZ, bu ayki gerçek tutarları kullanılır. Kullanıcıya bunun bir tahmin olduğunu, kesin bir garanti olmadığını her zaman belirt.",
       monthOver: isEn ? "This month has already ended — the figures above ARE the final month total, not an estimate." : "Bu ay zaten sona erdi — yukarıdaki rakamlar tahmin değil, ayın kesin toplam sonucudur.",
       sgkAll: isEn ? "ALL SGK INVOICES (full history)" : "TÜM SGK FATURALARI (tüm geçmiş)",
       sgkNote: isEn ? "SGK payments arrive on the 15th of the month, 3 months after invoice date." : "SGK ödemeleri fatura ayından 3 ay sonra, her ayın 15'inde gelir.",
@@ -395,7 +399,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
             `- ${L.forecastWorkedDays}: ${workedDaysCount} ${L.days}`,
             `- ${L.forecastAvgPerDay}: ${fmt(avgCiroPerWorkedDay)}`,
             `- ${L.forecastRemainingDays}: ${remainingCalendarDays} ${L.days}`,
-            `- ${L.forecastRemainingHolidays}: ${remainingHolidays} ${L.days}`,
+            `- ${L.forecastRemainingHolidays}: ${remainingClosedDays} ${L.days}`,
             `- ${L.forecastRemainingWorkingDays}: ${projectedRemainingWorkingDays} ${L.days}`,
             `- ${L.forecastProjectedIncome}: ${fmt(projectedTotalIncome)}`,
             `- ${L.forecastProjectedExpense}: ${fmt(projectedExpense)}`,
