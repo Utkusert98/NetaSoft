@@ -899,7 +899,14 @@ export default function SatisRaporPage() {
   // Ağustos'un ilk 11 günü) farklı bir ayda/aralıkta olsa bile. Sayfa
   // açıldığında önce bu eczaneye ait TÜM kayıtların gerçek min/max
   // `saleDate` aralığı hafif bir agregat sorgusuyla (`/api/v1/satis/date-range`)
-  // çekilir ve varsayılan aralık ona göre ayarlanır; hiç kayıt yoksa
+  // çekilir.
+  //
+  // Bu aralık DOĞRUDAN varsayılan olarak kullanılmaz — birden fazla ayı
+  // (ör. Temmuz + Ağustos'un ilk 11 günü) kapsıyorsa kullanıcı için yanıltıcı
+  // olur (gerçek bir kullanıcı geri bildirimiyle tespit edildi: "ay ay
+  // olması lazım"). Bunun yerine yalnızca EN SON verinin bulunduğu takvim
+  // ayı (o ayın 1'i ile ayın içindeki en son veri tarihi arasında, ayın
+  // henüz bitmemiş kısmına kadar) varsayılan olarak seçilir. Hiç kayıt yoksa
   // (`count === 0`, gerçekten yeni kullanıcı) sabit "bu ay" varsayılanı
   // olduğu gibi korunur. Kaydetme/preset sonrası otomatik genişletme mantığı
   // (`saleRowsDateSpan` — bkz. handleConfirm) burada DEĞİŞTİRİLMEDİ, yalnızca
@@ -912,8 +919,14 @@ export default function SatisRaporPage() {
         const res = await fetch("/api/v1/satis/date-range", { headers: { "Accept-Language": lang } });
         const json = await res.json() as { success: boolean; data?: { minDate: string | null; maxDate: string | null; count: number } };
         if (json.success && json.data && json.data.count > 0 && json.data.minDate && json.data.maxDate) {
-          const actualStart = json.data.minDate.slice(0, 10);
-          const actualEnd = json.data.maxDate.slice(0, 10);
+          const actualMinStr = json.data.minDate.slice(0, 10);
+          const actualMaxStr = json.data.maxDate.slice(0, 10);
+          const [maxY, maxM] = actualMaxStr.split("-").map(Number);
+          const monthStartStr = toDateStr(new Date(maxY, maxM - 1, 1));
+          // En son veri ayının başlangıcı, verinin gerçek min tarihinden
+          // önceyse (ör. veri zaten o ay içinde başlıyorsa) min tarih kullanılır.
+          const actualStart = monthStartStr > actualMinStr ? monthStartStr : actualMinStr;
+          const actualEnd = actualMaxStr;
           setStartDate(actualStart);
           setEndDate(actualEnd);
           setPendingStartDate(actualStart);
