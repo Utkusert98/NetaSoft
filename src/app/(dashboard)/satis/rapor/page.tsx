@@ -1786,14 +1786,17 @@ export default function SatisRaporPage() {
                   <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Day-of-Week Density" : "Haftanın Günü Bazında Yoğunluk"}</h3>
                   <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-3)" }}>
                     {lang === "en"
-                      ? "Hourly detail is not available (uploaded files don't retain time-of-day) — average revenue per day of week is shown instead."
-                      : "Saatlik detay mevcut değil (yüklenen dosyalar gün içi saat bilgisini saklamıyor) — bunun yerine haftanın günü bazında ortalama ciro gösteriliyor."}
+                      ? "Average revenue by day of week, across all sale types (see \"Hour-of-Day Sales Density\" below for hourly detail, when available)."
+                      : "Tüm satış tipleri genelinde haftanın günü bazında ortalama ciro (saat bazlı detay için aşağıdaki \"Saat Bazlı Yoğunluk Analizi\"ne bakın, dosyada saat bilgisi varsa)."}
                   </p>
                   <DayOfWeekChart data={dayOfWeekData} lang={lang} />
                 </section>
 
                 <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
-                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "var(--spacing-4)" }}>{lang === "en" ? "Avg. Ticket & Discount Rate Trend" : "Ortalama Fiş Tutarı ve İskonto Oranı Trendi"}</h3>
+                  <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Avg. Order Value (AOV) & Discount Rate Trend" : "Ortalama Sepet Tutarı (AOV) ve İskonto Oranı Trendi"}</h3>
+                  <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)", margin: "4px 0 var(--spacing-3)" }}>
+                    {lang === "en" ? "Avg. Order Value: " : "Ortalama Sepet Tutarı: "}{fmt(overallAov)}
+                  </div>
                   {periodTrendData.length > 0 ? (
                     <TrendChart data={periodTrendData} lang={lang} />
                   ) : (
@@ -1829,21 +1832,6 @@ export default function SatisRaporPage() {
                   retailCount={summary.retailCount}
                   lang={lang}
                 />
-              </section>
-
-              {/* #4 Ortalama Sepet Tutarı (AOV) */}
-              <section style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginTop: "var(--spacing-6)" }}>
-                <h3 style={{ fontSize: "var(--font-size-base)", fontWeight: 700, marginBottom: "4px" }}>{lang === "en" ? "Average Order Value (AOV) Analysis" : "Ortalama Sepet Tutarı (AOV) Analizi"}</h3>
-                <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)", margin: "var(--spacing-3) 0" }}>
-                  {lang === "en" ? "Avg. Order Value: " : "Ortalama Sepet Tutarı: "}{fmt(overallAov)}
-                </div>
-                {periodTrendData.length > 0 ? (
-                  <TrendChart data={periodTrendData} lang={lang} />
-                ) : (
-                  <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
-                    {lang === "en" ? "Not enough data for this period." : "Bu dönem için yeterli veri yok."}
-                  </div>
-                )}
               </section>
 
               {/* #6 Haftanın Günlerine Göre Perakende Satış Yoğunluğu (Yeni) */}
