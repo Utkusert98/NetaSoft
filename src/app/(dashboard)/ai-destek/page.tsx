@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, Send, Sparkles, Globe, Volume2, VolumeX } from "lucide-react";
+import { Mic, Send, Sparkles, Volume2, VolumeX, Plus, MessageSquare, PanelLeft, Trash2 } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
 import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
@@ -12,6 +12,13 @@ interface Message {
   content: string;
   id: string;
   followUps?: string[];
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: number;
 }
 
 const QUICK_ACTIONS: Record<Lang, string[]> = {
@@ -57,6 +64,10 @@ const UI_TEXT: Record<Lang, {
   micUnsupported: string;
   speak: string;
   ttsUnsupported: string;
+  history: string;
+  historyEmpty: string;
+  deleteChat: string;
+  newChat: string;
 }> = {
   tr: {
     title: "NetAI",
@@ -71,6 +82,10 @@ const UI_TEXT: Record<Lang, {
     micUnsupported: "Bu tarayıcı sesli komutu desteklemiyor",
     speak: "Sesli oku",
     ttsUnsupported: "Bu tarayıcı sesli okumayı desteklemiyor",
+    history: "Sohbetler",
+    historyEmpty: "Henüz sohbet geçmişiniz yok",
+    deleteChat: "Sohbeti sil",
+    newChat: "Yeni Sohbet",
   },
   en: {
     title: "NetAI",
@@ -85,6 +100,10 @@ const UI_TEXT: Record<Lang, {
     micUnsupported: "This browser does not support voice command",
     speak: "Read aloud",
     ttsUnsupported: "This browser does not support voice playback",
+    history: "Chats",
+    historyEmpty: "You don't have any chat history yet",
+    deleteChat: "Delete chat",
+    newChat: "New Chat",
   },
 };
 
@@ -164,21 +183,41 @@ function UserMessage({ content }: { content: string }) {
   );
 }
 
-// Sohbet geçmişi sayfalar arası geçişte (route değişince bileşen unmount
-// olduğu için) kaybolmasın diye localStorage'a yazılır — sunucuya
-// gönderilmez, sadece bu tarayıcıda kalıcı olur.
-const CHAT_STORAGE_KEY = "netasoft_ai_chat_history";
+// Sohbet geçmişi, ChatGPT/Gemini'deki gibi AYRI konuşmalar halinde
+// localStorage'a yazılır — sunucuya gönderilmez, sadece bu tarayıcıda kalıcı
+// olur. Önceki sürüm tek bir sohbeti (CHAT_STORAGE_KEY) saklıyordu; o eski
+// kayıt, kullanıcı geçmişini kaybetmesin diye tek konuşmalık bir kayıt olarak
+// göç ettirilir (bir daha o eski anahtara yazılmaz).
+const CONVERSATIONS_STORAGE_KEY = "netasoft_ai_conversations";
+const LEGACY_CHAT_STORAGE_KEY = "netasoft_ai_chat_history";
 
-function loadStoredMessages(): Message[] | null {
+function deriveTitle(text: string): string {
+  const clean = text.trim().replace(/\s+/g, " ");
+  return clean.length > 42 ? `${clean.slice(0, 42)}…` : clean;
+}
+
+function loadConversations(): Conversation[] {
   try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    return parsed as Message[];
+    const raw = localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) return parsed as Conversation[];
+    }
+    const legacyRaw = localStorage.getItem(LEGACY_CHAT_STORAGE_KEY);
+    if (legacyRaw) {
+      const legacy = JSON.parse(legacyRaw) as unknown;
+      if (Array.isArray(legacy) && legacy.length > 0) {
+        const messages = legacy as Message[];
+        const firstUser = messages.find((m) => m.role === "user");
+        if (firstUser) {
+          return [{ id: crypto.randomUUID(), title: deriveTitle(firstUser.content), messages, updatedAt: Date.now() }];
+        }
+      }
+    }
   } catch {
-    return null;
+    // bozuk/erişilemez localStorage — boş listeyle başla
   }
+  return [];
 }
 
 export default function AiDestek() {
@@ -204,6 +243,22 @@ export default function AiDestek() {
   const followUpIndexRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Sohbet geçmişi (ChatGPT/Gemini tarzı konuşma listesi) ──────
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const persistConversation = useCallback((msgs: Message[]) => {
+    const realMsgs = msgs.filter((m) => m.id !== "welcome");
+    if (realMsgs.length === 0) return;
+    const firstUser = realMsgs.find((m) => m.role === "user");
+    const title = firstUser ? deriveTitle(firstUser.content) : ui.newChat;
+    setConversations((prev) => {
+      const rest = prev.filter((c) => c.id !== activeId);
+      return [{ id: activeId, title, messages: msgs, updatedAt: Date.now() }, ...rest];
+    });
+  }, [activeId, ui.newChat]);
 
   // ── Sesli komut (STT) ────────────────────────────────────────
   const { settings: voiceSettings } = useVoiceSettings();
@@ -286,22 +341,32 @@ export default function AiDestek() {
   }, [lang, voiceSettings, speakingId]);
 
   useEffect(() => {
-    const stored = loadStoredMessages();
     // localStorage (harici bir sistem) mount sonrası okunuyor — SSR'da mevcut
     // olmadığı için render sırasında değil, effect içinde senkronize edilir.
+    // crypto.randomUUID() de aynı sebeple burada çağrılır — render sırasında
+    // çağrılsaydı sunucu/istemci arasında farklı ID üretip hydration
+    // uyuşmazlığına yol açardı.
+    const convs = loadConversations();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (stored) setMessages(stored);
+    setConversations(convs);
+    if (convs.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMessages(convs[0].messages);
+      setActiveId(convs[0].id);
+    } else {
+      setActiveId(crypto.randomUUID());
+    }
     setLoaded(true);
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+      localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations));
     } catch {
       // localStorage dolu/gizli mod vb. — sohbet devam eder, sadece kalıcı olmaz
     }
-  }, [messages, loaded]);
+  }, [conversations, loaded]);
 
   // Update welcome message when lang changes (React'in "render sırasında state
   // sıfırlama" deseni — effect yerine, çünkü bu bir prop değişimine tepki verir).
@@ -345,7 +410,29 @@ export default function AiDestek() {
     setLoading(false);
     setInput("");
     setMessages([{ id: "welcome", role: "assistant", content: ui.welcome }]);
+    setActiveId(crypto.randomUUID());
     followUpIndexRef.current = 0;
+    setHistoryOpen(false);
+  };
+
+  const selectConversation = (id: string) => {
+    const conv = conversations.find((c) => c.id === id);
+    if (!conv || id === activeId) { setHistoryOpen(false); return; }
+    pendingRef.current = "";
+    isAnimatingRef.current = false;
+    setDisplayedText("");
+    setLoading(false);
+    setInput("");
+    setMessages(conv.messages);
+    setActiveId(id);
+    followUpIndexRef.current = 0;
+    setHistoryOpen(false);
+  };
+
+  const deleteConversation = (id: string, e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (id === activeId) startNewChat();
   };
 
   const sendMessage = async (text: string) => {
@@ -353,6 +440,7 @@ export default function AiDestek() {
     const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text.trim() };
     const history = [...messages, userMsg];
     setMessages(history);
+    persistConversation(history);
     setInput("");
     setLoading(true);
     setDisplayedText("");
@@ -408,21 +496,18 @@ export default function AiDestek() {
       followUpIndexRef.current = (followUpIndexRef.current + 1) % followUpOptions.length;
       const followUpSet = followUpOptions[followUpIndexRef.current];
 
-      setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: accumulated,
-        followUps: followUpSet,
-      }]);
+      const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: accumulated, followUps: followUpSet };
+      const finalMessages = [...history, assistantMsg];
+      setMessages(finalMessages);
+      persistConversation(finalMessages);
       setDisplayedText("");
       pendingRef.current = "";
     } catch (err) {
       const msg = err instanceof Error ? err.message : (lang === "tr" ? "Bağlantı hatası" : "Connection error");
-      setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}`,
-      }]);
+      const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}` };
+      const finalMessages = [...history, assistantMsg];
+      setMessages(finalMessages);
+      persistConversation(finalMessages);
       setDisplayedText("");
       pendingRef.current = "";
     } finally {
@@ -440,57 +525,83 @@ export default function AiDestek() {
 
   return (
     <main className="ai-destek-main netai-page">
-    <div className="netai-inner">
-      {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız */}
+      {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız.
+          Not: yoğunluğu bilinçli olarak düşük tutulur (bkz. globals.css netai-pulse) —
+          önceki sürüm mesaj gönderirken ekranı neredeyse tamamen kaplayan aşırı parlak
+          bir ışıkla kaplıyordu (gerçek kullanıcı geri bildirimi). */}
       <div className={`netai-glow ${(listening || loading) ? "netai-glow-active" : ""}`} aria-hidden="true" />
 
-      {/* Header */}
-      <div className="netai-hero" style={{ marginBottom: "var(--spacing-5)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-4)", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", position: "relative", zIndex: 1 }}>
-          <NetAiOrb size={44} active={listening || loading} />
-          <div>
-            <h1 className="netai-brand-text" style={{ fontSize: "var(--font-size-3xl)", marginBottom: "4px", lineHeight: 1.1 }}>
-              {ui.title}
-            </h1>
-            <p style={{ color: "rgba(231,233,238,0.65)", fontSize: "var(--font-size-sm)" }}>
-              {ui.subtitle}
-            </p>
-          </div>
-        </div>
+      {/* Sohbet geçmişi arkaplanı — sadece mobilde, panel açıkken tıklanınca kapatır */}
+      <div className={`netai-history-backdrop ${historyOpen ? "open" : ""}`} onClick={() => setHistoryOpen(false)} aria-hidden="true" />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+      {/* Sohbet geçmişi paneli — masaüstünde kalıcı sol kolon, mobilde kaydırmalı çekmece.
+          ChatGPT/Gemini'deki gibi önceki konuşmalara geri dönülebilir; öncesinde sayfa
+          tek bir sohbeti hatırlıyordu, geçmiş konuşmalara ulaşmanın hiçbir yolu yoktu. */}
+      <aside className={`netai-history-panel ${historyOpen ? "open" : ""}`} aria-label={ui.history}>
+        <button type="button" className="netai-new-chat-btn" onClick={startNewChat}>
+          <Plus size={16} /> {ui.newChat}
+        </button>
+        <div className="netai-history-list">
+          {conversations.length === 0 ? (
+            <p className="netai-history-empty">{ui.historyEmpty}</p>
+          ) : conversations.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`netai-history-item ${c.id === activeId ? "active" : ""}`}
+              onClick={() => selectConversation(c.id)}
+            >
+              <MessageSquare size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
+              <span className="netai-history-item-title">{c.title}</span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="netai-history-delete"
+                onClick={(e) => deleteConversation(c.id, e)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); deleteConversation(c.id, e); } }}
+                aria-label={ui.deleteChat}
+                title={ui.deleteChat}
+              >
+                <Trash2 size={13} />
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+    <div className="netai-chat-col">
+    <div className="netai-chat-inner">
+      {/* Üst çubuk — dar ve kompakt (mobilde ekranın çeyreğini kaplayan eski geniş
+          başlık+alt yazı+iki buton satırı yerine); dil artık Ayarlar'daki genel dil
+          tercihinden geliyor, burada ayrı bir TR/EN düğmesine gerek yok. */}
+      <div className="netai-topbar">
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           <button
             type="button"
-            onClick={startNewChat}
-            disabled={loading}
-            title={lang === "tr" ? "Sohbeti temizle, baştan başla" : "Clear chat and start over"}
-            style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid rgba(159,232,112,0.3)", background: "rgba(159,232,112,0.08)",
-              color: "#e7e9ee", cursor: loading ? "not-allowed" : "pointer",
-              fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
-              opacity: loading ? 0.6 : 1,
-            }}
+            className="netai-history-toggle"
+            onClick={() => setHistoryOpen(true)}
+            aria-label={ui.history}
+            title={ui.history}
           >
-            <Sparkles size={14} /> {lang === "tr" ? "Yeni Sohbet" : "New Chat"}
+            <PanelLeft size={19} />
           </button>
-
-          <a
-            href="/ayarlar"
-            title={lang === "tr" ? "Dil ayarlarına git" : "Go to language settings"}
-            style={{
-              display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
-              padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid rgba(255,255,255,0.16)", background: "rgba(255,255,255,0.05)",
-              textDecoration: "none", color: "rgba(231,233,238,0.85)",
-              fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
-            }}
-          >
-            <Globe size={14} /> {lang.toUpperCase()}
-          </a>
+          <NetAiOrb size={32} active={listening || loading} />
+          <h1 className="netai-brand-text" style={{ fontSize: "var(--font-size-xl)", lineHeight: 1.1 }}>
+            {ui.title}
+          </h1>
         </div>
+        <button
+          type="button"
+          className="netai-topbar-newchat"
+          onClick={startNewChat}
+          disabled={loading}
+          title={lang === "tr" ? "Sohbeti temizle, baştan başla" : "Clear chat and start over"}
+          aria-label={ui.newChat}
+        >
+          <Sparkles size={17} />
+        </button>
       </div>
+      <p className="netai-subtitle">{ui.subtitle}</p>
 
       {/* Chat area — koyu stüdyo zeminiyle uyumlu, ferah bir mesaj akışı */}
       <div style={{
@@ -519,7 +630,7 @@ export default function AiDestek() {
                 <p style={{ fontSize: "11px", color: "rgba(231,233,238,0.5)", marginBottom: "6px", fontWeight: 500 }}>
                   {ui.suggestions}
                 </p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                <div className="netai-chip-row">
                   {msg.followUps.map((q) => (
                     <button
                       key={q}
@@ -570,9 +681,10 @@ export default function AiDestek() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick actions — only on first load */}
+      {/* Quick actions — only on first load. Yan yana kaydırmalı (yığılıp üst üste
+          binmesin diye) — bkz. globals.css .netai-chip-row. */}
       {messages.length <= 2 && !loading && (
-        <div style={{ display: "flex", gap: "var(--spacing-2)", flexWrap: "wrap", marginBottom: "var(--spacing-3)" }}>
+        <div className="netai-chip-row" style={{ marginBottom: "var(--spacing-3)" }}>
           {QUICK_ACTIONS[lang].map((q) => (
             <button
               key={q}
@@ -663,6 +775,7 @@ export default function AiDestek() {
           40% { transform: scale(1); }
         }
       `}</style>
+    </div>
     </div>
     </main>
   );
