@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, discountRate, aggregatePeriodTrend } from "./aggregations";
+import { aggregateByStaff, hasStaffData, aggregateByDayOfWeek, discountRate, aggregatePeriodTrend, topProductsByRevenue } from "./aggregations";
 import type { ParsedSaleRow } from "./mapRow";
 
 function row(overrides: Partial<ParsedSaleRow>): ParsedSaleRow {
@@ -109,5 +109,24 @@ describe("aggregatePeriodTrend", () => {
     expect(result.length).toBe(2);
     expect(result[0].periodKey).toBe("2026-06");
     expect(result[1].periodKey).toBe("2026-08");
+  });
+});
+
+describe("topProductsByRevenue", () => {
+  it("ürün adına göre toplar, gelire göre azalan sıralar ve limit uygular", () => {
+    const result = topProductsByRevenue([
+      row({ productName: "A", netRevenue: 100, quantity: 2 }),
+      row({ productName: "A", netRevenue: 50, quantity: 1 }),
+      row({ productName: "B", netRevenue: 300, quantity: 1 }),
+      row({ productName: "C", netRevenue: 10, quantity: 1 }),
+    ], 2);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ productName: "B", revenue: 300, quantity: 1 });
+    expect(result[1]).toEqual({ productName: "A", revenue: 150, quantity: 3 });
+  });
+
+  it("boş productName satırlarını hariç tutar", () => {
+    const result = topProductsByRevenue([row({ productName: "" }), row({ productName: "  " })]);
+    expect(result).toHaveLength(0);
   });
 });
