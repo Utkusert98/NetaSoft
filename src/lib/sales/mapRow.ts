@@ -37,6 +37,13 @@ export interface ParsedSaleRow {
    *  tutmalı ve kullanıcıya bildirmelidir (gerçek bir üretim hatasının kök nedeni —
    *  bkz. isParseableDate). */
   dateInvalid?: boolean;
+  /** "Saat" sütunundaki (ör. "14:01:45") saat bileşeni (0-23) — dakika/saniye
+   *  saatlik yoğunluk grafiği için gerekli değil, bilinçli olarak atılır.
+   *  Sütun bulunamazsa veya değer ayrıştırılamazsa `undefined` — asla uydurulmaz. */
+  saleHour?: number;
+  /** "Stok Adet" sütunundaki, satış ANINDAKİ stok miktarı — CANLI/gerçek zamanlı
+   *  bir stok değeri DEĞİLDİR, satış dosyasındaki bir anlık görüntüdür (snapshot). */
+  stockAtSale?: number;
 }
 
 export interface ColumnMap {
@@ -130,6 +137,22 @@ export function parseDate(raw: string): string {
     return d.toISOString();
   }
   return new Date().toISOString();
+}
+
+/**
+ * "Saat" sütunundaki bir değeri ("14:01:45" veya "14:01" gibi) saat bileşenine
+ * (0-23) çevirir. Ayrıştırılamazsa (boş, yanlış biçim, aralık dışı) `undefined`
+ * döner — ASLA sessizce bir varsayılan saat üretmez (parseDate'in bugüne düşme
+ * fallback'inin AYNISI hatayı burada tekrarlamamak için).
+ */
+export function parseHour(raw: unknown): number | undefined {
+  const s = String(raw ?? "").trim();
+  if (!s) return undefined;
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return undefined;
+  const h = Number(m[1]);
+  if (isNaN(h) || h < 0 || h > 23) return undefined;
+  return h;
 }
 
 export function parseNum(raw: unknown): number {
@@ -279,6 +302,16 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
   // exactOnlyKeys üzerinden, tam eşleşmede denenir (bulanık eşleşmede ilgisiz bir
   // sütunu yakalamasın diye).
   const loyaltyIdx = findIdx(headers, ["puan tutar", "sadakat puani", "loyalty points"], new Set<number>(), ["puan"]);
+  // "Saat" — kısa/genel bir kelime olduğu için (ör. başka bir bileşik başlığın
+  // içinde geçebilir), yalnızca tam eşleşmede (exactOnlyKeys) denenir; bulanık
+  // eşleşmeye asla girmez. `claimed` seti paylaşılır ki başka bir alan bu
+  // sütunu yanlışlıkla tekrar ele geçirmesin.
+  const hourIdx = gi(undefined, ["islem saati"], ["saat", "time"]);
+  // "Stok Adet" — "Satış Adet" ile KARIŞTIRILMAMALI: ikisi de "adet" içerir ama
+  // farklı iki kelimelik ifadelerdir ("stok adet" vs "satis adet"), bu yüzden
+  // bare "adet" yerine tam iki kelimelik ifade substring-uygun alias olarak
+  // kullanılıyor — kısa/genel "adet" kelimesi hiçbir zaman tek başına denenmiyor.
+  const stockIdx = gi(undefined, ["stok adet", "stok adedi", "mevcut stok"], []);
 
   const priceNum = parseNum(gv(priceIdx));
   const qtyNum = Math.max(1, Math.round(parseNum(gv(qtyIdx)) || 1));
@@ -331,6 +364,11 @@ export function mapRow(headers: string[], row: unknown[], override: ColumnOverri
       loyaltyPoints:  loyaltyIdx >= 0 ? parseNum(gv(loyaltyIdx)) : undefined,
       rawDateValue:   rawDateVal,
       dateInvalid:    !isParseableDate(rawDateVal),
+      saleHour:       hourIdx >= 0 ? parseHour(gv(hourIdx)) : undefined,
+      stockAtSale:    stockIdx >= 0 ? (() => {
+        const n = parseNum(gv(stockIdx));
+        return gv(stockIdx) !== "" && gv(stockIdx) !== undefined ? n : undefined;
+      })() : undefined,
     },
     colMap: {
       price:      gh(priceIdx),

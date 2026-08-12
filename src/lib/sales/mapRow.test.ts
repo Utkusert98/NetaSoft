@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapRow, isColumnMapConfident, parseDate, isParseableDate, isReturnTransaction, isGenericWalkInCustomer } from "./mapRow";
+import { mapRow, isColumnMapConfident, parseDate, isParseableDate, isReturnTransaction, isGenericWalkInCustomer, parseHour } from "./mapRow";
 
 describe("mapRow — sütun çakışması koruması", () => {
   // Birden fazla benzer isimli sütun içeren, gerçekçi bir zorlayıcı başlık seti:
@@ -271,6 +271,77 @@ describe("mapRow — 'Satış Adet'/'Ürün Grup' (tekil) başlık varyantları 
   it("bu eşleştirme manuel müdahale gerektirmeden güvenilir sayılır", () => {
     const { colMap } = mapRow(headers, row, {});
     expect(isColumnMapConfident(colMap)).toBe(true);
+  });
+});
+
+describe("parseHour — Saat sütunu ayrıştırma", () => {
+  it("HH:MM:SS biçimini saat tam sayısına çevirir", () => {
+    expect(parseHour("14:01:45")).toBe(14);
+    expect(parseHour("08:00:00")).toBe(8);
+  });
+
+  it("HH:MM biçimini de destekler", () => {
+    expect(parseHour("23:59")).toBe(23);
+  });
+
+  it("boş/eksik/geçersiz değerlerde undefined döner, uydurma saat üretmez", () => {
+    expect(parseHour("")).toBeUndefined();
+    expect(parseHour(undefined)).toBeUndefined();
+    expect(parseHour("saat yok")).toBeUndefined();
+    expect(parseHour("25:00:00")).toBeUndefined();
+  });
+});
+
+describe("mapRow — gerçek Satış Raporu başlık seti (Saat + Stok Adet + Satış Adet)", () => {
+  // Kullanıcının paylaştığı gerçek dosya biçimi — 'Stok Adet' ile 'Satış Adet'
+  // birbirine çok benzeyen ama TAMAMEN FARKLI iki sütun; ayrıca 'Saat' sütunu
+  // önceden hiç yakalanmıyordu.
+  const headers = [
+    "Kampanyalı", "İşlem No", "Tarih", "Saat", "İşlem Tipi", "Ürün Grup", "Barkod",
+    "Ürün Adı", "Stok Adet", "Satış Adet", "Birim Fiyat", "Toplam Tutar",
+    "İskonto Tutar", "Net Tutar", "Personel", "Servis",
+  ];
+  const row = [
+    "Hayır", "22803", "01/08/2026", "14:01:45", "P.SATIŞ (K.K.)", "İLAÇ", "8699",
+    "RENNIE 680 80 MG 48 CIGNEME TB.", "37", "2", "298.63", "597.26",
+    "0.00", "597.26", "KASA", "ECZANE",
+  ];
+
+  it("'Saat' sütunu doğru tespit edilir ve saat bileşenine ayrıştırılır", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.saleHour).toBe(14);
+  });
+
+  it("'Stok Adet' sütunu satış anındaki stok olarak doğru bulunur", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.stockAtSale).toBe(37);
+  });
+
+  it("regresyon: 'Stok Adet' ile 'Satış Adet' birbirine karıştırılmaz", () => {
+    const { row: mapped, colMap } = mapRow(headers, row, {});
+    // Satış Adet (2) -> quantity; Stok Adet (37) -> stockAtSale — ASLA yer değiştirmez.
+    expect(mapped.quantity).toBe(2);
+    expect(mapped.stockAtSale).toBe(37);
+    expect(colMap.quantity).toBe("Satış Adet");
+    expect(mapped.stockAtSale).not.toBe(mapped.quantity);
+  });
+
+  it("ciro ve diğer alanlar Saat/Stok Adet eklenmesinden etkilenmeden doğru hesaplanır", () => {
+    const { row: mapped, colMap } = mapRow(headers, row, {});
+    expect(mapped.netRevenue).toBeCloseTo(597.26, 2);
+    expect(mapped.productGroup).toBe("İLAÇ");
+    expect(isColumnMapConfident(colMap)).toBe(true);
+  });
+});
+
+describe("mapRow — Saat/Stok Adet sütunu olmayan dosyalarda zarif düşüş", () => {
+  const headers = ["Tarih", "Ürün Adı", "Ürün Grubu", "Adet", "Fiyat"];
+  const row = ["10.08.2026", "PAROL 500 MG", "İLAÇ", "3", "45.90"];
+
+  it("saleHour ve stockAtSale undefined kalır, hata fırlatmaz", () => {
+    const { row: mapped } = mapRow(headers, row, {});
+    expect(mapped.saleHour).toBeUndefined();
+    expect(mapped.stockAtSale).toBeUndefined();
   });
 });
 
