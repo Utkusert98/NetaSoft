@@ -31,7 +31,7 @@ const NAV_SECTIONS: NavSection[] = [
     titleKey: "general",
     items: [
       { href: "/panel", labelKey: "dashboard", icon: "📊" },
-      { href: "/ai-destek", labelKey: "aiAssistant", icon: "🤖" },
+      { href: "/ai-destek", labelKey: "aiAssistant", icon: "✨" },
     ],
   },
   {

@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
+import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
+import { NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 
 interface Message {
   role: "user" | "assistant";
@@ -49,44 +51,90 @@ const UI_TEXT: Record<Lang, {
   welcome: string;
   thinking: string;
   suggestions: string;
+  micStart: string;
+  micStop: string;
+  micUnsupported: string;
+  speak: string;
+  ttsUnsupported: string;
 }> = {
   tr: {
-    title: "🤖 AI Eczane Asistanı",
-    subtitle: "Eczane finansı hakkında sorularınızı sorun — tüm kayıtlarınıza göre analiz yapar.",
+    title: "NetAI",
+    subtitle: "Eczane finansı hakkında sorularınızı sorun — tüm kayıtlarınıza göre analiz yapar. Sesli de konuşabilirsiniz.",
     placeholder: "Eczane finansı hakkında sorunuzu yazın... (Enter ile gönder)",
     send: "Gönder ➤",
-    welcome: "Merhaba! Ben NetaSoft Eczane Asistanınım.\n\nSGK takibi, senet vadeleri, kârlılık analizi ve tüm finansal geçmişiniz hakkında sorularınızı yanıtlayabilirim.\n\nNasıl yardımcı olabilirim?",
-    thinking: "Analiz ediliyor...",
+    welcome: "Merhaba! Ben NetAI, NetaSoft'un eczane asistanınım.\n\nSGK takibi, senet vadeleri, kârlılık analizi ve tüm finansal geçmişiniz hakkında sorularınızı yanıtlayabilirim.\n\nNasıl yardımcı olabilirim?",
+    thinking: "NetAI analiz ediyor...",
     suggestions: "Bunları da sorabilirsiniz:",
+    micStart: "Sesli komutu başlat",
+    micStop: "Dinlemeyi durdur",
+    micUnsupported: "Bu tarayıcı sesli komutu desteklemiyor",
+    speak: "Sesli oku",
+    ttsUnsupported: "Bu tarayıcı sesli okumayı desteklemiyor",
   },
   en: {
-    title: "🤖 AI Pharmacy Assistant",
-    subtitle: "Ask questions about your pharmacy finances — analyzes all your records.",
+    title: "NetAI",
+    subtitle: "Ask questions about your pharmacy finances — analyzes all your records. You can also talk by voice.",
     placeholder: "Type your question about pharmacy finance... (Enter to send)",
     send: "Send ➤",
-    welcome: "Hello! I'm the NetaSoft Pharmacy Assistant.\n\nI can answer questions about SGK tracking, promissory note due dates, profitability analysis, and your complete financial history.\n\nHow can I assist you?",
-    thinking: "Analyzing...",
+    welcome: "Hello! I'm NetAI, NetaSoft's pharmacy assistant.\n\nI can answer questions about SGK tracking, promissory note due dates, profitability analysis, and your complete financial history.\n\nHow can I assist you?",
+    thinking: "NetAI is analyzing...",
     suggestions: "You can also ask:",
+    micStart: "Start voice command",
+    micStop: "Stop listening",
+    micUnsupported: "This browser does not support voice command",
+    speak: "Read aloud",
+    ttsUnsupported: "This browser does not support voice playback",
   },
 };
 
-function AssistantMessage({ content }: { content: string }) {
+function NetAiOrb({ size = 36, active = false }: { size?: number; active?: boolean }) {
+  return (
+    <div className={`netai-orb ${active ? "netai-orb-active" : ""}`} style={{ width: size, height: size, flexShrink: 0 }}>
+      <div className="netai-orb-ring" />
+      <div style={{
+        width: size, height: size, borderRadius: "50%",
+        background: "linear-gradient(135deg, #163300, #4e7c3f)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 0 0 1px rgba(159,232,112,0.35)",
+      }}>
+        <NetaSoftIcon size={Math.round(size * 0.62)} variant="white" />
+      </div>
+    </div>
+  );
+}
+
+function AssistantMessage({
+  content, canSpeak, speaking, onSpeak, speakLabel,
+}: {
+  content: string; canSpeak: boolean; speaking: boolean; onSpeak: () => void; speakLabel: string;
+}) {
   return (
     <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-        background: "linear-gradient(135deg, #4e7c3f, #9fe870)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "18px",
-      }}>
-        🤖
-      </div>
+      <NetAiOrb active={speaking} />
       <div style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
         fontSize: "var(--font-size-sm)", lineHeight: 1.7, whiteSpace: "pre-wrap",
       }}>
         {content}
+        {canSpeak && (
+          <div style={{ marginTop: "8px" }}>
+            <button
+              type="button"
+              onClick={onSpeak}
+              title={speakLabel}
+              aria-label={speakLabel}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "4px",
+                background: "none", border: "none", cursor: "pointer",
+                color: speaking ? "var(--color-primary)" : "var(--color-text-muted)",
+                fontSize: "12px", fontWeight: 600, padding: 0,
+              }}
+            >
+              {speaking ? "🔊" : "🔈"} {speakLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -154,6 +202,86 @@ export default function AiDestek() {
   const followUpIndexRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Sesli komut (STT) ────────────────────────────────────────
+  const { settings: voiceSettings } = useVoiceSettings();
+  const [micSupported, setMicSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // ── Sesli okuma (TTS) ────────────────────────────────────────
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Tarayıcı desteği yalnızca mount sonrası, gerçek window nesnesi üzerinden
+    // tespit edilebilir (SSR'da yok) — senkron bir alternatifi yoktur.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMicSupported(Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTtsSupported(typeof window.speechSynthesis !== "undefined");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+      if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Ctor) return;
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new Ctor();
+    recognition.lang = lang === "tr" ? "tr-TR" : "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // Otomatik gönderme YAPILMAZ — yanlış transkripsiyon riskine karşı
+      // kullanıcı metni gözden geçirip kendisi gönderir.
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  }, [listening, lang]);
+
+  const speak = useCallback((id: string, text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    // Aynı mesaj tekrar tıklanırsa okumayı durdur
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === "tr" ? "tr-TR" : "en-US";
+    utterance.rate = voiceSettings.rate;
+    utterance.pitch = voiceSettings.pitch;
+    if (voiceSettings.voiceURI) {
+      const voice = window.speechSynthesis.getVoices().find((v) => v.voiceURI === voiceSettings.voiceURI);
+      if (voice) utterance.voice = voice;
+    }
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+    setSpeakingId(id);
+    window.speechSynthesis.speak(utterance);
+  }, [lang, voiceSettings, speakingId]);
 
   useEffect(() => {
     const stored = loadStoredMessages();
@@ -310,18 +438,24 @@ export default function AiDestek() {
 
   return (
     <main className="page-content ai-destek-main" style={{ display: "flex", flexDirection: "column", maxWidth: 900 }}>
+      {/* Kenar parıltısı — sadece dinlerken/düşünürken aktif */}
+      <div className={`netai-glow ${(listening || loading) ? "netai-glow-active" : ""}`} aria-hidden="true" />
+
       {/* Header */}
-      <div style={{ marginBottom: "var(--spacing-5)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-4)" }}>
-        <div>
-          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "4px" }}>
-            {ui.title}
-          </h1>
-          <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-            {ui.subtitle}
-          </p>
+      <div className="netai-hero" style={{ marginBottom: "var(--spacing-5)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-4)", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", position: "relative", zIndex: 1 }}>
+          <NetAiOrb size={44} active={listening || loading} />
+          <div>
+            <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "4px", color: "white", letterSpacing: "-0.02em" }}>
+              {ui.title}
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "var(--font-size-sm)" }}>
+              {ui.subtitle}
+            </p>
+          </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <button
             type="button"
             onClick={startNewChat}
@@ -330,8 +464,8 @@ export default function AiDestek() {
             style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid var(--color-border)", background: "var(--color-surface)",
-              color: "var(--color-text)", cursor: loading ? "not-allowed" : "pointer",
+              border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)",
+              color: "white", cursor: loading ? "not-allowed" : "pointer",
               fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
               opacity: loading ? 0.6 : 1,
             }}
@@ -345,8 +479,8 @@ export default function AiDestek() {
             style={{
               display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
               padding: "6px 12px", borderRadius: "var(--radius-lg)",
-              border: "1px solid var(--color-border)", background: "var(--color-surface)",
-              textDecoration: "none", color: "var(--color-text-muted)",
+              border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.08)",
+              textDecoration: "none", color: "rgba(255,255,255,0.85)",
               fontSize: "13px", fontWeight: 700, transition: "border-color 0.15s",
             }}
           >
@@ -355,17 +489,25 @@ export default function AiDestek() {
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* Chat area — atmosferik, light modda dahi hafif koyu bir zemin */}
       <div style={{
         flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
-        padding: "var(--spacing-5)", background: "var(--color-bg)",
+        padding: "var(--spacing-5)", background: "var(--color-bg-alt)",
         borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)",
         marginBottom: "var(--spacing-4)",
       }}>
         {messages.map((msg) => (
           <div key={msg.id}>
             {msg.role === "assistant"
-              ? <AssistantMessage content={msg.content} />
+              ? (
+                <AssistantMessage
+                  content={msg.content}
+                  canSpeak={ttsSupported && voiceSettings.enabled}
+                  speaking={speakingId === msg.id}
+                  onSpeak={() => speak(msg.id, msg.content)}
+                  speakLabel={ui.speak}
+                />
+              )
               : <UserMessage content={msg.content} />}
 
             {/* Follow-up suggestions after assistant message */}
@@ -400,13 +542,13 @@ export default function AiDestek() {
           </div>
         ))}
 
-        {displayedText && <AssistantMessage content={displayedText + "▍"} />}
+        {displayedText && (
+          <AssistantMessage content={displayedText + "▍"} canSpeak={false} speaking={false} onSpeak={() => {}} speakLabel={ui.speak} />
+        )}
 
         {loading && !displayedText && (
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #4e7c3f, #9fe870)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-              🤖
-            </div>
+            <NetAiOrb active />
             <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
               <div style={{ display: "flex", gap: "5px" }}>
                 {[0, 1, 2].map((i) => (
@@ -462,6 +604,27 @@ export default function AiDestek() {
           onFocus={(e) => { e.currentTarget.style.borderColor = "var(--color-primary)"; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = "var(--color-border)"; }}
         />
+        {micSupported && (
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={loading}
+            title={listening ? ui.micStop : ui.micStart}
+            aria-label={listening ? ui.micStop : ui.micStart}
+            className={`netai-mic-btn ${listening ? "netai-mic-listening" : ""}`}
+            style={{
+              height: 48, width: 48, flexShrink: 0, borderRadius: "var(--radius-lg)",
+              border: `1px solid ${listening ? "var(--color-primary)" : "var(--color-border)"}`,
+              background: listening ? "var(--color-primary)" : "var(--color-surface)",
+              color: listening ? "white" : "var(--color-text)",
+              cursor: loading ? "not-allowed" : "pointer", fontSize: "18px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            🎙️
+          </button>
+        )}
         <button
           onClick={() => void sendMessage(input)}
           disabled={loading || !input.trim()}
