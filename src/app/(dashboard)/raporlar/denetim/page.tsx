@@ -30,6 +30,7 @@ const ENTITY_LABELS: Record<string, string> = {
   SupplierTransfer: "Depo Havalesi",
   User: "Kullanıcı",
   SaleRecordBatch: "Satış Raporu İçe Aktarma",
+  DailyRegisterBatch: "Kasa Toplu İçe Aktarma",
   InventoryReport: "Envanter Raporu",
 };
 
