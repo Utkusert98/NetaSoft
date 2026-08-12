@@ -189,11 +189,20 @@ function NetAiVoicePanel() {
       setSupported(false);
       return;
     }
-    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    // Tarayıcı genelde onlarca dildeki TÜM sesleri döner ("bir sürü ses var"
+    // şikayeti) — kullanıcının arayüz diline uyan sesler öne/yalnız alınır,
+    // hiç eşleşme yoksa (bazı tarayıcılarda tr-TR sesi olmayabilir) tüm
+    // liste geri döner ki kullanıcı seçeneksiz kalmasın.
+    const loadVoices = () => {
+      const all = window.speechSynthesis.getVoices();
+      const langPrefix = lang === "tr" ? "tr" : "en";
+      const matching = all.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+      setVoices(matching.length > 0 ? matching : all);
+    };
     loadVoices();
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
     return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-  }, []);
+  }, [lang]);
 
   const handleTest = () => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -804,7 +813,7 @@ export default function AyarlarPage() {
     { key: "guvenlik", label: tx(t.settings.securityTab, lang), icon: "🛡️" },
     { key: "faturalama", label: tx(t.settings.billingTab, lang), icon: "💳" },
     { key: "tema", label: tx(t.settings.themeTab, lang), icon: "🎨" },
-    { key: "netai", label: tx(t.settings.netaiTab, lang), icon: "🎙️" },
+    { key: "netai", label: tx(t.settings.netaiTab, lang), icon: "✨" },
     { key: "dil", label: lang === "en" ? "Language" : "Dil / Language", icon: "🌐" },
   ];
 
