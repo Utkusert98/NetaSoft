@@ -196,7 +196,7 @@ export default function SabitGiderPage() {
         {tx(t.sabitGider.title, lang)}
       </h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "var(--spacing-8)", alignItems: "start" }}>
+      <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* Form */}
         <div className="card">
           <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>

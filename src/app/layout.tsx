@@ -10,6 +10,7 @@ export const viewport: Viewport = {
   // altında kalmaması için gereklidir (bkz. .mobile-topbar / .toast-container
   // / .drp-popover mobil stilleri).
   viewportFit: "cover",
+  themeColor: "#163300",
 };
 
 export const metadata: Metadata = {
@@ -22,6 +23,15 @@ export const metadata: Metadata = {
   keywords: ["eczane", "finansal yönetim", "muhasebe", "stok", "fatura"],
   authors: [{ name: "NetaSoft" }],
   robots: "noindex, nofollow", // Üretim için değiştirilecek
+  manifest: "/manifest.json",
+  // iOS Safari "Ana Ekrana Ekle" ile tam ekran, tarayıcı çubuğu olmadan
+  // uygulama gibi açılması için — App Store gerektirmeyen ücretsiz bir
+  // "app" deneyimi (gerçek native uygulama değil, PWA).
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "NetaSoft",
+  },
 };
 
 export default function RootLayout({
@@ -43,6 +53,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <link rel="icon" href="/logo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body>
         <ThemeProvider>
