@@ -122,5 +122,28 @@ export const loginSchema = z.object({
   otpCode: z.string().optional(),
 });
 
+// Şifremi unuttum — e-posta talep şeması
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .email("Geçerli bir e-posta adresi giriniz")
+    .toLowerCase()
+    .trim(),
+});
+
+// Şifre sıfırlama — token ile yeni şifre belirleme şeması
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Geçersiz veya eksik token"),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Şifreler eşleşmiyor",
+    path: ["confirmPassword"],
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

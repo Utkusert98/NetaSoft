@@ -23,6 +23,10 @@ const messages = {
   created:            { tr: "Başarıyla oluşturuldu",              en: "Created successfully" },
   updated:            { tr: "Başarıyla güncellendi",              en: "Updated successfully" },
   deleted:            { tr: "Başarıyla silindi",                  en: "Deleted successfully" },
+  resetLinkSent:      { tr: "E-posta adresiniz sistemimizde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.", en: "If this email is registered, a password reset link has been sent." },
+  resetTokenInvalid:  { tr: "Bu şifre sıfırlama bağlantısının süresi dolmuş veya geçersiz. Lütfen yeni bir bağlantı isteyin.", en: "This password reset link is invalid or has expired. Please request a new one." },
+  resetSuccess:       { tr: "Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.", en: "Your password has been updated. You can now log in with your new password." },
+  rateLimited:        { tr: "Çok fazla istek gönderildi. Lütfen birkaç dakika sonra tekrar deneyin.", en: "Too many requests. Please try again in a few minutes." },
 } as const;
 
 export type MessageKey = keyof typeof messages;
