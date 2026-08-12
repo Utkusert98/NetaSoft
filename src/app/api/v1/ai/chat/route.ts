@@ -135,12 +135,15 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
         where: { pharmacyId, deletedAt: null, expenseDate: { gte: twelveMonthsAgo } },
         select: { totalAmount: true, expenseDate: true },
       }),
-      // All promissory notes
+      // Promissory notes — son 12 aydan vadesi gelenler + kalan tüm gelecek
+      // vadeliler (limit yok, `take: 50` eskiden ASC sıralamada en eski 50
+      // notu getirip bu ayın senetlerini dışarıda bırakabiliyordu — gerçek
+      // bir kullanıcı geri bildirimiyle tespit edildi: AI "bu ayın giderleri"
+      // sorusunda Senetler kategorisini hiç göstermiyordu).
       prisma.promissoryNote.findMany({
         where: { pharmacyId, deletedAt: null },
         select: { amount: true, noteNumber: true, isPaid: true, dueDate: true },
         orderBy: { dueDate: "asc" },
-        take: 50,
       }),
       // Supplier transfers last 12 months
       prisma.supplierTransfer.findMany({
@@ -204,9 +207,9 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       const dt = new Date(d);
       return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
     };
-    const monthlyMap = new Map<string, { cash: number; sgk: number; platform: number; fixed: number; emp: number }>();
+    const monthlyMap = new Map<string, { cash: number; sgk: number; platform: number; fixed: number; emp: number; senet: number; depo: number }>();
     const ensureMonth = (key: string) => {
-      if (!monthlyMap.has(key)) monthlyMap.set(key, { cash: 0, sgk: 0, platform: 0, fixed: 0, emp: 0 });
+      if (!monthlyMap.has(key)) monthlyMap.set(key, { cash: 0, sgk: 0, platform: 0, fixed: 0, emp: 0, senet: 0, depo: 0 });
       return monthlyMap.get(key)!;
     };
     dailyRegs12mo.forEach(r => {
@@ -229,6 +232,16 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       const bucket = ensureMonth(monthKey(e.expenseDate));
       bucket.emp += Number(e.totalAmount);
     });
+    // Aylık kırılıma Senet ve Depo Havalesi de eklenir — daha önce bu
+    // aylık geçmişte de eksikti, sadece Sabit+Personel gösteriliyordu.
+    allNotes.filter(n => new Date(n.dueDate) >= twelveMonthsAgo).forEach(n => {
+      const bucket = ensureMonth(monthKey(n.dueDate));
+      bucket.senet += Number(n.amount);
+    });
+    supplierTransfers.forEach(t => {
+      const bucket = ensureMonth(monthKey(t.transferDate));
+      bucket.depo += Number(t.amount);
+    });
     const monthlyKeysSorted = Array.from(monthlyMap.keys()).sort();
 
     const unpaidNotes = allNotes.filter(n => !n.isPaid);
@@ -245,6 +258,18 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       const d = new Date(e.expenseDate);
       return d >= startOfMonth && d <= endOfMonth;
     }).reduce((s, r) => s + Number(r.totalAmount), 0);
+    // Aylık Özet sayfasıyla (bkz. /api/v1/raporlar/ozet) AYNI mantık: vadesi
+    // bu ay içinde olan TÜM senetler (ödenmiş/ödenmemiş fark etmeksizin) gider
+    // sayılır. Daha önce bu hiç hesaplanmıyordu — AI "bu ayın giderleri"
+    // sorusunda Senetler kategorisini tamamen atlıyordu.
+    const thisMonthSenet = allNotes.filter(n => {
+      const d = new Date(n.dueDate);
+      return d >= startOfMonth && d <= endOfMonth;
+    }).reduce((s, r) => s + Number(r.amount), 0);
+    const thisMonthDepo = supplierTransfers.filter(t => {
+      const d = new Date(t.transferDate);
+      return d >= startOfMonth && d <= endOfMonth;
+    }).reduce((s, r) => s + Number(r.amount), 0);
 
     // ── AY SONU CİRO TAHMİNİ ─────────────────────────────────────────────────
     // Kullanıcı "bu ay kâr eder miyiz" gibi GELECEĞE dönük bir soru sorduğunda,
@@ -276,7 +301,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
     const projectedRemainingCash = avgCiroPerWorkedDay * projectedRemainingWorkingDays;
     const projectedMonthCash = cashIncome + projectedRemainingCash;
     const projectedTotalIncome = projectedMonthCash + thisMonthSgkTotal + platformTotal;
-    const projectedExpense = thisMonthFixed + thisMonthEmp;
+    const projectedExpense = thisMonthFixed + thisMonthEmp + thisMonthDepo + thisMonthSenet;
     const projectedNet = projectedTotalIncome - projectedExpense;
     const isMonthOver = remainingCalendarDays === 0;
 
@@ -327,6 +352,7 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       fixed: isEn ? "Fixed Expenses" : "Sabit Giderler",
       staff: isEn ? "Staff Expenses" : "Personel Giderleri",
       supplier: isEn ? "Warehouse Transfers" : "Depo Havaleleri",
+      thisMonthNotes: isEn ? "Promissory Notes (due this month, paid or unpaid)" : "Senetler (bu ay vadesi gelen, ödenmiş/ödenmemiş fark etmeksizin)",
       net: isEn ? "NET PROFIT/LOSS SO FAR (only elapsed days this month, NOT a full-month figure)" : "BUGÜNE KADAR GERÇEKLEŞEN NET KAR/ZARAR (sadece ayın şu ana kadar geçen günleri, TAM AY rakamı DEĞİLDİR)",
       forecast: isEn ? "MONTH-END FORECAST (ESTIMATE — use this for questions like \"will we be profitable this month\")" : "AY SONU TAHMİNİ (TAHMİNİDİR — \"bu ay kâr eder miyiz/edecek miyiz\" gibi sorular için BUNU kullan)",
       forecastWorkedDays: isEn ? "Days worked so far (days with a register entry)" : "Bugüne kadar çalışılan gün sayısı (kasa girişi yapılan günler)",
@@ -335,11 +361,11 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       forecastRemainingHolidays: isEn ? "Closed days among remaining days (Sundays + official holidays)" : "Kalan günler içindeki kapalı gün sayısı (Pazarlar + resmi tatiller)",
       forecastRemainingWorkingDays: isEn ? "Estimated remaining working days" : "Tahmini kalan çalışma günü",
       forecastProjectedIncome: isEn ? "Projected total income (month-end)" : "Tahmini ay sonu toplam gelir",
-      forecastProjectedExpense: isEn ? "Expenses used in forecast (fixed+staff, not extrapolated — see note)" : "Tahminde kullanılan gider (sabit+personel, ekstrapole edilmez — açıklamaya bakın)",
+      forecastProjectedExpense: isEn ? "Expenses used in forecast (fixed+staff+warehouse+notes, not extrapolated — see note)" : "Tahminde kullanılan gider (sabit+personel+depo+senet, ekstrapole edilmez — açıklamaya bakın)",
       forecastNet: isEn ? "PROJECTED NET PROFIT/LOSS (month-end estimate)" : "TAHMİNİ NET KAR/ZARAR (ay sonu tahmini)",
       forecastNote: isEn
-        ? "This is an ESTIMATE based on the average revenue of days actually worked so far, projected across the remaining working days (calendar days minus Sundays and official Turkish holidays — the pharmacy is closed Sundays unless on duty) until month-end. Fixed/staff expenses are usually one-time monthly entries, so they are NOT extrapolated — this month's actual amounts are used as-is. Always tell the user this is an estimate, not a guarantee."
-        : "Bu bir TAHMİNDİR: bugüne kadar fiilen çalışılan günlerin ortalama cirosu, ay sonuna kadar kalan çalışma günlerine (takvim günü eksi Pazar günleri ve resmi tatiller — eczane nöbetçi olmadığı sürece Pazar günleri kapalıdır) yansıtılarak hesaplanmıştır. Sabit/personel giderleri genelde ay içinde tek seferlik girildiği için ekstrapole EDİLMEZ, bu ayki gerçek tutarları kullanılır. Kullanıcıya bunun bir tahmin olduğunu, kesin bir garanti olmadığını her zaman belirt.",
+        ? "This is an ESTIMATE based on the average revenue of days actually worked so far, projected across the remaining working days (calendar days minus Sundays and official Turkish holidays — the pharmacy is closed Sundays unless on duty) until month-end. Fixed/staff/warehouse/notes expenses are usually one-time monthly entries, so they are NOT extrapolated — this month's actual amounts are used as-is. Always tell the user this is an estimate, not a guarantee."
+        : "Bu bir TAHMİNDİR: bugüne kadar fiilen çalışılan günlerin ortalama cirosu, ay sonuna kadar kalan çalışma günlerine (takvim günü eksi Pazar günleri ve resmi tatiller — eczane nöbetçi olmadığı sürece Pazar günleri kapalıdır) yansıtılarak hesaplanmıştır. Sabit/personel/depo/senet giderleri genelde ay içinde tek seferlik girildiği için ekstrapole EDİLMEZ, bu ayki gerçek tutarları kullanılır. Kullanıcıya bunun bir tahmin olduğunu, kesin bir garanti olmadığını her zaman belirt.",
       monthOver: isEn ? "This month has already ended — the figures above ARE the final month total, not an estimate." : "Bu ay zaten sona erdi — yukarıdaki rakamlar tahmin değil, ayın kesin toplam sonucudur.",
       sgkAll: isEn ? "ALL SGK INVOICES (full history)" : "TÜM SGK FATURALARI (tüm geçmiş)",
       sgkNote: isEn ? "SGK payments arrive on the 15th of the month, 3 months after invoice date." : "SGK ödemeleri fatura ayından 3 ay sonra, her ayın 15'inde gelir.",
@@ -389,8 +415,10 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       `${L.expenses}`,
       `- ${L.fixed}: ${fmt(thisMonthFixed)}`,
       `- ${L.staff}: ${fmt(thisMonthEmp)}`,
-      `- ${L.supplier}: ${fmt(supplierTransfers.filter(t => { const d = new Date(t.transferDate); return d >= startOfMonth && d <= endOfMonth; }).reduce((s, r) => s + Number(r.amount), 0))}`,
-      `- ${L.net}: ${fmt(totalIncome - thisMonthFixed - thisMonthEmp)}`,
+      `- ${L.supplier}: ${fmt(thisMonthDepo)}`,
+      `- ${L.thisMonthNotes}: ${fmt(thisMonthSenet)}`,
+      `- ${isEn ? "TOTAL EXPENSES" : "TOPLAM GİDER"}: ${fmt(thisMonthFixed + thisMonthEmp + thisMonthDepo + thisMonthSenet)}`,
+      `- ${L.net}: ${fmt(totalIncome - thisMonthFixed - thisMonthEmp - thisMonthDepo - thisMonthSenet)}`,
       ``,
       `${L.forecast}`,
       ...(isMonthOver
@@ -456,8 +484,8 @@ async function getFinancialContext(userId: string, lang: string): Promise<string
       const [yy, mmk] = key.split("-");
       const label = new Date(Number(yy), Number(mmk) - 1, 1).toLocaleDateString(isEn ? "en-GB" : "tr-TR", { month: "long", year: "numeric" });
       const income = b.cash + b.sgk + b.platform;
-      const expense = b.fixed + b.emp;
-      lines.push(`  * ${label}: ${isEn ? "Cash" : "Kasa"} ${fmt(b.cash)}, SGK ${fmt(b.sgk)}, ${isEn ? "Platform" : "Platform"} ${fmt(b.platform)}, ${isEn ? "Total Income" : "Toplam Gelir"} ${fmt(income)}, ${isEn ? "Fixed Exp" : "Sabit Gider"} ${fmt(b.fixed)}, ${isEn ? "Staff Exp" : "Personel Gideri"} ${fmt(b.emp)}, ${isEn ? "Total Expense" : "Toplam Gider"} ${fmt(expense)}, ${isEn ? "Net" : "Net"} ${fmt(income - expense)}`);
+      const expense = b.fixed + b.emp + b.senet + b.depo;
+      lines.push(`  * ${label}: ${isEn ? "Cash" : "Kasa"} ${fmt(b.cash)}, SGK ${fmt(b.sgk)}, ${isEn ? "Platform" : "Platform"} ${fmt(b.platform)}, ${isEn ? "Total Income" : "Toplam Gelir"} ${fmt(income)}, ${isEn ? "Fixed Exp" : "Sabit Gider"} ${fmt(b.fixed)}, ${isEn ? "Staff Exp" : "Personel Gideri"} ${fmt(b.emp)}, ${isEn ? "Notes" : "Senet"} ${fmt(b.senet)}, ${isEn ? "Warehouse" : "Depo"} ${fmt(b.depo)}, ${isEn ? "Total Expense" : "Toplam Gider"} ${fmt(expense)}, ${isEn ? "Net" : "Net"} ${fmt(income - expense)}`);
     });
 
     if (platformIncomes.length > 0) {
