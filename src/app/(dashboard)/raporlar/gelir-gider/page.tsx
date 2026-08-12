@@ -108,8 +108,16 @@ export default function GelirGiderPage() {
     { name: "Platform", value: data.incomeBySource.platform },
   ].filter(d => d.value > 0) : [];
 
+  // EXPENSE_LABELS çevirisi daha önce sadece grafiğin ALTINDAKİ listeye
+  // uygulanıyordu; grafiğin kendisine (ve dolayısıyla üzerine gelince çıkan
+  // Tooltip'e) hiç uygulanmamıştı — ham İngilizce enum anahtarları (INVOICE,
+  // RENT, PERSONEL vb.) tooltip'te görünüyordu (gerçek kullanıcı geri
+  // bildirimiyle tespit edildi). Artık ikisi de AYNI çevrilmiş isimden besleniyor.
   const expensePieData = data ? Object.entries(data.expenseByType)
-    .map(([name, value]) => ({ name, value }))
+    .map(([rawName, value]) => ({
+      name: EXPENSE_LABELS[rawName] ? (lang === "en" ? EXPENSE_LABELS[rawName][1] : EXPENSE_LABELS[rawName][0]) : rawName,
+      value,
+    }))
     .sort((a, b) => b.value - a.value) : [];
 
   const topPlatforms = data ? Object.entries(data.platformByName)
@@ -183,9 +191,15 @@ export default function GelirGiderPage() {
                       <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Legend formatter={(v: string) => ({ gelir: lang === "en" ? "Income" : "Gelir", gider: lang === "en" ? "Expense" : "Gider", kar: lang === "en" ? "Profit" : "Kâr" }[v] ?? v)} />
-                      <Area type="monotone" dataKey="gelir" stroke="#4e7c3f" fill="url(#gGelir)" strokeWidth={2} />
-                      <Area type="monotone" dataKey="gider" stroke="#e74c3c" fill="url(#gGider)" strokeWidth={2} />
-                      <Area type="monotone" dataKey="kar" stroke="#3498db" fill="none" strokeWidth={2} strokeDasharray="4 2" />
+                      {/* `dot` eklendi: tek aylık (dar) özel tarih aralıklarında `data.monthly`
+                          tek bir noktaya iniyor — Recharts en az 2 nokta olmadan çizgi/alan
+                          çizemediği için grafik TAMAMEN BOŞ görünüyordu (6/12 aylık hazır
+                          aralıklar her zaman 2+ nokta ürettiği için sorun fark edilmemişti —
+                          gerçek kullanıcı geri bildirimiyle tespit edildi). Nokta işaretçisi
+                          tek veri noktasında bile görünür kalmasını sağlar. */}
+                      <Area type="monotone" dataKey="gelir" stroke="#4e7c3f" fill="url(#gGelir)" strokeWidth={2} dot={{ r: 4, fill: "#4e7c3f", strokeWidth: 0 }} />
+                      <Area type="monotone" dataKey="gider" stroke="#e74c3c" fill="url(#gGider)" strokeWidth={2} dot={{ r: 4, fill: "#e74c3c", strokeWidth: 0 }} />
+                      <Area type="monotone" dataKey="kar" stroke="#3498db" fill="none" strokeWidth={2} strokeDasharray="4 2" dot={{ r: 4, fill: "#3498db", strokeWidth: 0 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -254,7 +268,7 @@ export default function GelirGiderPage() {
                         <div key={d.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "var(--font-size-sm)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <div style={{ width: 10, height: 10, borderRadius: "50%", background: EXPENSE_COLORS[i % EXPENSE_COLORS.length], flexShrink: 0 }} />
-                            <span>{EXPENSE_LABELS[d.name] ? (lang === "en" ? EXPENSE_LABELS[d.name][1] : EXPENSE_LABELS[d.name][0]) : d.name}</span>
+                            <span>{d.name}</span>
                           </div>
                           <div style={{ display: "flex", gap: "12px" }}>
                             <span style={{ color: "var(--color-text-muted)" }}>%{total > 0 ? ((d.value / total) * 100).toFixed(0) : 0}</span>
