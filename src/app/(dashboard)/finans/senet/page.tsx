@@ -253,7 +253,7 @@ export default function SenetPage() {
               <input type="text" className="form-input" name="supplierName" value={formData.supplierName} onChange={handleChange} placeholder={lang === "en" ? "Bağfaş, Hedef Ecza, etc." : "Bağfaş, Hedef Ecza vb."} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-3)" }}>
+            <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-3)" }}>
               <div className="form-group">
                 <label className="form-label required">{lang === "en" ? "Issue Date" : "Senet Tarihi"}</label>
                 <SingleDatePicker value={formData.issueDate} onChange={(date) => setFormData(prev => ({ ...prev, issueDate: date }))} lang={lang} required />

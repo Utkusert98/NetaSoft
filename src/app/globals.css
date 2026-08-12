@@ -1461,7 +1461,18 @@ select.form-input {
   top: 0;
   left: 0;
   right: 0;
-  height: 56px;
+  /* `height: 56px` + `box-sizing: border-box` (global reset) demekti ki
+     `padding-top: env(safe-area-inset-top)` sabit 56px'in İÇİNDEN yer
+     kaplıyordu — çentikli/Dynamic Island'lı iPhone'larda bu padding tek
+     başına 56px'e yakın/fazla olabildiği için çubuğun gerçek görüntülenen
+     yüksekliği (içerik taşması nedeniyle) 56px'i aşıyor, ama `.main-content`
+     bunu telafi eden padding-top'ı hâlâ sabit 56px'ti — sayfa içeriği
+     (başlıklar, grafikler) çubuğun altında kısmen gizli kalıyordu (gerçek
+     bir kullanıcı geri bildirimiyle tespit edildi). `min-height` + padding'in
+     TOPLAMA eklenmesiyle çubuk artık gerçek yüksekliğini doğru rapor eder;
+     `.main-content`'in padding-top'ı da aynı formülle eşleştirildi (aşağıda).
+  */
+  min-height: 56px;
   padding-top: env(safe-area-inset-top); /* iOS çentik alanı */
   background: var(--sidebar-bg);
   z-index: 300;
@@ -1517,7 +1528,7 @@ select.form-input {
   .sidebar-overlay.open { display: block; }
 
   /* Main content full width + topbar offset */
-  .main-content { margin-left: 0; padding-top: 56px; }
+  .main-content { margin-left: 0; padding-top: calc(56px + env(safe-area-inset-top)); }
 
   /* Page padding */
   .page-content { padding: var(--spacing-4) var(--spacing-4) var(--spacing-8); }
