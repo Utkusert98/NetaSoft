@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
+import DashboardInsightCards from "@/components/ui/DashboardInsightCards";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface DashboardData {
@@ -415,6 +416,9 @@ export default function DashboardClient({ data, pharmacistName }: {
           accent={unpaidNotes.length > 0 ? "expense" : "profit"}
         />
       </div>
+
+      {/* ── Satış Raporu / Envanter Analizi Özet Kartları (bilgilendirici, resmi toplamları etkilemez) ── */}
+      <DashboardInsightCards />
 
       {/* ── Ana Grid (trend + SGK pasta) ── */}
       <div className="responsive-grid responsive-grid-2-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>

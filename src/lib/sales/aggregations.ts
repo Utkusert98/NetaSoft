@@ -120,6 +120,37 @@ function isoWeekStart(dateOnly: string): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+export interface TopProduct {
+  productName: string;
+  revenue: number;
+  quantity: number;
+}
+
+/**
+ * Ürün adına göre net geliri toplulaştırır ve en yüksek gelirli ilk `limit`
+ * ürünü döner (azalan sırada). Dashboard'daki "Bu Ayın En Çok Satan Ürünleri"
+ * gibi küçük/özet listeler için — tam Satış Raporu grafik setinin yerine
+ * geçmez, sadece kısa bir üst-N özetidir.
+ */
+export function topProductsByRevenue(
+  records: Array<Pick<ParsedSaleRow, "productName" | "netRevenue" | "quantity">>,
+  limit = 5,
+): TopProduct[] {
+  const byProduct = new Map<string, { revenue: number; quantity: number }>();
+  for (const r of records) {
+    const name = r.productName?.trim();
+    if (!name) continue;
+    const cur = byProduct.get(name) ?? { revenue: 0, quantity: 0 };
+    cur.revenue += r.netRevenue;
+    cur.quantity += r.quantity;
+    byProduct.set(name, cur);
+  }
+  return Array.from(byProduct.entries())
+    .map(([productName, v]) => ({ productName, ...v }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit);
+}
+
 /**
  * Ortalama fiş tutarı ve iskonto oranı trendi. Veri aralığı 60 günden büyükse
  * aylık, değilse haftalık (ISO hafta başlangıcı — Pazartesi) gruplanır.

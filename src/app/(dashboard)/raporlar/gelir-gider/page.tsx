@@ -8,6 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
+import PrescriptionRetailSplit from "@/components/ui/PrescriptionRetailSplit";
 
 
 interface ReportData {
@@ -286,6 +287,15 @@ export default function GelirGiderPage() {
               </ChartCard>
             )}
 
+            <PrescriptionRetailSplit
+              startDate={data.period.start.slice(0, 10)}
+              endDate={data.period.end.slice(0, 10)}
+              title={lang === "en" ? "Sales Report: Prescription / Retail Distribution (period)" : "Satış Raporu: Reçeteli / Perakende Dağılımı (dönem)"}
+            />
+          </div>
+
+          {/* Aylık Gider Kırılımı */}
+          <div className="responsive-grid responsive-grid-1-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
             <ChartCard title={lang === "en" ? "Monthly Expense Breakdown" : "Aylık Gider Kırılımı"}>
               {data.monthly.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No data." : "Veri yok."}</p>
