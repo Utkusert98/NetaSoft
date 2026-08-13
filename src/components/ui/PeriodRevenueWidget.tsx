@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BarChart3, Info } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 
 type KasaRecord = {
@@ -104,8 +105,8 @@ export default function PeriodRevenueWidget({
 
   return (
     <div className="card">
-      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-        📊 {heading}
+      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)", display: "flex", alignItems: "center", gap: "8px" }}>
+        <BarChart3 size={18} style={{ color: "var(--color-text-muted)" }} /> {heading}
       </h2>
 
       {loading ? (
@@ -166,10 +167,13 @@ export default function PeriodRevenueWidget({
             </div>
           )}
 
-          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-            ℹ️ {lang === "en"
-              ? "Informational only. This combined total does not feed into any other page's official figures. It uses the actual prescription revenue from Sales Report, not the SGK Invoice amount — so it may differ from the official Total Income figure elsewhere, which uses the SGK Invoice amount as the source of truth for invoiced/collectible prescription revenue."
-              : "Sadece bilgilendirme amaçlıdır. Bu toplam başka hiçbir sayfanın resmi rakamlarını beslemez veya değiştirmez. Buradaki reçete tutarı Satış Raporu'ndaki GERÇEK satış tutarıdır, SGK Fatura'ya girilen tutar değildir — bu yüzden başka bir yerdeki resmi Toplam Gelir rakamından farklı çıkabilir (o rakam, faturalanabilir/tahsil edilebilir reçeteli gelirin doğruluk kaynağı olan SGK Fatura tutarını kullanır)."}
+          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px", display: "flex", alignItems: "flex-start", gap: "5px" }}>
+            <Info size={12} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <span>
+              {lang === "en"
+                ? "Informational only. This combined total does not feed into any other page's official figures. It uses the actual prescription revenue from Sales Report, not the SGK Invoice amount — so it may differ from the official Total Income figure elsewhere, which uses the SGK Invoice amount as the source of truth for invoiced/collectible prescription revenue."
+                : "Sadece bilgilendirme amaçlıdır. Bu toplam başka hiçbir sayfanın resmi rakamlarını beslemez veya değiştirmez. Buradaki reçete tutarı Satış Raporu'ndaki GERÇEK satış tutarıdır, SGK Fatura'ya girilen tutar değildir — bu yüzden başka bir yerdeki resmi Toplam Gelir rakamından farklı çıkabilir (o rakam, faturalanabilir/tahsil edilebilir reçeteli gelirin doğruluk kaynağı olan SGK Fatura tutarını kullanır)."}
+            </span>
           </p>
         </div>
       )}

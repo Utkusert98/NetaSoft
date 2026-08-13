@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Mail, AlertTriangle } from "lucide-react";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 import { useLangContext } from "@/app/providers/LangProvider";
 
@@ -46,7 +47,7 @@ export default function SifremiUnuttumPage() {
       <div className="auth-page">
         <div className="auth-form-side" style={{ justifyContent: "center", alignItems: "center" }}>
           <div style={{ textAlign: "center", animation: "fadeIn 0.5s ease", maxWidth: "420px" }}>
-            <div style={{ fontSize: "80px", marginBottom: "24px" }}>📧</div>
+            <div style={{ marginBottom: "24px", display: "flex", justifyContent: "center", color: "var(--color-primary)" }}><Mail size={64} /></div>
             <h2 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "12px", color: "var(--color-success)" }}>
               {lang === "en" ? "Check Your Email" : "E-Postanızı Kontrol Edin"}
             </h2>
@@ -94,9 +95,12 @@ export default function SifremiUnuttumPage() {
                 color: "var(--color-danger)",
                 fontSize: "var(--font-size-sm)",
                 fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
               }}
             >
-              ⚠️ {error}
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} /> {error}
             </div>
           )}
 

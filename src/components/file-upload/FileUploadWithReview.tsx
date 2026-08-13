@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { CheckCircle2, ClipboardList, AlertTriangle, FolderOpen } from "lucide-react";
 import { formatFileSize } from "@/lib/utils";
 
 interface ParsedRow {
@@ -154,7 +155,7 @@ export default function FileUploadWithReview({
   if (step === "done") {
     return (
       <div style={{ textAlign: "center", padding: "var(--spacing-12)" }}>
-        <div style={{ fontSize: "64px", marginBottom: "16px" }}>✅</div>
+        <div style={{ marginBottom: "16px", display: "flex", justifyContent: "center", color: "var(--color-success)" }}><CheckCircle2 size={56} /></div>
         <h3 style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, marginBottom: "8px", color: "var(--color-success)" }}>
           {en ? "Import Complete" : "İçe Aktarma Tamamlandı"}
         </h3>
@@ -213,8 +214,8 @@ export default function FileUploadWithReview({
     return (
       <div className="import-review" id="import-review-panel">
         <div className="import-review-header">
-          <h2 className="import-review-title">
-            📋 {en ? "Here's What I Read — Is This Correct?" : "Verileri Bu Şekilde Okudum, Doğru Mu?"}
+          <h2 className="import-review-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <ClipboardList size={20} /> {en ? "Here's What I Read — Is This Correct?" : "Verileri Bu Şekilde Okudum, Doğru Mu?"}
           </h2>
           <p className="import-review-subtitle">
             {en
@@ -295,8 +296,8 @@ export default function FileUploadWithReview({
 
         <div className="import-actions">
           {error && (
-            <span style={{ color: "var(--color-danger)", fontSize: "var(--font-size-sm)", marginRight: "auto" }}>
-              ⚠️ {error}
+            <span style={{ color: "var(--color-danger)", fontSize: "var(--font-size-sm)", marginRight: "auto", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <AlertTriangle size={14} /> {error}
             </span>
           )}
           <button id="btn-import-cancel" className="btn btn-secondary" onClick={handleReset}>
@@ -324,9 +325,9 @@ export default function FileUploadWithReview({
           background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)",
           borderRadius: "var(--radius-md)", padding: "var(--spacing-4)",
           marginBottom: "var(--spacing-4)", color: "var(--color-danger)",
-          fontSize: "var(--font-size-sm)",
+          fontSize: "var(--font-size-sm)", display: "flex", alignItems: "center", gap: "8px",
         }}>
-          ⚠️ {error}
+          <AlertTriangle size={16} style={{ flexShrink: 0 }} /> {error}
         </div>
       )}
 
@@ -342,7 +343,7 @@ export default function FileUploadWithReview({
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
       >
-        <div className="file-upload-icon">📁</div>
+        <div className="file-upload-icon"><FolderOpen size={40} /></div>
         <h3 className="file-upload-title">
           {en ? "Drag Your File Here" : "Dosyanızı Buraya Sürükleyin"}
         </h3>

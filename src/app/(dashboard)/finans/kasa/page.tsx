@@ -2,6 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect, type CSSProperties } from "react";
+import { Trash2, CalendarPlus, Upload, Banknote, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -180,9 +181,9 @@ export default function KasaPage() {
   );
 
   const channelFields = [
-    { name: "posAmount", label: "💳 POS" },
-    { name: "cashAmount", label: lang === "en" ? "💵 Cash" : "💵 Nakit" },
-    { name: "wireAmount", label: lang === "en" ? "🏦 Wire / EFT" : "🏦 Havale / EFT" },
+    { name: "posAmount", label: "POS" },
+    { name: "cashAmount", label: lang === "en" ? "Cash" : "Nakit" },
+    { name: "wireAmount", label: lang === "en" ? "Wire / EFT" : "Havale / EFT" },
   ];
 
   const kasaTableHeader = (
@@ -223,8 +224,8 @@ export default function KasaPage() {
                 {lang === "en" ? "Edit" : "Düzenle"}
               </button>
               <button onClick={() => setDeleteId(rec.id)}
-                style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}>
-                🗑️ {lang === "en" ? "Delete" : "Sil"}
+                style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                <Trash2 size={12} /> {lang === "en" ? "Delete" : "Sil"}
               </button>
             </div>
           </td>
@@ -254,16 +255,16 @@ export default function KasaPage() {
         {/* FORM */}
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-3)", marginBottom: "var(--spacing-5)" }}>
-            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600 }}>
-              📅 {lang === "en" ? "New Register Entry" : "Yeni Kasa Girişi"}
+            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <CalendarPlus size={18} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "New Register Entry" : "Yeni Kasa Girişi"}
             </h2>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: "13px", padding: "6px 12px" }}
+              style={{ fontSize: "13px", padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
               onClick={() => setBulkOpen(true)}
             >
-              📥 {lang === "en" ? "Bulk Upload (Excel)" : "Excel ile Toplu Yükle"}
+              <Upload size={14} /> {lang === "en" ? "Bulk Upload (Excel)" : "Excel ile Toplu Yükle"}
             </button>
           </div>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
@@ -317,7 +318,7 @@ export default function KasaPage() {
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
           ) : thisMonthRecords.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏦</div>
+              <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center" }}><Banknote size={36} /></div>
               {lang === "en" ? "No cash records this month." : "Bu ay kasa kaydı yok."}
             </div>
           ) : (
@@ -363,7 +364,7 @@ export default function KasaPage() {
         </div>
         {historyRecords.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+            <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}><ClipboardList size={28} /></div>
             {lang === "en" ? "No records in selected period." : "Seçili dönemde kayıt bulunamadı."}
           </div>
         ) : (

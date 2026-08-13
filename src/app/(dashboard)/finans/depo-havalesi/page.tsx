@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, type CSSProperties } from "react";
+import { ClipboardList, Trash2 } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
@@ -341,7 +342,7 @@ export default function DepoHavalesiPage() {
         </div>
         {historyTransfers.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+            <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}><ClipboardList size={28} /></div>
             {lang === "en" ? "No records in selected period." : "Seçili dönemde kayıt bulunamadı."}
           </div>
         ) : (
@@ -395,7 +396,7 @@ export default function DepoHavalesiPage() {
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
               {lang === "en" ? "Delete Transfer" : "Havaleyi Sil"}
             </h3>

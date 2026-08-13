@@ -28,7 +28,7 @@ export const t = {
 
   // ─── Common ────────────────────────────────────────────────
   common: {
-    save: { tr: "💾 Kaydet", en: "💾 Save" },
+    save: { tr: "Kaydet", en: "Save" },
     saving: { tr: "Kaydediliyor...", en: "Saving..." },
     add: { tr: "Ekle", en: "Add" },
     edit: { tr: "Düzenle", en: "Edit" },
@@ -261,7 +261,7 @@ export const t = {
     updateProfile: { tr: "Profil bilgileri güncellendi.", en: "Profile information updated." },
     updatePassword: { tr: "Şifre başarıyla güncellendi.", en: "Password successfully updated." },
     passwordHint: { tr: "Güçlü bir şifre kullanın: en az 12 karakter, büyük/küçük harf, rakam ve özel karakter içermeli.", en: "Use a strong password: at least 12 characters with uppercase, lowercase, numbers and special characters." },
-    updateBtn: { tr: "🔑 Şifreyi Güncelle", en: "🔑 Update Password" },
+    updateBtn: { tr: "Şifreyi Güncelle", en: "Update Password" },
     registered: { tr: "Kayıt", en: "Registered" },
     teamTab: { tr: "Ekip Yönetimi", en: "Team Management" },
     securityTab: { tr: "Güvenlik", en: "Security" },

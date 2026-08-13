@@ -14,6 +14,7 @@
  */
 
 import { useState, useRef, useEffect, useId, type CSSProperties } from "react";
+import { CalendarDays } from "lucide-react";
 import {
   buildMonthGrid,
   nextRangeSelection,
@@ -137,7 +138,7 @@ export default function DateRangePicker({ startDate, endDate, onChange, lang = "
         aria-controls={popoverId}
         onClick={() => setOpen(v => !v)}
       >
-        <span className="drp-trigger-icon" aria-hidden="true">📅</span>
+        <span className="drp-trigger-icon" aria-hidden="true"><CalendarDays size={14} /></span>
         <span className="drp-trigger-text">{displayText}</span>
         <span className="drp-trigger-chevron" aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>

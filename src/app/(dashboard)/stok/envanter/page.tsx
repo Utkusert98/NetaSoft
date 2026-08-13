@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Info, Package, AlertTriangle, Trash2, CheckCircle2 } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import {
   BarChart,
@@ -556,7 +557,7 @@ function AnalysisDashboard({ analysis, inventoryRows, lang }: {
           padding: "12px 16px", background: "var(--color-primary-pale)", border: "1px solid var(--color-primary-light)",
           borderRadius: "var(--radius-md)", fontSize: "13px", color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
         }}>
-          <span style={{ fontSize: "18px", flexShrink: 0 }}>ℹ️</span>
+          <Info size={18} style={{ flexShrink: 0 }} />
           <span>
             {en
               ? "This file has no sales-quantity column — it's a stock valuation report. The figures below show the value of your CURRENT stock, not sales performance."
@@ -846,7 +847,7 @@ function LastUploadBanner({ report, loaded, en }: {
       border: "1px solid var(--color-primary-light)", borderRadius: "var(--radius-md)", fontSize: "13px",
       color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
     }}>
-      <span style={{ fontSize: "16px", flexShrink: 0 }}>📦</span>
+      <Package size={16} style={{ flexShrink: 0 }} />
       <span>
         <strong>{en ? "Last Upload: " : "Son Yükleme: "}</strong>
         {formatDate(report.createdAt, true)}
@@ -1139,7 +1140,9 @@ export default function EnvanterPage() {
           )}
 
           {!historyLoading && historyError && (
-            <p style={{ color: "var(--color-danger)" }}>⚠ {historyError}</p>
+            <p style={{ color: "var(--color-danger)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {historyError}
+            </p>
           )}
 
           {!historyLoading && !historyError && historyList.length === 0 && (
@@ -1193,7 +1196,7 @@ export default function EnvanterPage() {
         {deleteTarget && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
             <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+              <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
               <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{en ? "Delete Report" : "Raporu Sil"}</h3>
               <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
                 {en
@@ -1304,10 +1307,14 @@ export default function EnvanterPage() {
               borderRadius: "var(--radius-md)",
               fontSize: "13px",
               color: "#92400e",
+              display: "flex", alignItems: "flex-start", gap: "6px",
             }}>
-              ⚠ {en
-                ? "This field may leave calculations incomplete if left unmapped:"
-                : "Bu alan boş bırakılırsa hesaplamalar eksik olabilir:"} {missingLabels.join(", ")}
+              <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span>
+                {en
+                  ? "This field may leave calculations incomplete if left unmapped:"
+                  : "Bu alan boş bırakılırsa hesaplamalar eksik olabilir:"} {missingLabels.join(", ")}
+              </span>
             </div>
           )}
 
@@ -1338,8 +1345,8 @@ export default function EnvanterPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", flexWrap: "wrap" }}>
             {saveMessage && (
-              <span style={{ fontSize: "13px", color: saveState === "error" ? "var(--color-danger)" : "var(--color-success)" }}>
-                {saveState === "error" ? "⚠ " : "✓ "}{saveMessage}
+              <span style={{ fontSize: "13px", color: saveState === "error" ? "var(--color-danger)" : "var(--color-success)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                {saveState === "error" ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />} {saveMessage}
               </span>
             )}
             <button
