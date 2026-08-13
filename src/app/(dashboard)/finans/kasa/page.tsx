@@ -42,6 +42,9 @@ export default function KasaPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearAllSubmitting, setClearAllSubmitting] = useState(false);
+
   const [histStart, setHistStart] = useState("");
   const [histEnd, setHistEnd] = useState("");
 
@@ -159,6 +162,31 @@ export default function KasaPage() {
       setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  // Tarih filtresi aktifse yalnızca o ARALIKTAKİ kayıtlar silinir (aşağıdaki
+  // historyRecords ile BİREBİR aynı küme) — yanlış eşleştirilmiş bir dosyanın
+  // yalnızca ilgili bölümü, geri kalan geçerli kayıtlar etkilenmeden
+  // temizlenebilsin diye. Filtre yoksa TÜM kayıtlar silinir.
+  const handleClearAll = async () => {
+    setClearAllSubmitting(true);
+    try {
+      const params = new URLSearchParams();
+      if (histStart) params.set("start", histStart);
+      if (histEnd) params.set("end", histEnd);
+      const qs = params.toString();
+      const res = await fetch(`/api/v1/finans/kasa/clear-all${qs ? `?${qs}` : ""}`, {
+        method: "DELETE",
+        headers: { "Accept-Language": lang },
+      });
+      if (!res.ok) throw new Error(lang === "en" ? "Delete failed" : "Silme işlemi başarısız");
+      setClearAllOpen(false);
+      await fetchRecords();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+    } finally {
+      setClearAllSubmitting(false);
     }
   };
 
@@ -360,6 +388,18 @@ export default function KasaPage() {
             <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
               {historyRecords.length} {lang === "en" ? "records" : "kayıt"}
             </span>
+            {historyRecords.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setClearAllOpen(true)}
+                style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center", gap: "4px" }}
+              >
+                <Trash2 size={12} />
+                {histStart || histEnd
+                  ? (lang === "en" ? "Delete Selected Range" : "Seçili Aralığı Sil")
+                  : (lang === "en" ? "Delete All" : "Tümünü Sil")}
+              </button>
+            )}
           </div>
         </div>
         {historyRecords.length === 0 ? (
@@ -436,6 +476,35 @@ export default function KasaPage() {
               <button className="btn" onClick={() => void handleDelete()} disabled={deleteSubmitting}
                 style={{ background: "var(--color-danger)", color: "white", border: "none" }}>
                 {deleteSubmitting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CLEAR ALL / RANGE CONFIRM MODAL */}
+      {clearAllOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "420px" }}>
+            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>
+              {lang === "en" ? "Confirm Delete" : "Silmeyi Onayla"}
+            </h3>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginBottom: "24px" }}>
+              {histStart || histEnd
+                ? (lang === "en"
+                    ? `${historyRecords.length} record(s) in the selected date range will be deleted. This action cannot be undone.`
+                    : `Seçili tarih aralığındaki ${historyRecords.length} kayıt silinecek. Bu işlem geri alınamaz.`)
+                : (lang === "en"
+                    ? `ALL ${historyRecords.length} register record(s) will be deleted. This action cannot be undone.`
+                    : `TÜM ${historyRecords.length} kasa kaydı silinecek. Bu işlem geri alınamaz.`)}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <button className="btn" onClick={() => setClearAllOpen(false)} style={{ border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
+              <button className="btn" onClick={() => void handleClearAll()} disabled={clearAllSubmitting}
+                style={{ background: "var(--color-danger)", color: "white", border: "none" }}>
+                {clearAllSubmitting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
               </button>
             </div>
           </div>
