@@ -213,13 +213,20 @@ export default function KasaBulkUploadModal({
             <p style={{ fontWeight: 700, fontSize: "var(--font-size-lg)", marginBottom: "8px" }}>
               {en ? `${result.created} record(s) saved.` : `${result.created} kayıt kaydedildi.`}
             </p>
-            {result.skippedDates.length > 0 && (
-              <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "16px" }}>
-                {en
-                  ? `${result.skippedDates.length} date(s) already had a record and were skipped: ${result.skippedDates.slice(0, 10).join(", ")}${result.skippedDates.length > 10 ? "…" : ""}`
-                  : `${result.skippedDates.length} tarihte zaten kayıt vardı, atlandı: ${result.skippedDates.slice(0, 10).join(", ")}${result.skippedDates.length > 10 ? "…" : ""}`}
-              </p>
-            )}
+            {result.skippedDates.length > 0 && (() => {
+              // Bir tarih hem "DB'de zaten vardı" hem "dosyada birden fazla kez
+              // geçiyordu" nedeniyle atlanmış olabilir — kullanıcıya yanlışlıkla
+              // "zaten kayıt vardı" denmesin diye nötr bir ifade kullanılır,
+              // ve tekrarlanan tarihler listede sadece bir kez gösterilir.
+              const uniqueDates = Array.from(new Set(result.skippedDates));
+              return (
+                <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "16px" }}>
+                  {en
+                    ? `${result.skippedDates.length} row(s) were skipped (date already recorded, or repeated within the file): ${uniqueDates.slice(0, 10).join(", ")}${uniqueDates.length > 10 ? "…" : ""}`
+                    : `${result.skippedDates.length} satır atlandı (tarihe zaten kayıt vardı ya da dosyada tekrar ediyordu): ${uniqueDates.slice(0, 10).join(", ")}${uniqueDates.length > 10 ? "…" : ""}`}
+                </p>
+              );
+            })()}
             <button type="button" className="btn btn-primary" onClick={onClose}>
               {en ? "Done" : "Tamam"}
             </button>
