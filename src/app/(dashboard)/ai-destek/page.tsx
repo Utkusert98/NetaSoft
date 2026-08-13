@@ -189,8 +189,7 @@ function AssistantMessage({
     <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
       <NetAiOrb active={speaking} />
       <div style={{
-        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
+        flex: 1, minWidth: 0, paddingTop: "6px",
         fontSize: "var(--font-size-sm)", lineHeight: 1.7,
         color: "#e7e9ee",
       }}>
@@ -232,18 +231,10 @@ function AssistantMessage({
 
 function UserMessage({ content }: { content: string }) {
   return (
-    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", flexDirection: "row-reverse" }}>
+    <div style={{ display: "flex", justifyContent: "flex-end" }}>
       <div style={{
-        width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-        background: "linear-gradient(135deg, #163300, #4e9b3f)", color: "white",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontWeight: 700, fontSize: "14px",
-      }}>
-        S
-      </div>
-      <div style={{
-        background: "linear-gradient(135deg, #234d0a, #163300)", color: "white",
-        borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
+        background: "rgba(255,255,255,0.07)", color: "#fff",
+        borderRadius: "var(--radius-lg)", padding: "10px 16px", maxWidth: "80%",
         fontSize: "var(--font-size-sm)", lineHeight: 1.7, whiteSpace: "pre-wrap",
       }}>
         {content}
@@ -591,15 +582,17 @@ export default function AiDestek() {
     } catch (err) {
       if (controller.signal.aborted) {
         // Kullanıcı "Durdur" ile üretimi kestiyse, o ana kadar akmış olan
-        // metin varsa (boş değilse) yarım da olsa sohbete kaydedilir —
-        // sessizce kaybolmak yerine kullanıcının o ana kadar okuduğu şey elde kalır.
+        // metin (boş da olsa) sohbete kaydedilir — sessizce kaybolmak yerine
+        // kullanıcının o ana kadar okuduğu şey elde kalır VE "Yeniden üret"
+        // butonunun görünebilmesi için her zaman bir asistan mesajı eklenir
+        // (aksi halde henüz hiç metin akmadan durdurulduğunda geriye hiçbir
+        // mesaj kalmıyor, dolayısıyla yeniden dene seçeneği hiç çıkmıyordu).
         const partial = accumulatedRef.current.trim();
-        if (partial) {
-          const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: partial };
-          const finalMessages = [...history, assistantMsg];
-          setMessages(finalMessages);
-          persistConversation(finalMessages);
-        }
+        const stoppedText = lang === "tr" ? "_(Durduruldu.)_" : "_(Stopped.)_";
+        const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: partial || stoppedText };
+        const finalMessages = [...history, assistantMsg];
+        setMessages(finalMessages);
+        persistConversation(finalMessages);
         setDisplayedText("");
         pendingRef.current = "";
       } else {
@@ -890,7 +883,7 @@ export default function AiDestek() {
             {loading && !displayedText && (
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                 <NetAiOrb active />
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(255,255,255,0.04)", borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", paddingTop: "6px" }}>
                   <div style={{ display: "flex", gap: "5px" }}>
                     {[0, 1, 2].map((i) => (
                       <div key={i} style={{
