@@ -33,17 +33,35 @@ function norm(h: string): string {
     .replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
 }
 
-const DATE_ALIASES = ["tarih", "z raporu tarihi", "kasa tarihi", "gun", "date"];
-const POS_ALIASES = ["pos", "kredi karti", "kart", "pos tutar", "pos tutari"];
-const CASH_ALIASES = ["nakit", "kasa", "nakit tutar", "nakit tutari", "cash"];
+// ÖNEMLİ: "pos", "kasa", "kart" gibi kısa/genel kelimeler yalnızca TAM başlık
+// eşleşmesinde (exactOnlyAliases) denenir, bulanık (substring) eşleşmede
+// KULLANILMAZ — aksi halde "Pos Z No" (POS terminalinin günlük Z-raporu sıra
+// numarası, bir tutar DEĞİL) gibi bir sütun "pos" içerdiği için POS tutarı
+// sanılıp yanlış (küçük, sıralı sayılardan oluşan) değerler kaydediliyordu
+// (gerçek bir üretim hatasının kök nedeniydi — Satış Raporu'nda
+// (`@/lib/sales/mapRow`) daha önce aynı sınıf hata için uygulanan
+// `exactOnlyKeys` deseninin aynısı burada da uygulanır).
+// "tarih", "havale", "eft" gibi kelimeler yeterince özgün olduğu için
+// bulanık eşleşmede kalmaya devam eder (ör. "İşlem Tarihi" içindeki "tarih"
+// hâlâ yakalanmalı) — yalnızca gerçekten çakışma riski taşıyan (kimlik/sıra
+// numarası sütunlarıyla karışabilen) kısa/genel kelimeler exact-only'e alındı.
+const DATE_ALIASES = ["tarih", "z raporu tarihi", "kasa tarihi", "date"];
+const DATE_EXACT_ONLY = ["gun"];
+const POS_ALIASES = ["kredi karti", "pos tutar", "pos tutari"];
+const POS_EXACT_ONLY = ["pos", "kart"];
+const CASH_ALIASES = ["nakit tutar", "nakit tutari", "cash"];
+const CASH_EXACT_ONLY = ["nakit", "kasa"];
 const WIRE_ALIASES = ["havale", "eft", "havale eft", "havale/eft", "wire"];
-const NOTES_ALIASES = ["not", "notlar", "aciklama", "notes"];
+const NOTES_ALIASES = ["notlar", "aciklama", "notes"];
+const NOTES_EXACT_ONLY = ["not"];
 
-function findIdx(normalized: string[], aliases: string[]): number {
-  for (const alias of aliases) {
+function findIdx(normalized: string[], aliases: string[], exactOnlyAliases: string[] = []): number {
+  // 1. geçiş: tam eşleşme (en güvenilir) — hem substring-uygun hem exact-only alias'lar denenir
+  for (const alias of [...aliases, ...exactOnlyAliases]) {
     const idx = normalized.findIndex(h => h === alias);
     if (idx >= 0) return idx;
   }
+  // 2. geçiş: başlık, alias ifadesini bir bütün olarak içeriyor — SADECE substring-uygun alias'lar
   for (const alias of aliases) {
     const idx = normalized.findIndex(h => h.includes(alias));
     if (idx >= 0) return idx;
@@ -53,11 +71,11 @@ function findIdx(normalized: string[], aliases: string[]): number {
 
 export function mapKasaRow(headers: string[], row: unknown[]): { row: ParsedKasaRow; colMap: KasaColumnMap } {
   const normalized = headers.map(norm);
-  const dateIdx = findIdx(normalized, DATE_ALIASES);
-  const posIdx = findIdx(normalized, POS_ALIASES);
-  const cashIdx = findIdx(normalized, CASH_ALIASES);
+  const dateIdx = findIdx(normalized, DATE_ALIASES, DATE_EXACT_ONLY);
+  const posIdx = findIdx(normalized, POS_ALIASES, POS_EXACT_ONLY);
+  const cashIdx = findIdx(normalized, CASH_ALIASES, CASH_EXACT_ONLY);
   const wireIdx = findIdx(normalized, WIRE_ALIASES);
-  const notesIdx = findIdx(normalized, NOTES_ALIASES);
+  const notesIdx = findIdx(normalized, NOTES_ALIASES, NOTES_EXACT_ONLY);
 
   const gv = (idx: number): unknown => (idx >= 0 && idx < row.length ? row[idx] : undefined);
 

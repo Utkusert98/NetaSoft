@@ -44,4 +44,23 @@ describe("mapKasaRow", () => {
     const { row: parsed } = mapKasaRow(headers, row);
     expect(parsed.notes).toBe("Bayram kapalı yarım gün");
   });
+
+  it("\"Pos Z No\" gibi bir sıra numarası sütununu POS tutarı SANMAZ (gerçek bir üretim hatasının kök nedeni)", () => {
+    const headers = ["İşlem Tarihi", "Pos Z No", "Nakit", "Havale"];
+    const row = ["01.11.2025", "480", "300", "0"];
+    const { row: parsed, colMap } = mapKasaRow(headers, row);
+    // "Pos Z No" bir tutar sütunu değil, günlük Z-raporu sıra numarasıdır —
+    // eşleşmemeli (posAmount 0 kalmalı), Nakit'ten çalınmamalı.
+    expect(parsed.posAmount).toBe(0);
+    expect(parsed.cashAmount).toBe(300);
+    expect(colMap.pos).toBe("—");
+  });
+
+  it("tam eşleşen kısa başlıkları (\"POS\", \"Kasa\") yine de yakalar", () => {
+    const headers = ["Tarih", "POS", "Kasa", "Havale"];
+    const row = ["01.11.2025", "1000", "200", "0"];
+    const { row: parsed } = mapKasaRow(headers, row);
+    expect(parsed.posAmount).toBe(1000);
+    expect(parsed.cashAmount).toBe(200);
+  });
 });
