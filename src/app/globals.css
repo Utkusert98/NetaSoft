@@ -444,7 +444,8 @@ h6 { font-size: var(--font-size-base); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.netai-history-delete {
+.netai-history-delete,
+.netai-history-rename {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -458,14 +459,100 @@ h6 { font-size: var(--font-size-base); }
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 .netai-history-item:hover .netai-history-delete,
-.netai-history-item:focus-within .netai-history-delete { opacity: 1; }
+.netai-history-item:hover .netai-history-rename,
+.netai-history-item:focus-within .netai-history-delete,
+.netai-history-item:focus-within .netai-history-rename { opacity: 1; }
 .netai-history-delete:hover { background: rgba(231, 76, 60, 0.2); color: #ff6b6b; }
+.netai-history-rename:hover { background: rgba(159, 232, 112, 0.16); color: #9fe870; }
+.netai-history-item-editing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: rgba(159, 232, 112, 0.08);
+}
+.netai-history-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(159, 232, 112, 0.4);
+  border-radius: var(--radius-sm);
+  color: #e7e9ee;
+  font-size: 13px;
+  padding: 3px 6px;
+  outline: none;
+}
 .netai-history-empty {
   color: rgba(231, 233, 238, 0.4);
   font-size: 12px;
   padding: var(--spacing-3) var(--spacing-2);
 }
 .netai-history-backdrop { display: none; }
+
+/* Sohbet mesajı alt eylemleri — Kopyala/Yeniden üret/Sesli oku */
+.netai-msg-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(231, 233, 238, 0.55);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  transition: color 0.15s;
+}
+.netai-msg-action-btn:hover { color: #9fe870; }
+
+/* AI cevaplarındaki markdown biçimlendirmesi (kalın, liste, kod, tablo) —
+   önceden düz metin (whiteSpace:pre-wrap) olarak gösteriliyordu, model
+   **kalın** veya "- madde" yazdığında yıldız/tire işaretleri OLDUĞU GİBİ
+   görünüyordu (kullanıcı geri bildirimi). */
+.netai-markdown { color: #e7e9ee; }
+.netai-markdown p { margin: 0 0 10px; }
+.netai-markdown p:last-child { margin-bottom: 0; }
+.netai-markdown strong { font-weight: 700; color: #fff; }
+.netai-markdown ul, .netai-markdown ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.netai-markdown li { margin-bottom: 3px; }
+.netai-markdown a { color: #9fe870; text-decoration: underline; }
+.netai-markdown code {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+  font-family: var(--font-mono, monospace);
+}
+.netai-markdown pre {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+.netai-markdown pre code { background: none; padding: 0; }
+.netai-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 10px;
+  font-size: 0.92em;
+}
+.netai-markdown th, .netai-markdown td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 5px 8px;
+  text-align: left;
+}
+.netai-markdown th { background: rgba(255, 255, 255, 0.06); }
+.netai-markdown blockquote {
+  border-left: 2px solid rgba(159, 232, 112, 0.4);
+  padding-left: 10px;
+  margin: 0 0 10px;
+  color: rgba(231, 233, 238, 0.75);
+}
 
 .netai-chat-col {
   flex: 1;

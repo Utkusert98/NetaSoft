@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, Send, Sparkles, Volume2, VolumeX, Plus, MessageSquare, PanelLeft, Trash2, TrendingUp, Landmark, FileText, Receipt, type LucideIcon } from "lucide-react";
+import {
+  Mic, Send, Sparkles, Volume2, VolumeX, Plus, MessageSquare, PanelLeft, Trash2,
+  TrendingUp, Landmark, FileText, Receipt, Copy, Check, RefreshCw, Square, Pencil,
+  type LucideIcon,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
 import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
@@ -17,6 +24,7 @@ interface Message {
 interface Conversation {
   id: string;
   title: string;
+  titleManual?: boolean;
   messages: Message[];
   updatedAt: number;
 }
@@ -72,7 +80,12 @@ const UI_TEXT: Record<Lang, {
   history: string;
   historyEmpty: string;
   deleteChat: string;
+  renameChat: string;
   newChat: string;
+  stop: string;
+  copy: string;
+  copied: string;
+  regenerate: string;
 }> = {
   tr: {
     title: "NetAI",
@@ -91,7 +104,12 @@ const UI_TEXT: Record<Lang, {
     history: "Sohbetler",
     historyEmpty: "Henüz sohbet geçmişiniz yok",
     deleteChat: "Sohbeti sil",
+    renameChat: "Sohbeti yeniden adlandır",
     newChat: "Yeni Sohbet",
+    stop: "Durdur",
+    copy: "Kopyala",
+    copied: "Kopyalandı",
+    regenerate: "Yeniden üret",
   },
   en: {
     title: "NetAI",
@@ -110,7 +128,12 @@ const UI_TEXT: Record<Lang, {
     history: "Chats",
     historyEmpty: "You don't have any chat history yet",
     deleteChat: "Delete chat",
+    renameChat: "Rename chat",
     newChat: "New Chat",
+    stop: "Stop",
+    copy: "Copy",
+    copied: "Copied",
+    regenerate: "Regenerate",
   },
 };
 
@@ -130,10 +153,37 @@ function NetAiOrb({ size = 36, active = false }: { size?: number; active?: boole
   );
 }
 
+function CopyButton({ content, label, copiedLabel }: { content: string; label: string; copiedLabel: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Panoya erişim engellenmiş olabilir (izin/HTTPS dışı ortam) — sessizce yoksay
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      title={copied ? copiedLabel : label}
+      aria-label={copied ? copiedLabel : label}
+      className="netai-msg-action-btn"
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? copiedLabel : label}
+    </button>
+  );
+}
+
 function AssistantMessage({
-  content, canSpeak, speaking, onSpeak, speakLabel,
+  content, canSpeak, speaking, onSpeak, speakLabel, copyLabel, copiedLabel,
+  onRegenerate, regenerateLabel, streaming,
 }: {
   content: string; canSpeak: boolean; speaking: boolean; onSpeak: () => void; speakLabel: string;
+  copyLabel: string; copiedLabel: string;
+  onRegenerate?: () => void; regenerateLabel: string; streaming?: boolean;
 }) {
   return (
     <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
@@ -141,26 +191,38 @@ function AssistantMessage({
       <div style={{
         background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
         borderRadius: "var(--radius-lg)", padding: "12px 16px", maxWidth: "80%",
-        fontSize: "var(--font-size-sm)", lineHeight: 1.7, whiteSpace: "pre-wrap",
+        fontSize: "var(--font-size-sm)", lineHeight: 1.7,
         color: "#e7e9ee",
       }}>
-        {content}
-        {canSpeak && (
-          <div style={{ marginTop: "8px" }}>
-            <button
-              type="button"
-              onClick={onSpeak}
-              title={speakLabel}
-              aria-label={speakLabel}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "5px",
-                background: "none", border: "none", cursor: "pointer",
-                color: speaking ? "#9fe870" : "rgba(231,233,238,0.55)",
-                fontSize: "12px", fontWeight: 600, padding: 0,
-              }}
-            >
-              {speaking ? <Volume2 size={14} /> : <VolumeX size={14} />} {speakLabel}
-            </button>
+        <div className="netai-markdown">
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{content}</ReactMarkdown>
+        </div>
+        {!streaming && (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
+            <CopyButton content={content} label={copyLabel} copiedLabel={copiedLabel} />
+            {onRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                title={regenerateLabel}
+                aria-label={regenerateLabel}
+                className="netai-msg-action-btn"
+              >
+                <RefreshCw size={13} /> {regenerateLabel}
+              </button>
+            )}
+            {canSpeak && (
+              <button
+                type="button"
+                onClick={onSpeak}
+                title={speakLabel}
+                aria-label={speakLabel}
+                className="netai-msg-action-btn"
+                style={{ color: speaking ? "#9fe870" : undefined }}
+              >
+                {speaking ? <Volume2 size={13} /> : <VolumeX size={13} />} {speakLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -247,6 +309,8 @@ export default function AiDestek() {
   const [displayedText, setDisplayedText] = useState("");
   const pendingRef = useRef("");
   const isAnimatingRef = useRef(false);
+  const accumulatedRef = useRef("");
+  const abortControllerRef = useRef<AbortController | null>(null);
   const followUpIndexRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -255,17 +319,32 @@ export default function AiDestek() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const persistConversation = useCallback((msgs: Message[]) => {
     const realMsgs = msgs.filter((m) => m.id !== "welcome");
     if (realMsgs.length === 0) return;
-    const firstUser = realMsgs.find((m) => m.role === "user");
-    const title = firstUser ? deriveTitle(firstUser.content) : ui.newChat;
     setConversations((prev) => {
+      const existing = prev.find((c) => c.id === activeId);
+      // Kullanıcı sohbeti elle yeniden adlandırdıysa (titleManual), yeni bir
+      // mesaj gönderildiğinde/yeniden üretildiğinde başlık otomatik olarak
+      // ilk mesajdan tekrar türetilip ÜZERİNE YAZILMAZ.
+      let title = existing?.title;
+      if (!existing?.titleManual) {
+        const firstUser = realMsgs.find((m) => m.role === "user");
+        title = firstUser ? deriveTitle(firstUser.content) : ui.newChat;
+      }
       const rest = prev.filter((c) => c.id !== activeId);
-      return [{ id: activeId, title, messages: msgs, updatedAt: Date.now() }, ...rest];
+      return [{ id: activeId, title: title ?? ui.newChat, titleManual: existing?.titleManual, messages: msgs, updatedAt: Date.now() }, ...rest];
     });
   }, [activeId, ui.newChat]);
+
+  const renameConversation = useCallback((id: string, title: string) => {
+    const clean = title.trim();
+    if (!clean) return;
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title: clean, titleManual: true } : c)));
+  }, []);
 
   // ── Sesli komut (STT) ────────────────────────────────────────
   const { settings: voiceSettings } = useVoiceSettings();
@@ -442,17 +521,17 @@ export default function AiDestek() {
     if (id === activeId) startNewChat();
   };
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || loading) return;
-    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text.trim() };
-    const history = [...messages, userMsg];
-    setMessages(history);
-    persistConversation(history);
-    setInput("");
+  // Sohbetin bir sonraki adımını (AI'nin yanıtını) üretir — hem yeni mesaj
+  // gönderirken hem de "Yeniden üret" ile aynı mantık tekrar kullanılır.
+  // `history` her zaman son elemanı bir kullanıcı mesajı olan tam listedir.
+  const runAssistantTurn = async (history: Message[]) => {
     setLoading(true);
     setDisplayedText("");
     pendingRef.current = "";
     isAnimatingRef.current = false;
+    accumulatedRef.current = "";
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const apiMessages = history
@@ -463,6 +542,7 @@ export default function AiDestek() {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify({ messages: apiMessages, lang }),
+        signal: controller.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -478,13 +558,12 @@ export default function AiDestek() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
-        accumulated += chunk;
+        accumulatedRef.current += chunk;
         pendingRef.current += chunk;
         startTypewriter();
       }
@@ -503,24 +582,66 @@ export default function AiDestek() {
       followUpIndexRef.current = (followUpIndexRef.current + 1) % followUpOptions.length;
       const followUpSet = followUpOptions[followUpIndexRef.current];
 
-      const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: accumulated, followUps: followUpSet };
+      const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: accumulatedRef.current, followUps: followUpSet };
       const finalMessages = [...history, assistantMsg];
       setMessages(finalMessages);
       persistConversation(finalMessages);
       setDisplayedText("");
       pendingRef.current = "";
     } catch (err) {
-      const msg = err instanceof Error ? err.message : (lang === "tr" ? "Bağlantı hatası" : "Connection error");
-      const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}` };
-      const finalMessages = [...history, assistantMsg];
-      setMessages(finalMessages);
-      persistConversation(finalMessages);
-      setDisplayedText("");
-      pendingRef.current = "";
+      if (controller.signal.aborted) {
+        // Kullanıcı "Durdur" ile üretimi kestiyse, o ana kadar akmış olan
+        // metin varsa (boş değilse) yarım da olsa sohbete kaydedilir —
+        // sessizce kaybolmak yerine kullanıcının o ana kadar okuduğu şey elde kalır.
+        const partial = accumulatedRef.current.trim();
+        if (partial) {
+          const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: partial };
+          const finalMessages = [...history, assistantMsg];
+          setMessages(finalMessages);
+          persistConversation(finalMessages);
+        }
+        setDisplayedText("");
+        pendingRef.current = "";
+      } else {
+        const msg = err instanceof Error ? err.message : (lang === "tr" ? "Bağlantı hatası" : "Connection error");
+        const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", content: `⚠️ ${lang === "tr" ? "Hata" : "Error"}: ${msg}` };
+        const finalMessages = [...history, assistantMsg];
+        setMessages(finalMessages);
+        persistConversation(finalMessages);
+        setDisplayedText("");
+        pendingRef.current = "";
+      }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
       inputRef.current?.focus();
     }
+  };
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return;
+    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text.trim() };
+    const history = [...messages, userMsg];
+    setMessages(history);
+    persistConversation(history);
+    setInput("");
+    await runAssistantTurn(history);
+  };
+
+  // Bir asistan cevabını beğenmeyip aynı soruyu tekrar sordurmak için — o
+  // cevaba kadar olan geçmiş (kendisi hariç) korunur, cevap yeniden üretilir.
+  const regenerate = async (assistantId: string) => {
+    if (loading) return;
+    const idx = messages.findIndex((m) => m.id === assistantId);
+    if (idx <= 0) return;
+    const truncated = messages.slice(0, idx);
+    setMessages(truncated);
+    persistConversation(truncated);
+    await runAssistantTurn(truncated);
+  };
+
+  const handleStop = () => {
+    abortControllerRef.current?.abort();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -560,13 +681,13 @@ export default function AiDestek() {
         </button>
       )}
       <button
-        onClick={() => void sendMessage(input)}
-        disabled={loading || !input.trim()}
-        aria-label={ui.send}
-        title={ui.send}
+        onClick={loading ? handleStop : () => void sendMessage(input)}
+        disabled={!loading && !input.trim()}
+        aria-label={loading ? ui.stop : ui.send}
+        title={loading ? ui.stop : ui.send}
         className="netai-send-btn"
       >
-        <Send size={17} />
+        {loading ? <Square size={14} /> : <Send size={17} />}
       </button>
     </div>
   );
@@ -593,26 +714,54 @@ export default function AiDestek() {
           {conversations.length === 0 ? (
             <p className="netai-history-empty">{ui.historyEmpty}</p>
           ) : conversations.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={`netai-history-item ${c.id === activeId ? "active" : ""}`}
-              onClick={() => selectConversation(c.id)}
-            >
-              <MessageSquare size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
-              <span className="netai-history-item-title">{c.title}</span>
-              <span
-                role="button"
-                tabIndex={0}
-                className="netai-history-delete"
-                onClick={(e) => deleteConversation(c.id, e)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); deleteConversation(c.id, e); } }}
-                aria-label={ui.deleteChat}
-                title={ui.deleteChat}
+            renamingId === c.id ? (
+              <div key={c.id} className="netai-history-item netai-history-item-editing">
+                <MessageSquare size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
+                <input
+                  autoFocus
+                  className="netai-history-rename-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={() => { renameConversation(c.id, renameValue); setRenamingId(null); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); renameConversation(c.id, renameValue); setRenamingId(null); }
+                    if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); }
+                  }}
+                />
+              </div>
+            ) : (
+              <button
+                key={c.id}
+                type="button"
+                className={`netai-history-item ${c.id === activeId ? "active" : ""}`}
+                onClick={() => selectConversation(c.id)}
               >
-                <Trash2 size={13} />
-              </span>
-            </button>
+                <MessageSquare size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
+                <span className="netai-history-item-title">{c.title}</span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="netai-history-rename"
+                  onClick={(e) => { e.stopPropagation(); setRenamingId(c.id); setRenameValue(c.title); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setRenamingId(c.id); setRenameValue(c.title); } }}
+                  aria-label={ui.renameChat}
+                  title={ui.renameChat}
+                >
+                  <Pencil size={12} />
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="netai-history-delete"
+                  onClick={(e) => deleteConversation(c.id, e)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); deleteConversation(c.id, e); } }}
+                  aria-label={ui.deleteChat}
+                  title={ui.deleteChat}
+                >
+                  <Trash2 size={13} />
+                </span>
+              </button>
+            )
           ))}
         </div>
       </aside>
@@ -681,7 +830,7 @@ export default function AiDestek() {
             padding: "var(--spacing-4) 0",
             marginBottom: "var(--spacing-4)",
           }}>
-            {messages.map((msg) => (
+            {messages.map((msg, i) => (
               <div key={msg.id}>
                 {msg.role === "assistant"
                   ? (
@@ -691,6 +840,10 @@ export default function AiDestek() {
                       speaking={speakingId === msg.id}
                       onSpeak={() => speak(msg.id, msg.content)}
                       speakLabel={ui.speak}
+                      copyLabel={ui.copy}
+                      copiedLabel={ui.copied}
+                      regenerateLabel={ui.regenerate}
+                      onRegenerate={!loading && i === messages.length - 1 ? () => void regenerate(msg.id) : undefined}
                     />
                   )
                   : <UserMessage content={msg.content} />}
@@ -728,7 +881,10 @@ export default function AiDestek() {
             ))}
 
             {displayedText && (
-              <AssistantMessage content={displayedText + "▍"} canSpeak={false} speaking={false} onSpeak={() => {}} speakLabel={ui.speak} />
+              <AssistantMessage
+                content={displayedText + "▍"} canSpeak={false} speaking={false} onSpeak={() => {}} speakLabel={ui.speak}
+                copyLabel={ui.copy} copiedLabel={ui.copied} regenerateLabel={ui.regenerate} streaming
+              />
             )}
 
             {loading && !displayedText && (
