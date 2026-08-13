@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Trophy, Package, FileText } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { formatCurrency } from "@/lib/utils";
 import { topProductsByRevenue, type TopProduct } from "@/lib/sales/aggregations";
@@ -55,8 +56,8 @@ function TopProductsCard(): React.JSX.Element {
 
   return (
     <div className="card">
-      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-        🏆 {en ? "Top-Selling Products This Month" : "Bu Ayın En Çok Satan Ürünleri"}
+      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)", display: "flex", alignItems: "center", gap: "8px" }}>
+        <Trophy size={18} style={{ color: "var(--color-text-muted)" }} /> {en ? "Top-Selling Products This Month" : "Bu Ayın En Çok Satan Ürünleri"}
       </h2>
       {loading ? (
         <div style={{ textAlign: "center", padding: "24px 0" }}><div className="spinner" /></div>
@@ -134,8 +135,8 @@ function LastInventorySummaryCard(): React.JSX.Element {
 
   return (
     <div className="card">
-      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-        📦 {en ? "Latest Inventory Summary" : "Son Envanter Özeti"}
+      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)", display: "flex", alignItems: "center", gap: "8px" }}>
+        <Package size={18} style={{ color: "var(--color-text-muted)" }} /> {en ? "Latest Inventory Summary" : "Son Envanter Özeti"}
       </h2>
       {loading ? (
         <div style={{ textAlign: "center", padding: "24px 0" }}><div className="spinner" /></div>
@@ -158,8 +159,8 @@ function LastInventorySummaryCard(): React.JSX.Element {
               %{Number(report.potentialMargin).toFixed(1)}
             </span>
           </div>
-          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            📄 {report.fileName}
+          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "5px" }}>
+            <FileText size={12} style={{ flexShrink: 0 }} /> {report.fileName}
           </p>
         </div>
       )}

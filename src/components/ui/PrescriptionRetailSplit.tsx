@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Receipt, Info } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { formatCurrency } from "@/lib/utils";
@@ -78,8 +79,8 @@ export default function PrescriptionRetailSplit({
 
   return (
     <div className="card">
-      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)" }}>
-        🧾 {heading}
+      <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-4)", display: "flex", alignItems: "center", gap: "8px" }}>
+        <Receipt size={18} style={{ color: "var(--color-text-muted)" }} /> {heading}
       </h2>
 
       {loading ? (
@@ -130,8 +131,8 @@ export default function PrescriptionRetailSplit({
               </div>
             ))}
           </div>
-          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "var(--spacing-3)" }}>
-            ℹ️ {en
+          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "var(--spacing-3)", display: "flex", alignItems: "flex-start", gap: "5px" }}>
+            <Info size={12} style={{ flexShrink: 0, marginTop: "2px" }} /> {en
               ? "Informational only, sourced from Sales Report. Does not feed into any official total (Register total, Total Income, SGK Invoice)."
               : "Sadece bilgilendirme amaçlıdır, Satış Raporu'ndan kaynaklanır. Hiçbir resmi toplamı (Kasa toplamı, Toplam Gelir, SGK Fatura) beslemez."}
           </p>
