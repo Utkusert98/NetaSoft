@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Upload, X, AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { ParsedKasaRow, KasaColumnMap } from "@/lib/kasa/mapRow";
+import { mapKasaRow, type ParsedKasaRow, type KasaColumnMap } from "@/lib/kasa/mapRow";
+import { parseKasaFileClient, isClientParseableKasaFile } from "@/lib/kasa/parseFile";
 
 const fmtTL = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(v);
 
@@ -31,6 +32,12 @@ export default function KasaBulkUploadModal({
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ created: number; skippedDates: string[] } | null>(null);
 
+  // Dosya tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya yüklenmez
+  // (Satış Raporu'ndaki aynı desen, bkz. @/lib/kasa/parseFile). Önceden
+  // dosya /api/v1/finans/kasa/parse'a POST ediliyordu; büyük/çok aylık kasa
+  // dosyaları platformun istek boyutu sınırına takılınca sunucu JSON olmayan
+  // bir hata döndürüyor, bu da yalnızca üretimde (yerelde asla) görülen
+  // genel "Sunucu hatası" mesajıyla sonuçlanıyordu.
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -39,19 +46,29 @@ export default function KasaBulkUploadModal({
     setParseError("");
     setResult(null);
     try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/api/v1/finans/kasa/parse", { method: "POST", body: fd });
-      const json = await res.json() as { success: boolean; error?: string; data?: { rows: ParsedKasaRow[]; columnMap: KasaColumnMap | null } };
-      if (!res.ok || !json.success || !json.data) {
-        setParseError(json.error ?? (en ? "File could not be read." : "Dosya okunamadı."));
+      if (!isClientParseableKasaFile(f.name)) {
+        setParseError(en ? "Unsupported file format. Upload CSV or Excel." : "Desteklenmeyen dosya formatı. CSV veya Excel yükleyin.");
         setRows([]);
         return;
       }
-      setRows(json.data.rows);
-      setColMap(json.data.columnMap);
-    } catch {
-      setParseError(en ? "Server error, please try again." : "Sunucu hatası, lütfen tekrar deneyin.");
+      const { headers, dataRows } = await parseKasaFileClient(f);
+      const nonEmptyRows = dataRows.filter(row => !row.every(c => !c));
+      if (!nonEmptyRows.length) {
+        setParseError(en ? "No register data found in file" : "Dosyadan kasa verisi okunamadı");
+        setRows([]);
+        return;
+      }
+      let map: KasaColumnMap | null = null;
+      const parsedRows: ParsedKasaRow[] = nonEmptyRows.map(row => {
+        const mapped = mapKasaRow(headers, row);
+        if (!map) map = mapped.colMap;
+        return mapped.row;
+      });
+      setRows(parsedRows);
+      setColMap(map);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : (en ? "File could not be read." : "Dosya okunamadı."));
+      setRows([]);
     } finally {
       setParsing(false);
     }
