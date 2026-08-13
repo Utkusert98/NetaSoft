@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import {
+  ClipboardList, Upload, History, Info, AlertTriangle, CheckCircle2,
+  XCircle, FolderOpen, Wrench, FileText, BarChart3, Trash2,
+} from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
@@ -1300,14 +1304,18 @@ export default function SatisRaporPage() {
           <p style={{ color: "var(--color-text-muted)", marginTop: "4px" }}>{lang === "en" ? "Analyze pharmacy sales data by date range" : "Eczane satış verilerini tarih aralığına göre analiz edin"}</p>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {(["list", "upload", "history"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className="btn"
-              style={{ background: tab === t ? "var(--color-primary)" : "var(--color-surface)", color: tab === t ? "white" : "var(--color-text)", border: "1px solid var(--color-border)", fontWeight: 600, fontSize: "13px" }}>
-              {t === "list" ? (lang === "en" ? "📋 Sales List" : "📋 Satış Listesi")
-                : t === "upload" ? (lang === "en" ? "📤 Import Data" : "📤 Veri Aktar")
-                : (lang === "en" ? "🕒 Import History" : "🕒 İçe Aktarma Geçmişi")}
-            </button>
-          ))}
+          {(["list", "upload", "history"] as const).map(t => {
+            const TabIcon = t === "list" ? ClipboardList : t === "upload" ? Upload : History;
+            return (
+              <button key={t} onClick={() => setTab(t)} className="btn"
+                style={{ display: "flex", alignItems: "center", gap: "6px", background: tab === t ? "var(--color-primary)" : "var(--color-surface)", color: tab === t ? "white" : "var(--color-text)", border: "1px solid var(--color-border)", fontWeight: 600, fontSize: "13px" }}>
+                <TabIcon size={15} />
+                {t === "list" ? (lang === "en" ? "Sales List" : "Satış Listesi")
+                  : t === "upload" ? (lang === "en" ? "Import Data" : "Veri Aktar")
+                  : (lang === "en" ? "Import History" : "İçe Aktarma Geçmişi")}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1320,13 +1328,17 @@ export default function SatisRaporPage() {
       </div>
 
       {saveSuccess && (
-        <div style={{ marginBottom: "var(--spacing-4)", padding: "12px 16px", background: "#e8f5e9", color: "#2e7d32", borderRadius: "var(--radius-md)", fontWeight: 600, fontSize: "14px" }}>
-          {lang === "en" ? "✅ Sales saved successfully. You can view them in the list." : "✅ Satışlar başarıyla kaydedildi. Listede görüntüleyebilirsiniz."}
+        <div style={{ marginBottom: "var(--spacing-4)", padding: "12px 16px", background: "#e8f5e9", color: "#2e7d32", borderRadius: "var(--radius-md)", fontWeight: 600, fontSize: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+            {lang === "en" ? "Sales saved successfully. You can view them in the list." : "Satışlar başarıyla kaydedildi. Listede görüntüleyebilirsiniz."}
+          </span>
           {lastSaveExcludedCount > 0 && (
-            <div style={{ marginTop: "6px", fontWeight: 600, color: "#b45309" }}>
+            <div style={{ fontWeight: 600, color: "#b45309", display: "flex", alignItems: "center", gap: "6px" }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0 }} />
               {lang === "en"
-                ? `⚠ ${lastSaveExcludedCount} row(s) had an unparseable date and were NOT saved (check your source file).`
-                : `⚠ ${lastSaveExcludedCount} satırda tarih ayrıştırılamadığı için bu satırlar kaydedilmedi (dosyanızı kontrol edin).`}
+                ? `${lastSaveExcludedCount} row(s) had an unparseable date and were NOT saved (check your source file).`
+                : `${lastSaveExcludedCount} satırda tarih ayrıştırılamadığı için bu satırlar kaydedilmedi (dosyanızı kontrol edin).`}
             </div>
           )}
         </div>
@@ -1337,7 +1349,7 @@ export default function SatisRaporPage() {
         border: "1px solid var(--color-primary-light)", borderRadius: "var(--radius-md)", fontSize: "13px",
         color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
       }}>
-        <span style={{ fontSize: "18px", flexShrink: 0 }}>ℹ️</span>
+        <Info size={18} style={{ flexShrink: 0 }} />
         <span>
           {lang === "en"
             ? "This page is for product-level sales analysis only (which products sell, prescription vs. retail mix, trends). It does NOT feed into your Dashboard's Total Income/Expense or the Monthly Summary — those come from Kasa (POS/Cash/Wire) entries, which you enter separately. Importing sales data here will not double-count or change your Kasa totals."
@@ -1360,7 +1372,7 @@ export default function SatisRaporPage() {
             border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", fontSize: "13px",
             color: "var(--color-text)", display: "flex", gap: "10px", alignItems: "flex-start",
           }}>
-            <span style={{ fontSize: "16px", flexShrink: 0 }}>🕒</span>
+            <History size={16} style={{ flexShrink: 0 }} />
             <span>
               <strong>{lang === "en" ? "Last Upload: " : "Son Yükleme: "}</strong>
               {last.importDate ? format(new Date(last.importDate), "dd MMMM yyyy, HH:mm", { locale: lang === "en" ? enUS : tr }) : "—"}
@@ -1387,24 +1399,25 @@ export default function SatisRaporPage() {
           {/* Adım göstergesi */}
           <div style={{ display: "flex", marginBottom: "var(--spacing-5)", borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--color-border)" }}>
             {([
-              { id: "select",  label: lang === "en" ? "1. Select File" : "1. Dosya Seç", icon: "📂" },
-              { id: "mapping", label: lang === "en" ? "2. Map Columns" : "2. Kolon Eşleştir", icon: "🔧" },
-              { id: "preview", label: lang === "en" ? "3. Confirm & Save" : "3. Onayla & Kaydet", icon: "✅" },
+              { id: "select",  label: lang === "en" ? "1. Select File" : "1. Dosya Seç", icon: FolderOpen },
+              { id: "mapping", label: lang === "en" ? "2. Map Columns" : "2. Kolon Eşleştir", icon: Wrench },
+              { id: "preview", label: lang === "en" ? "3. Confirm & Save" : "3. Onayla & Kaydet", icon: CheckCircle2 },
             ] as const).map((s, i, arr) => (
               <div key={s.id} style={{
                 flex: 1, padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 600,
                 background: step === s.id ? "var(--color-primary)" : "var(--color-bg)",
                 color: step === s.id ? "white" : "var(--color-text-muted)",
                 borderRight: i < arr.length - 1 ? "1px solid var(--color-border)" : "none",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
               }}>
-                {s.icon} {s.label}
+                <s.icon size={14} /> {s.label}
               </div>
             ))}
           </div>
 
           {parseError && (
-            <div style={{ padding: "12px", background: "var(--color-danger-bg, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "16px", fontSize: "14px" }}>
-              ❌ {parseError}
+            <div style={{ padding: "12px", background: "var(--color-danger-bg, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "16px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <XCircle size={16} style={{ flexShrink: 0 }} /> {parseError}
             </div>
           )}
 
@@ -1421,7 +1434,9 @@ export default function SatisRaporPage() {
                 padding: "36px", textAlign: "center", background: "var(--color-bg)",
                 cursor: "pointer", marginBottom: "var(--spacing-4)",
               }}>
-                <div style={{ fontSize: "44px", marginBottom: "10px" }}>{file ? "📄" : "📊"}</div>
+                <div style={{ marginBottom: "10px", display: "flex", justifyContent: "center", color: "var(--color-text-muted)" }}>
+                  {file ? <FileText size={40} /> : <BarChart3 size={40} />}
+                </div>
                 <p style={{ fontWeight: 600, fontSize: "15px", marginBottom: "4px" }}>
                   {file ? file.name : (lang === "en" ? "Click to select a file" : "Dosya seçmek için tıklayın")}
                 </p>
@@ -1448,7 +1463,9 @@ export default function SatisRaporPage() {
 
               {effectiveIsNet() && (
                 <div style={{ padding: "12px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", fontSize: "13px" }}>
-                  <p style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }}>⚠ {lang === "en" ? "Net Amount Mode Active" : "Net Tutar Modu Aktif"}</p>
+                  <p style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {lang === "en" ? "Net Amount Mode Active" : "Net Tutar Modu Aktif"}
+                  </p>
                   <p style={{ color: "#92400e" }}>
                     {lang === "en"
                       ? "The selected price column already contains total revenue — it will not be multiplied by quantity. If this is correct, continue. If you have a unit price column, change it below."
@@ -1519,8 +1536,9 @@ export default function SatisRaporPage() {
 
               {invalidDateRows.length > 0 && (
                 <div style={{ padding: "12px 14px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", fontSize: "13px" }}>
-                  <p style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }}>
-                    ⚠ {lang === "en"
+                  <p style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                    {lang === "en"
                       ? `${invalidDateRows.length} row(s) have an unparseable date and will NOT be saved`
                       : `${invalidDateRows.length} satırda tarih ayrıştırılamadı, bu satırlar kaydedilMEyecek`}
                   </p>
@@ -1727,13 +1745,15 @@ export default function SatisRaporPage() {
               </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button className="btn" onClick={() => { setTab("upload"); setStep("select"); }}
-                style={{ border: "1px solid var(--color-primary)", color: "var(--color-primary)", fontWeight: 600, fontSize: "13px" }}>
-                📤 {lang === "en" ? "Import Data" : "Veri Aktar"}
+                style={{ display: "flex", alignItems: "center", gap: "6px", border: "1px solid var(--color-primary)", color: "var(--color-primary)", fontWeight: 600, fontSize: "13px" }}>
+                <Upload size={14} /> {lang === "en" ? "Import Data" : "Veri Aktar"}
               </button>
               {records.length > 0 && (
                 <button className="btn" onClick={() => void handleClearAll()} disabled={clearingAll}
-                  style={{ background: "var(--color-danger)", color: "white", fontSize: "13px" }}>
-                  {clearingAll ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "🗑 Clear All Records" : "🗑 Tüm Kayıtları Temizle")}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--color-danger)", color: "white", fontSize: "13px" }}>
+                  {clearingAll
+                    ? (lang === "en" ? "Deleting..." : "Siliniyor...")
+                    : <><Trash2 size={14} /> {lang === "en" ? "Clear All Records" : "Tüm Kayıtları Temizle"}</>}
                 </button>
               )}
             </div>
@@ -1801,8 +1821,8 @@ export default function SatisRaporPage() {
                 </div>
               </div>
               {sgkDiffPct !== null && (
-                <div style={{ marginTop: "var(--spacing-3)", fontSize: "13px", fontWeight: 600, color: sgkDiffIsWarning ? "var(--color-warning)" : "var(--color-info)" }}>
-                  {sgkDiffIsWarning ? "⚠ " : "ℹ "}
+                <div style={{ marginTop: "var(--spacing-3)", fontSize: "13px", fontWeight: 600, color: sgkDiffIsWarning ? "var(--color-warning)" : "var(--color-info)", display: "flex", alignItems: "center", gap: "6px" }}>
+                  {sgkDiffIsWarning ? <AlertTriangle size={14} /> : <Info size={14} />}
                   {lang === "en" ? `Difference: %${sgkDiffPct.toFixed(1)}` : `Fark: %${sgkDiffPct.toFixed(1)}`}
                 </div>
               )}
@@ -2028,11 +2048,11 @@ export default function SatisRaporPage() {
               <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
             ) : records.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 40px", color: "var(--color-text-muted)" }}>
-                <div style={{ fontSize: "48px", marginBottom: "12px" }}>📊</div>
+                <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center" }}><BarChart3 size={44} /></div>
                 <p style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>{lang === "en" ? "No Sales Records for Selected Period" : "Seçilen Dönemde Satış Kaydı Yok"}</p>
                 <p style={{ fontSize: "14px", marginBottom: "16px" }}>{lang === "en" ? "Change the date range or import sales data." : "Tarih aralığını değiştirin veya satış verisi aktarın."}</p>
-                <button className="btn btn-primary" onClick={() => { setTab("upload"); setStep("select"); }}>
-                  📤 {lang === "en" ? "Import Data" : "Veri Aktar"}
+                <button className="btn btn-primary" onClick={() => { setTab("upload"); setStep("select"); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <Upload size={14} /> {lang === "en" ? "Import Data" : "Veri Aktar"}
                 </button>
               </div>
             ) : (
@@ -2091,7 +2111,7 @@ export default function SatisRaporPage() {
             <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
           ) : batches.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 40px", color: "var(--color-text-muted)" }}>
-              <div style={{ fontSize: "48px", marginBottom: "12px" }}>🕒</div>
+              <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center" }}><History size={44} /></div>
               <p style={{ fontSize: "16px", fontWeight: 600 }}>{lang === "en" ? "No Import History Yet" : "Henüz İçe Aktarma Geçmişi Yok"}</p>
             </div>
           ) : (
@@ -2143,7 +2163,7 @@ export default function SatisRaporPage() {
       {overlapCheck && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "480px", padding: "var(--spacing-6)" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px", textAlign: "center" }}>⚠️</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-warning)" }}><AlertTriangle size={36} /></div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px", textAlign: "center" }}>
               {lang === "en" ? "Overlapping Date Range Detected" : "Çakışan Tarih Aralığı Tespit Edildi"}
             </h3>
@@ -2182,7 +2202,7 @@ export default function SatisRaporPage() {
       {batchDeleteTarget && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "420px", padding: "var(--spacing-6)", textAlign: "center" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{lang === "en" ? "Delete This Import" : "Bu Yüklemeyi Sil"}</h3>
             <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
               {lang === "en"
@@ -2203,7 +2223,7 @@ export default function SatisRaporPage() {
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>{lang === "en" ? "Delete Sales Record" : "Satış Kaydını Sil"}</h3>
             <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>{lang === "en" ? "Are you sure you want to delete this sales record?" : "Bu satış kaydını silmek istediğinizden emin misiniz?"}</p>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>

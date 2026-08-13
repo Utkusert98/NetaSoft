@@ -3,6 +3,10 @@ import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
+import {
+  TrendingUp, TrendingDown, Wallet, Banknote, Landmark, Info,
+  Smartphone, Receipt, Users, FileText, type LucideIcon,
+} from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { ChartFormatter } from "@/lib/utils/chartTypes";
 import PeriodRevenueWidget from "@/components/ui/PeriodRevenueWidget";
@@ -44,10 +48,10 @@ function Badge({ cur, prev }: { cur: number; prev: number }) {
   );
 }
 
-function StatRow({ label, cur, prev }: { label: string; cur: number; prev: number }) {
+function StatRow({ label, cur, prev }: { label: React.ReactNode; cur: number; prev: number }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--color-border)" }}>
-      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>{label}</span>
+      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>{label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{fmt(prev)}</span>
         <span style={{ fontWeight: 700, fontSize: "var(--font-size-sm)" }}>{fmt(cur)}</span>
@@ -162,15 +166,15 @@ export default function AylikOzetPage() {
 
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
-            {[
-              { label: lang === "en" ? "Total Income" : "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: "📈", color: "var(--color-income-green)" },
-              { label: lang === "en" ? "Total Expense" : "Toplam Gider", value: cur?.totalExpense ?? 0, prev: prev?.totalExpense ?? 0, icon: "📉", color: "#e74c3c" },
-              { label: lang === "en" ? "Net Profit" : "Net Kâr", value: cur?.netProfit ?? 0, prev: prev?.netProfit ?? 0, icon: "💰", color: "#3498db" },
-            ].map(card => (
+            {([
+              { label: lang === "en" ? "Total Income" : "Toplam Gelir", value: cur?.totalIncome ?? 0, prev: prev?.totalIncome ?? 0, icon: TrendingUp, color: "var(--color-income-green)" },
+              { label: lang === "en" ? "Total Expense" : "Toplam Gider", value: cur?.totalExpense ?? 0, prev: prev?.totalExpense ?? 0, icon: TrendingDown, color: "#e74c3c" },
+              { label: lang === "en" ? "Net Profit" : "Net Kâr", value: cur?.netProfit ?? 0, prev: prev?.netProfit ?? 0, icon: Wallet, color: "#3498db" },
+            ] as Array<{ label: string; value: number; prev: number; icon: LucideIcon; color: string }>).map(card => (
               <div key={card.label} style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", borderTop: `3px solid ${card.color}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-2)" }}>
                   <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", fontWeight: 500 }}>{card.label}</span>
-                  <span style={{ fontSize: "20px" }}>{card.icon}</span>
+                  <card.icon size={20} style={{ color: card.color }} />
                 </div>
                 <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color: card.color, marginBottom: "4px" }}>{fmt(card.value)}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -189,16 +193,17 @@ export default function AylikOzetPage() {
               </h3>
               {data?.monthly[0] ? (
                 <>
-                  <StatRow label={lang === "en" ? "🏦 Cash Register (POS + Cash)" : "🏦 Kasa (POS + Nakit)"} cur={data.monthly[0].kasa} prev={prevData?.monthly[0]?.kasa ?? 0} />
-                  <StatRow label={lang === "en" ? "🏥 SGK Invoices" : "🏥 SGK Faturaları"} cur={data.monthly[0].sgk} prev={prevData?.monthly[0]?.sgk ?? 0} />
+                  <StatRow label={<><Banknote size={14} /> {lang === "en" ? "Cash Register (POS + Cash)" : "Kasa (POS + Nakit)"}</>} cur={data.monthly[0].kasa} prev={prevData?.monthly[0]?.kasa ?? 0} />
+                  <StatRow label={<><Landmark size={14} /> {lang === "en" ? "SGK Invoices" : "SGK Faturaları"}</>} cur={data.monthly[0].sgk} prev={prevData?.monthly[0]?.sgk ?? 0} />
                   {data.monthly[0].sgk === 0 && (
-                    <p style={{ fontSize: "11px", color: "var(--color-text-muted)", padding: "4px 0 8px 0", fontStyle: "italic" }}>
+                    <p style={{ fontSize: "11px", color: "var(--color-text-muted)", padding: "4px 0 8px 0", fontStyle: "italic", display: "flex", alignItems: "center", gap: "5px" }}>
+                      <Info size={12} style={{ flexShrink: 0 }} />
                       {lang === "en"
-                        ? "ℹ️ SGK invoices are shown by invoice date. Bank payment arrives on the 15th, 3 months after invoice date."
-                        : "ℹ️ SGK faturaları fatura tarihine göre gösterilir. Banka ödemesi fatura tarihinden 3 ay sonra her ayın 15'inde yatar."}
+                        ? "SGK invoices are shown by invoice date. Bank payment arrives on the 15th, 3 months after invoice date."
+                        : "SGK faturaları fatura tarihine göre gösterilir. Banka ödemesi fatura tarihinden 3 ay sonra her ayın 15'inde yatar."}
                     </p>
                   )}
-                  <StatRow label={lang === "en" ? "📱 Platform Revenue" : "📱 Platform Gelirleri"} cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
+                  <StatRow label={<><Smartphone size={14} /> {lang === "en" ? "Platform Revenue" : "Platform Gelirleri"}</>} cur={data.monthly[0].platform} prev={prevData?.monthly[0]?.platform ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
                     <span>{lang === "en" ? "Total Income" : "Toplam Gelir"}</span>
                     <span style={{ color: "var(--color-income-green)" }}>{fmt(data.monthly[0].gelir)}</span>
@@ -216,10 +221,10 @@ export default function AylikOzetPage() {
               </h3>
               {data?.monthly[0] ? (
                 <>
-                  <StatRow label={lang === "en" ? "🧾 Fixed Expenses" : "🧾 Sabit Giderler"} cur={data.monthly[0].sabitGider} prev={prevData?.monthly[0]?.sabitGider ?? 0} />
-                  <StatRow label={lang === "en" ? "👥 Staff Expenses" : "👥 Personel Giderleri"} cur={data.monthly[0].personelGider} prev={prevData?.monthly[0]?.personelGider ?? 0} />
-                  <StatRow label={lang === "en" ? "📄 Promissory Notes (Due)" : "📄 Senetler (Vadeli)"} cur={data.monthly[0].senetGider ?? 0} prev={prevData?.monthly[0]?.senetGider ?? 0} />
-                  <StatRow label={lang === "en" ? "🏦 Warehouse Transfer / EFT" : "🏦 Depo Havalesi / EFT"} cur={data.monthly[0].depoHavalesi ?? 0} prev={prevData?.monthly[0]?.depoHavalesi ?? 0} />
+                  <StatRow label={<><Receipt size={14} /> {lang === "en" ? "Fixed Expenses" : "Sabit Giderler"}</>} cur={data.monthly[0].sabitGider} prev={prevData?.monthly[0]?.sabitGider ?? 0} />
+                  <StatRow label={<><Users size={14} /> {lang === "en" ? "Staff Expenses" : "Personel Giderleri"}</>} cur={data.monthly[0].personelGider} prev={prevData?.monthly[0]?.personelGider ?? 0} />
+                  <StatRow label={<><FileText size={14} /> {lang === "en" ? "Promissory Notes (Due)" : "Senetler (Vadeli)"}</>} cur={data.monthly[0].senetGider ?? 0} prev={prevData?.monthly[0]?.senetGider ?? 0} />
+                  <StatRow label={<><Banknote size={14} /> {lang === "en" ? "Warehouse Transfer / EFT" : "Depo Havalesi / EFT"}</>} cur={data.monthly[0].depoHavalesi ?? 0} prev={prevData?.monthly[0]?.depoHavalesi ?? 0} />
                   <div style={{ padding: "12px 0", display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
                     <span>{lang === "en" ? "Total Expense" : "Toplam Gider"}</span>
                     <span style={{ color: "#e74c3c" }}>{fmt(data.monthly[0].gider)}</span>
@@ -262,8 +267,8 @@ export default function AylikOzetPage() {
           {/* Senetler Tablosu */}
           {data?.promissoryNotes && data.promissoryNotes.length > 0 && (
             <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
-              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)" }}>
-                📄 {lang === "en" ? "Promissory Notes Due This Month" : "Bu Ay Vadesi Gelen Senetler"}
+              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <FileText size={17} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Promissory Notes Due This Month" : "Bu Ay Vadesi Gelen Senetler"}
               </h3>
               <div style={{ overflowX: "auto" }}>
                 <table className="table" style={{ width: "100%", fontSize: "13px" }}>
@@ -299,8 +304,8 @@ export default function AylikOzetPage() {
           {/* Depo Havaleleri Tablosu */}
           {data?.supplierTransfers && data.supplierTransfers.length > 0 && (
             <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
-              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)" }}>
-                🏦 {lang === "en" ? "Warehouse Transfers This Month" : "Bu Ay Depo Havaleleri"}
+              <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-4)", fontSize: "var(--font-size-base)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Banknote size={17} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Warehouse Transfers This Month" : "Bu Ay Depo Havaleleri"}
               </h3>
               <div style={{ overflowX: "auto" }}>
                 <table className="table" style={{ width: "100%", fontSize: "13px" }}>

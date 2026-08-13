@@ -2,6 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
+import { Banknote, AlertTriangle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -210,7 +211,7 @@ export default function SenetPage() {
         </div>
         <a href="/finans/depo-havalesi"
           style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontWeight: 600, fontSize: "14px", textDecoration: "none" }}>
-          🏦 {lang === "en" ? "Supplier Transfer / EFT" : "Depo Havalesi / EFT"}
+          <Banknote size={16} /> {lang === "en" ? "Supplier Transfer / EFT" : "Depo Havalesi / EFT"}
         </a>
       </div>
 
@@ -321,8 +322,8 @@ export default function SenetPage() {
             </span>
           </div>
           {paidError && (
-            <div style={{ marginBottom: "var(--spacing-3)", padding: "10px 14px", background: "var(--color-danger-pale, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", fontWeight: 500 }}>
-              ⚠ {paidError}
+            <div style={{ marginBottom: "var(--spacing-3)", padding: "10px 14px", background: "var(--color-danger-pale, #fee2e2)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", gap: "6px" }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {paidError}
             </div>
           )}
           {loading ? (
@@ -365,7 +366,7 @@ export default function SenetPage() {
                         <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
                         <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
                           {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
-                          {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
+                          {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "3px" }}><AlertTriangle size={11} /> {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
                         </td>
                         <td style={{ fontWeight: 700, color: note.isPaid ? "inherit" : "var(--color-danger)" }}>
                           {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
@@ -459,7 +460,7 @@ export default function SenetPage() {
                       <td style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{note.supplierName || "—"}</td>
                       <td style={{ color: isOverdue ? "var(--color-danger)" : "inherit", fontWeight: isOverdue ? 600 : 400 }}>
                         {format(new Date(note.dueDate), "dd MMM yyyy", { locale })}
-                        {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px" }}>⚠ {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
+                        {isOverdue && <span style={{ marginLeft: "4px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "3px" }}><AlertTriangle size={11} /> {lang === "en" ? "Overdue" : "Vadesi Geçti"}</span>}
                       </td>
                       <td style={{ fontWeight: 700, color: note.isPaid ? "inherit" : "var(--color-danger)" }}>
                         {Number(note.amount).toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
@@ -547,7 +548,7 @@ export default function SenetPage() {
       {deleteId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "400px", padding: "var(--spacing-6)", textAlign: "center" }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🗑️</div>
+            <div style={{ marginBottom: "16px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={40} /></div>
             <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "8px" }}>
               {lang === "en" ? "Delete Note" : "Senedi Sil"}
             </h3>

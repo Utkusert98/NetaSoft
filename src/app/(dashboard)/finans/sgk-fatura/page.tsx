@@ -3,6 +3,7 @@ import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect, useRef } from "react";
+import { FolderOpen, FileText, Landmark, CalendarDays, AlertTriangle, CheckCircle2, X, Trash2, ClipboardList } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import type { ParsedSgkInvoice } from "@/app/api/v1/finans/sgk-fatura/parse-pdf/route";
@@ -78,7 +79,9 @@ function PdfUploadReview({
     <div className="card" style={{ marginBottom: "var(--spacing-6)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
         <div>
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>{lang === "en" ? "📂 Upload Invoice from PDF" : "📂 PDF'den Fatura Yükle"}</h2>
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+            <FolderOpen size={18} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Upload Invoice from PDF" : "PDF'den Fatura Yükle"}
+          </h2>
           <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
             {lang === "en" ? "Select multiple SGK invoice PDF files — the system reads them automatically; you review and confirm." : "Birden fazla SGK faturası PDF dosyası seçin — sistem otomatik okur, siz düzenler ve onaylarsınız."}
           </p>
@@ -107,7 +110,7 @@ function PdfUploadReview({
             <><div className="spinner" style={{ margin: "0 auto 12px" }} /><p>{lang === "en" ? "Reading PDFs..." : "PDF'ler okunuyor..."}</p></>
           ) : (
             <>
-              <div style={{ fontSize: "36px", marginBottom: "8px" }}>📄</div>
+              <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}><FileText size={32} /></div>
               <p style={{ fontWeight: 600, marginBottom: "4px" }}>{lang === "en" ? "Drag PDF files here or click" : "PDF dosyalarını sürükleyin veya tıklayın"}</p>
               <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>{lang === "en" ? "You can select multiple files" : "Birden fazla dosya seçebilirsiniz"}</p>
             </>
@@ -123,22 +126,28 @@ function PdfUploadReview({
             <div key={i} style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
               {/* Başlık — dosya adı + PDF'ten okunan referans bilgileri */}
               <div style={{ padding: "12px 16px", background: "var(--color-bg)", borderBottom: "1px solid var(--color-border)", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)" }}>📄 {row.fileName}</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <FileText size={12} /> {row.fileName}
+                </span>
                 {row.invoiceNo && (
                   <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "var(--radius-sm)", background: "rgba(99,102,241,0.1)", color: "#6366f1", fontWeight: 600 }}>
                     No: {row.invoiceNo}
                   </span>
                 )}
                 {row.eczaneName && (
-                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>🏥 {row.eczaneName}</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <Landmark size={11} /> {row.eczaneName}
+                  </span>
                 )}
                 {row.periodStart && row.periodEnd && (
-                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
-                    📅 {lang === "en" ? "Period:" : "Dönem:"} {row.periodStart} — {row.periodEnd}
+                  <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <CalendarDays size={11} /> {lang === "en" ? "Period:" : "Dönem:"} {row.periodStart} — {row.periodEnd}
                   </span>
                 )}
                 {row.amount === null && (
-                  <span style={{ fontSize: "11px", color: "var(--color-danger)", fontWeight: 600 }}>⚠️ {lang === "en" ? "Amount not read" : "Tutar okunamadı"}</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-danger)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <AlertTriangle size={11} /> {lang === "en" ? "Amount not read" : "Tutar okunamadı"}
+                  </span>
                 )}
               </div>
 
@@ -191,19 +200,19 @@ function PdfUploadReview({
 
           {/* Onay kutusu */}
           <div style={{ padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)", background: "rgba(78,124,63,0.06)", border: "1px solid rgba(78,124,63,0.2)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--spacing-2)", fontSize: "var(--font-size-sm)" }}>
-              ✅ {rows.length} {lang === "en" ? "invoices read. Have you reviewed the data?" : "fatura okundu. Verileri kontrol ettiniz mi?"}
+            <p style={{ fontWeight: 600, marginBottom: "var(--spacing-2)", fontSize: "var(--font-size-sm)", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={16} style={{ flexShrink: 0 }} /> {rows.length} {lang === "en" ? "invoices read. Have you reviewed the data?" : "fatura okundu. Verileri kontrol ettiniz mi?"}
             </p>
             <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginBottom: "var(--spacing-4)" }}>
               {lang === "en" ? "You can edit the fields above. After confirming, all invoices will be saved to the system." : "Yukarıdaki alanları düzenleyebilirsiniz. Onayladıktan sonra tüm faturalar sisteme kaydedilecektir."}
             </p>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
-              <button onClick={reset} className="btn" style={{ border: "1px solid var(--color-border)" }}>
-                ✕ {lang === "en" ? "Cancel" : "İptal Et"}
+              <button onClick={reset} className="btn" style={{ border: "1px solid var(--color-border)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <X size={14} /> {lang === "en" ? "Cancel" : "İptal Et"}
               </button>
               <button onClick={() => void handleConfirm()} disabled={saving || rows.some(r => !r.amount)}
-                className="btn btn-primary" style={{ flex: 1 }}>
-                {saving ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : `✔ ${lang === "en" ? `Confirm and Save ${rows.length} Invoices` : `Onayla ve ${rows.length} Faturayı Kaydet`}`}
+                className="btn btn-primary" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                {saving ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : <><CheckCircle2 size={14} /> {lang === "en" ? `Confirm and Save ${rows.length} Invoices` : `Onayla ve ${rows.length} Faturayı Kaydet`}</>}
               </button>
             </div>
           </div>
@@ -212,7 +221,7 @@ function PdfUploadReview({
 
       {step === "done" && (
         <div style={{ textAlign: "center", padding: "32px", color: "var(--color-success)" }}>
-          <div style={{ fontSize: "40px", marginBottom: "8px" }}>✅</div>
+          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}><CheckCircle2 size={36} /></div>
           <p style={{ fontWeight: 700 }}>{lang === "en" ? "Invoices saved successfully!" : "Faturalar başarıyla kaydedildi!"}</p>
           <button onClick={reset} className="btn" style={{ marginTop: "12px" }}>{lang === "en" ? "Upload New" : "Yeni Yükle"}</button>
         </div>
@@ -462,8 +471,8 @@ export default function SgkFaturaPage() {
       <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* FORM */}
         <div className="card">
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>
-            {lang === "en" ? "📋 Add New Invoice" : "📋 Yeni Fatura Ekle"}
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <ClipboardList size={18} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Add New Invoice" : "Yeni Fatura Ekle"}
           </h2>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
@@ -488,8 +497,8 @@ export default function SgkFaturaPage() {
               background: "linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))",
               border: "1px solid rgba(16,185,129,0.25)",
             }}>
-              <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-success)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
-                📅 {lang === "en" ? "Est. Payment Date (+3 Mo)" : "Tahmini Ödeme Tarihi (+3 Ay)"}
+              <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-success)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "5px" }}>
+                <CalendarDays size={12} /> {lang === "en" ? "Est. Payment Date (+3 Mo)" : "Tahmini Ödeme Tarihi (+3 Ay)"}
               </p>
               <p style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-success)" }}>
                 {previewPaymentDate}
@@ -523,7 +532,7 @@ export default function SgkFaturaPage() {
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
           ) : thisMonthInvoices.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏥</div>
+              <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center" }}><Landmark size={36} /></div>
               {lang === "en" ? "No invoices for this month." : "Bu ay için fatura bulunamadı."}
             </div>
           ) : (
@@ -577,9 +586,9 @@ export default function SgkFaturaPage() {
                             </button>
                             <button
                               onClick={() => setDeleteId(inv.id)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center", gap: "4px" }}
                             >
-                              🗑️ {lang === "en" ? "Delete" : "Sil"}
+                              <Trash2 size={12} /> {lang === "en" ? "Delete" : "Sil"}
                             </button>
                           </div>
                         </td>
@@ -668,9 +677,9 @@ export default function SgkFaturaPage() {
                           </button>
                           <button
                             onClick={() => setDeleteId(inv.id)}
-                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center", gap: "4px" }}
                           >
-                            🗑️ {lang === "en" ? "Delete" : "Sil"}
+                            <Trash2 size={12} /> {lang === "en" ? "Delete" : "Sil"}
                           </button>
                         </div>
                       </td>
@@ -703,8 +712,8 @@ export default function SgkFaturaPage() {
                 <label className="form-label">{lang === "en" ? "Amount (₺)" : "Tutar (₺)"}</label>
                 <input type="number" step="0.01" min="0.01" className="form-input" name="amount" value={editForm.amount} onChange={handleEditChange} required />
               </div>
-              <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", fontSize: "13px" }}>
-                📅 {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "var(--color-success)" }}>{editPreviewDate}</strong>
+              <div style={{ padding: "12px", borderRadius: "var(--radius-md)", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <CalendarDays size={14} /> {lang === "en" ? "New Payment Date:" : "Yeni Ödeme Tarihi:"} <strong style={{ color: "var(--color-success)" }}>{editPreviewDate}</strong>
               </div>
               <div className="form-group">
                 <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>

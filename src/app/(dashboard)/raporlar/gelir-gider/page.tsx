@@ -3,6 +3,7 @@ import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
+import { CalendarDays, TrendingUp, TrendingDown, Wallet, type LucideIcon } from "lucide-react";
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -39,12 +40,12 @@ const TT = { background: "var(--color-surface)", border: "1px solid var(--color-
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(v);
 
-function SummaryCard({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
+function SummaryCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: LucideIcon; color: string }) {
   return (
     <div style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-5)", borderTop: `3px solid ${color}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-2)" }}>
         <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", fontWeight: 500 }}>{label}</span>
-        <span style={{ fontSize: "20px" }}>{icon}</span>
+        <Icon size={20} style={{ color }} />
       </div>
       <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color }}>{value}</p>
     </div>
@@ -143,8 +144,8 @@ export default function GelirGiderPage() {
         ))}
         <button onClick={() => setShowCustom(v => !v)}
           className={`btn ${showCustom ? "btn-primary" : "btn-ghost"}`}
-          style={{ fontSize: "var(--font-size-sm)", padding: "8px 16px" }}>
-          📅 {lang === "en" ? "Custom Range" : "Özel Aralık"}
+          style={{ fontSize: "var(--font-size-sm)", padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <CalendarDays size={15} /> {lang === "en" ? "Custom Range" : "Özel Aralık"}
         </button>
         {showCustom && (
           <div style={{ display: "flex", gap: "var(--spacing-2)", alignItems: "center" }}>
@@ -163,9 +164,9 @@ export default function GelirGiderPage() {
         <>
           {/* Özet Kartlar */}
           <div className="grid-3" style={{ marginBottom: "var(--spacing-5)" }}>
-            <SummaryCard label={lang === "en" ? "Total Income" : "Toplam Gelir"} value={fmt(data.summary.totalIncome)} icon="📈" color="#4e7c3f" />
-            <SummaryCard label={lang === "en" ? "Total Expense" : "Toplam Gider"} value={fmt(data.summary.totalExpense)} icon="📉" color="#e74c3c" />
-            <SummaryCard label={lang === "en" ? "Net Profit" : "Net Kâr"} value={fmt(data.summary.netProfit)} icon="💰"
+            <SummaryCard label={lang === "en" ? "Total Income" : "Toplam Gelir"} value={fmt(data.summary.totalIncome)} icon={TrendingUp} color="#4e7c3f" />
+            <SummaryCard label={lang === "en" ? "Total Expense" : "Toplam Gider"} value={fmt(data.summary.totalExpense)} icon={TrendingDown} color="#e74c3c" />
+            <SummaryCard label={lang === "en" ? "Net Profit" : "Net Kâr"} value={fmt(data.summary.netProfit)} icon={Wallet}
               color={data.summary.netProfit >= 0 ? "#3498db" : "#e74c3c"} />
           </div>
 

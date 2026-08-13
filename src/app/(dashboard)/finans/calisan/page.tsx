@@ -2,6 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
+import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -468,7 +469,7 @@ export default function CalisanPage() {
       {deleteExpId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
           <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🗑️</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
             <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
               {lang === "en" ? "Delete Expense" : "Gideri Sil"}
             </h3>

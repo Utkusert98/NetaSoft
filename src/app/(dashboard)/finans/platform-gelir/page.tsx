@@ -3,6 +3,7 @@ import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 
 import { useState, useEffect } from "react";
+import { CircleDollarSign, AlertTriangle, Trash2 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -235,8 +236,8 @@ export default function PlatformGelirPage() {
       <div className="responsive-grid form-list-grid" style={{ gap: "var(--spacing-8)", alignItems: "start" }}>
         {/* FORM */}
         <div className="card">
-          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)" }}>
-            💸 {lang === "en" ? "New Platform Income" : "Yeni Platform Geliri"}
+          <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "var(--spacing-5)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <CircleDollarSign size={18} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "New Platform Income" : "Yeni Platform Geliri"}
           </h2>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             <div className="form-group">
@@ -313,7 +314,7 @@ export default function PlatformGelirPage() {
             <div style={{ textAlign: "center", padding: "60px 0" }}><div className="spinner" /></div>
           ) : thisMonthIncomes.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-text-muted)" }}>
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>💸</div>
+              <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center" }}><CircleDollarSign size={36} /></div>
               {lang === "en" ? "No income this month." : "Bu ay henüz gelir eklenmemiş."}
             </div>
           ) : (
@@ -344,7 +345,7 @@ export default function PlatformGelirPage() {
                           <span style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text)", fontWeight: isOverdue ? 700 : 400 }}>
                             {format(new Date(inc.expectedPaymentDate), "dd MMM yyyy", { locale })}
                           </span>
-                          {isOverdue && <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-danger)" }}>❗</span>}
+                          {isOverdue && <AlertTriangle size={11} style={{ marginLeft: "6px", color: "var(--color-danger)", display: "inline-block", verticalAlign: "middle" }} />}
                         </td>
                         <td>
                           <select
@@ -376,9 +377,9 @@ export default function PlatformGelirPage() {
                             </button>
                             <button
                               onClick={() => setDeleteId(inc.id)}
-                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                              style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center" }}
                             >
-                              🗑️
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </td>
@@ -444,7 +445,7 @@ export default function PlatformGelirPage() {
                         <span style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text)", fontWeight: isOverdue ? 700 : 400 }}>
                           {format(new Date(inc.expectedPaymentDate), "dd MMM yyyy", { locale })}
                         </span>
-                        {isOverdue && <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--color-danger)" }}>❗</span>}
+                        {isOverdue && <AlertTriangle size={11} style={{ marginLeft: "6px", color: "var(--color-danger)", display: "inline-block", verticalAlign: "middle" }} />}
                       </td>
                       <td>
                         <select
@@ -476,9 +477,9 @@ export default function PlatformGelirPage() {
                           </button>
                           <button
                             onClick={() => setDeleteId(inc.id)}
-                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)" }}
+                            style={{ padding: "4px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-danger)", background: "transparent", cursor: "pointer", fontSize: "12px", color: "var(--color-danger)", display: "inline-flex", alignItems: "center" }}
                           >
-                            🗑️
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </td>
