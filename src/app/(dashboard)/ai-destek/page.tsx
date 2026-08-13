@@ -353,16 +353,16 @@ export default function AiDestek() {
     // crypto.randomUUID() de aynı sebeple burada çağrılır — render sırasında
     // çağrılsaydı sunucu/istemci arasında farklı ID üretip hydration
     // uyuşmazlığına yol açardı.
+    //
+    // Sayfaya her girişte EN SON sohbeti otomatik açmak yerine (kullanıcı
+    // geri bildirimi: "NetAI'den çıktıktan sonra tekrar girince karşılama
+    // ekranı gelsin, geçmişi zaten solda görüyoruz, istersem seçerim") boş
+    // karşılama ekranıyla başlanır — geçmiş listesi yine de doldurulur,
+    // sadece otomatik AÇILMAZ.
     const convs = loadConversations();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setConversations(convs);
-    if (convs.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMessages(convs[0].messages);
-      setActiveId(convs[0].id);
-    } else {
-      setActiveId(crypto.randomUUID());
-    }
+    setActiveId(crypto.randomUUID());
     setLoaded(true);
   }, []);
 
