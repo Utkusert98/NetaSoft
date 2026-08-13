@@ -646,7 +646,7 @@ export default function AiDestek() {
           title={lang === "tr" ? "Sohbeti temizle, baştan başla" : "Clear chat and start over"}
           aria-label={ui.newChat}
         >
-          <Sparkles size={17} />
+          <Plus size={18} />
         </button>
       </div>
       {isEmpty ? (
@@ -672,11 +672,13 @@ export default function AiDestek() {
         </div>
       ) : (
         <>
-          {/* Chat area — koyu stüdyo zeminiyle uyumlu, ferah bir mesaj akışı */}
+          {/* Chat area — kullanıcı geri bildirimi: mesajların arkasında ayrı bir
+              "kutu/pencere" görünmesin istendi (karşılama ekranında yok, sohbette de
+              olmamalı) — çerçeve/arkaplan kaldırıldı, mesajlar doğrudan sayfanın
+              koyu zemininde akıyor. */}
           <div style={{
             flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
-            padding: "var(--spacing-5)", background: "rgba(255,255,255,0.015)",
-            borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.06)",
+            padding: "var(--spacing-4) 0",
             marginBottom: "var(--spacing-4)",
           }}>
             {messages.map((msg) => (
