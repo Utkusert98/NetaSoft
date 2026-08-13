@@ -512,13 +512,16 @@ h6 { font-size: var(--font-size-base); }
   cursor: pointer;
   flex-shrink: 0;
 }
+/* Masaüstünde sol paneldeki "+ Yeni Sohbet" düğmesiyle birebir aynı işi
+   yapan bu ikon gereksiz bir tekrardı (kullanıcı geri bildirimi) — panel
+   mobilde çekmeceye gizlendiği için SADECE mobilde gösterilir. */
 .netai-topbar-newchat {
+  display: none;
   background: rgba(159, 232, 112, 0.08);
   border: 1px solid rgba(159, 232, 112, 0.3);
   border-radius: var(--radius-md);
   width: 34px;
   height: 34px;
-  display: flex;
   align-items: center;
   justify-content: center;
   color: #9fe870;
@@ -552,6 +555,7 @@ h6 { font-size: var(--font-size-base); }
     padding: var(--spacing-3) var(--spacing-3) 0;
   }
   .netai-history-toggle { display: flex; }
+  .netai-topbar-newchat { display: flex; }
   .netai-subtitle { display: none; }
 
   /* Mobilde kalıcı kolon yerine soldan açılan bir çekmece — dar ekranda
