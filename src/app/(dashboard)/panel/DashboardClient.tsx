@@ -5,6 +5,10 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import {
+  FileDown, AlertTriangle, CalendarDays, CalendarRange,
+  TrendingUp, TrendingDown, Wallet, BarChart3, FileText, type LucideIcon,
+} from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
@@ -77,8 +81,8 @@ const BLUE = "#3498db";
 const ORANGE = "#f5a623";
 
 // ── Summary card ───────────────────────────────────────────────────────────
-function StatCard({ label, value, change, icon, accent }: {
-  label: string; value: string; change?: number; icon: string;
+function StatCard({ label, value, change, icon: Icon, accent }: {
+  label: string; value: string; change?: number; icon: LucideIcon;
   accent: "income" | "expense" | "profit";
 }) {
   const { lang } = useLangContext();
@@ -96,10 +100,10 @@ function StatCard({ label, value, change, icon, accent }: {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)", fontWeight: 500 }}>{label}</span>
         <span style={{
-          fontSize: "22px", width: 40, height: 40, display: "flex",
+          width: 40, height: 40, display: "flex",
           alignItems: "center", justifyContent: "center",
-          background: bgs[accent], borderRadius: "var(--radius-md)",
-        }}>{icon}</span>
+          background: bgs[accent], borderRadius: "var(--radius-md)", color: colors[accent],
+        }}><Icon size={20} strokeWidth={2} /></span>
       </div>
       <p style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, color: colors[accent], lineHeight: 1.1, overflowWrap: "anywhere" }}>{value}</p>
       {change !== undefined && change !== 0 && (
@@ -251,7 +255,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "var(--spacing-8)", flexWrap: "wrap", gap: "var(--spacing-4)" }}>
         <div>
           <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "4px" }}>
-            {tx(d.welcome, lang)}, {pharmacistName}! 👋
+            {tx(d.welcome, lang)}, {pharmacistName}!
           </h1>
           <p style={{ color: "var(--color-text-muted)" }}>
             {new Date().toLocaleDateString(lang === "en" ? "en-GB" : "tr-TR", { day: "numeric", month: "long", year: "numeric" })} · {tx(d.subtitle, lang)}
@@ -266,7 +270,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           {exporting ? (
             <><span className="spinner" style={{ width: 16, height: 16 }} /> {lang === "en" ? "Preparing PDF..." : "PDF Hazırlanıyor..."}</>
           ) : (
-            <>📄 {tx(d.downloadPdf, lang)}</>
+            <><FileDown size={16} /> {tx(d.downloadPdf, lang)}</>
           )}
         </button>
       </div>
@@ -276,8 +280,9 @@ export default function DashboardClient({ data, pharmacistName }: {
           background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)",
           color: "var(--color-danger)", borderRadius: "var(--radius-md)",
           padding: "10px 16px", marginBottom: "var(--spacing-5)", fontSize: "14px",
+          display: "flex", alignItems: "center", gap: "8px",
         }}>
-          ⚠️ {exportError}
+          <AlertTriangle size={16} style={{ flexShrink: 0 }} /> {exportError}
         </div>
       )}
 
@@ -288,7 +293,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           padding: "12px 18px", marginBottom: "var(--spacing-5)",
           display: "flex", alignItems: "center", gap: "12px",
         }}>
-          <span style={{ fontSize: "22px", flexShrink: 0 }}>⚠️</span>
+          <AlertTriangle size={22} style={{ flexShrink: 0, color: "#c53030" }} />
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 700, color: "#c53030", fontSize: "var(--font-size-sm)" }}>
               {lang === "en"
@@ -316,7 +321,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           borderRadius: "var(--radius-lg)", padding: "14px 18px", marginBottom: "var(--spacing-5)",
           display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
         }}>
-          <span style={{ fontSize: "20px", flexShrink: 0 }}>📅</span>
+          <CalendarDays size={20} style={{ flexShrink: 0, color: "var(--color-text-muted)" }} />
           <div style={{ flex: 1, minWidth: 240 }}>
             <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 700 }}>
               {lang === "en"
@@ -347,7 +352,7 @@ export default function DashboardClient({ data, pharmacistName }: {
           borderRadius: "var(--radius-lg)", padding: "14px 18px", marginBottom: "var(--spacing-5)",
           display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
         }}>
-          <span style={{ fontSize: "20px", flexShrink: 0 }}>🗓️</span>
+          <CalendarRange size={20} style={{ flexShrink: 0, color: "var(--color-text-muted)" }} />
           <div style={{ flex: 1, minWidth: 240 }}>
             <p style={{ fontSize: "var(--font-size-sm)", fontWeight: 700 }}>
               {lang === "en" ? "This week (last 7 days) vs previous week" : "Bu hafta (son 7 gün) geçen haftayla kıyaslandı"}
@@ -400,19 +405,19 @@ export default function DashboardClient({ data, pharmacistName }: {
 
       {/* ── Özet Kartlar ── */}
       <div className="responsive-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--spacing-4)", marginBottom: "var(--spacing-6)" }}>
-        <StatCard label={tx(d.totalIncome, lang)} value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon="📈" accent="income" />
-        <StatCard label={tx(d.totalExpense, lang)} value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon="📉" accent="expense" />
-        <StatCard label={tx(d.netProfit, lang)} value={formatCurrency(summary.netProfit)} icon="💰" accent="profit" />
+        <StatCard label={tx(d.totalIncome, lang)} value={formatCurrency(summary.totalIncome)} change={summary.incomeChange} icon={TrendingUp} accent="income" />
+        <StatCard label={tx(d.totalExpense, lang)} value={formatCurrency(summary.totalExpense)} change={summary.expenseChange} icon={TrendingDown} accent="expense" />
+        <StatCard label={tx(d.netProfit, lang)} value={formatCurrency(summary.netProfit)} icon={Wallet} accent="profit" />
         <StatCard
           label={lang === "en" ? "Daily Avg. Sales" : "Günlük Ort. Ciro"}
           value={formatCurrency(dailyAvgCiro)}
-          icon="📊"
+          icon={BarChart3}
           accent="income"
         />
         <StatCard
           label={tx(d.unpaidNote, lang)}
           value={unpaidNotes.length > 0 ? formatCurrency(unpaidTotal) : tx(d.none, lang)}
-          icon="📄"
+          icon={FileText}
           accent={unpaidNotes.length > 0 ? "expense" : "profit"}
         />
       </div>
@@ -671,7 +676,9 @@ export default function DashboardClient({ data, pharmacistName }: {
                   border: `1px solid ${urgent ? "var(--color-danger-border)" : "var(--color-border)"}`,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-                    <span style={{ fontSize: "16px" }}>{urgent ? "⚠️" : "📄"}</span>
+                    {urgent
+                      ? <AlertTriangle size={16} style={{ color: "var(--color-danger)", flexShrink: 0 }} />
+                      : <FileText size={16} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />}
                     <div>
                       <p style={{ fontWeight: 600, fontSize: "var(--font-size-sm)" }}>{lang === "en" ? "Note" : "Senet"} #{note.noteNumber}</p>
                       <p style={{ fontSize: "var(--font-size-xs)", color: urgent ? "var(--color-danger)" : "var(--color-text-muted)" }}>
