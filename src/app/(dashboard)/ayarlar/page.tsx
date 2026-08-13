@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Sun, Moon, Monitor, Building2, User, KeyRound, Users, ShieldCheck,
-  CreditCard, Palette, Sparkles, Globe, type LucideIcon,
+  CreditCard, Palette, Sparkles, Globe, CheckCircle2, AlertTriangle, X, Circle, type LucideIcon,
 } from "lucide-react";
 import { useTheme, type Theme } from "@/lib/hooks/useTheme";
 import { useLangContext } from "@/app/providers/LangProvider";
@@ -30,8 +30,8 @@ type Tab = "eczane" | "profil" | "sifre" | "ekip" | "guvenlik" | "faturalama" | 
 function SuccessBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
   return (
     <div style={{ padding: "12px 16px", background: "#f0fce8", color: "#4e7c3f", border: "1px solid #9fe870", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "var(--font-size-sm)", fontWeight: 500 }}>
-      ✅ {msg}
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: "16px" }}>✕</button>
+      <span style={{ display: "flex", alignItems: "center", gap: "8px" }}><CheckCircle2 size={16} /> {msg}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", alignItems: "center" }}><X size={16} /></button>
     </div>
   );
 }
@@ -39,8 +39,8 @@ function SuccessBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
 function ErrorBanner({ msg, onClose }: { msg: string; onClose: () => void }) {
   return (
     <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "var(--spacing-4)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "var(--font-size-sm)" }}>
-      ⚠️ {msg}
-      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: "16px" }}>✕</button>
+      <span style={{ display: "flex", alignItems: "center", gap: "8px" }}><AlertTriangle size={16} /> {msg}</span>
+      <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", alignItems: "center" }}><X size={16} /></button>
     </div>
   );
 }
@@ -980,7 +980,7 @@ export default function AyarlarPage() {
                   { ok: /[^A-Za-z0-9]/.test(pwForm.newPassword), label: lang === "en" ? "At least 1 special character (!@#$...)" : "En az 1 özel karakter (!@#$...)" },
                 ].map(r => (
                   <div key={r.label} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px", color: r.ok ? "var(--color-income-green)" : "var(--color-text-muted)" }}>
-                    {r.ok ? "✅" : "○"} {r.label}
+                    {r.ok ? <CheckCircle2 size={14} /> : <Circle size={14} />} {r.label}
                   </div>
                 ))}
               </div>

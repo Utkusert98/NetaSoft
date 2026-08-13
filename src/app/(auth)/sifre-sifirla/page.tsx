@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 import { calculatePasswordStrength } from "@/lib/validators/auth";
 import { useLangContext } from "@/app/providers/LangProvider";
@@ -68,7 +69,7 @@ function SifreSifirlaForm() {
       <div className="auth-page">
         <div className="auth-form-side" style={{ justifyContent: "center", alignItems: "center" }}>
           <div style={{ textAlign: "center", maxWidth: "420px" }}>
-            <div style={{ fontSize: "80px", marginBottom: "24px" }}>⚠️</div>
+            <div style={{ marginBottom: "24px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><AlertTriangle size={64} /></div>
             <h2 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "12px", color: "var(--color-danger)" }}>
               {lang === "en" ? "Invalid Link" : "Geçersiz Bağlantı"}
             </h2>
@@ -92,7 +93,7 @@ function SifreSifirlaForm() {
       <div className="auth-page">
         <div className="auth-form-side" style={{ justifyContent: "center", alignItems: "center" }}>
           <div style={{ textAlign: "center", animation: "fadeIn 0.5s ease" }}>
-            <div style={{ fontSize: "80px", marginBottom: "24px" }}>✅</div>
+            <div style={{ marginBottom: "24px", display: "flex", justifyContent: "center", color: "var(--color-success)" }}><CheckCircle2 size={64} /></div>
             <h2 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "12px", color: "var(--color-success)" }}>
               {lang === "en" ? "Password Updated!" : "Şifreniz Güncellendi!"}
             </h2>
@@ -135,9 +136,12 @@ function SifreSifirlaForm() {
                 color: "var(--color-danger)",
                 fontSize: "var(--font-size-sm)",
                 fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
               }}
             >
-              ⚠️ {error}
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} /> {error}
             </div>
           )}
 
@@ -170,7 +174,7 @@ function SifreSifirlaForm() {
                     color: "var(--color-text-muted)", fontSize: "18px",
                   }}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
 
@@ -246,7 +250,7 @@ function SifreSifirlaForm() {
                     color: "var(--color-text-muted)", fontSize: "18px",
                   }}
                 >
-                  {showConfirm ? "🙈" : "👁"}
+                  {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {confirmPassword && password === confirmPassword && (

@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect, useId, type CSSProperties } from "react";
+import { CalendarDays } from "lucide-react";
 import {
   buildMonthGrid,
   isSameDate,
@@ -122,7 +123,7 @@ export default function SingleDatePicker({ value, onChange, lang = "tr", disable
         aria-required={required}
         onClick={() => setOpen(v => !v)}
       >
-        <span className="drp-trigger-icon" aria-hidden="true">📅</span>
+        <span className="drp-trigger-icon" aria-hidden="true"><CalendarDays size={14} /></span>
         <span className="drp-trigger-text">{displayText}</span>
         <span className="drp-trigger-chevron" aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>

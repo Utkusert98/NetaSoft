@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Upload, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { ParsedKasaRow, KasaColumnMap } from "@/lib/kasa/mapRow";
 
 const fmtTL = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(v);
@@ -96,10 +97,10 @@ export default function KasaBulkUploadModal({
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-4)" }}>
-          <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>
-            📥 {en ? "Bulk Upload Register Entries (Excel)" : "Kasa Kayıtlarını Toplu Yükle (Excel)"}
+          <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+            <Upload size={18} style={{ color: "var(--color-text-muted)" }} /> {en ? "Bulk Upload Register Entries (Excel)" : "Kasa Kayıtlarını Toplu Yükle (Excel)"}
           </h3>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "var(--color-text-muted)" }}>✕</button>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", display: "flex", alignItems: "center" }}><X size={18} /></button>
         </div>
 
         {!result && (
@@ -120,8 +121,8 @@ export default function KasaBulkUploadModal({
             />
 
             {parseError && (
-              <div style={{ padding: "10px 14px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", marginBottom: "var(--spacing-4)" }}>
-                ⚠️ {parseError}
+              <div style={{ padding: "10px 14px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", fontSize: "13px", marginBottom: "var(--spacing-4)", display: "flex", alignItems: "center", gap: "6px" }}>
+                <AlertTriangle size={14} style={{ flexShrink: 0 }} /> {parseError}
               </div>
             )}
 
@@ -138,8 +139,9 @@ export default function KasaBulkUploadModal({
                 )}
 
                 {invalidCount > 0 && (
-                  <div style={{ padding: "10px 14px", background: "var(--color-warning-bg)", color: "var(--color-warning)", borderRadius: "var(--radius-md)", fontSize: "13px", marginBottom: "var(--spacing-3)" }}>
-                    ⚠️ {en
+                  <div style={{ padding: "10px 14px", background: "var(--color-warning-bg)", color: "var(--color-warning)", borderRadius: "var(--radius-md)", fontSize: "13px", marginBottom: "var(--spacing-3)", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                    {en
                       ? `${invalidCount} row(s) have an unreadable date and will be skipped.`
                       : `${invalidCount} satırda tarih okunamadı, bu satırlar atlanacak.`}
                   </div>
@@ -190,7 +192,7 @@ export default function KasaBulkUploadModal({
 
         {result && (
           <div style={{ textAlign: "center", padding: "12px 0" }}>
-            <div style={{ fontSize: "48px", marginBottom: "12px" }}>✅</div>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-income-green)" }}><CheckCircle2 size={42} /></div>
             <p style={{ fontWeight: 700, fontSize: "var(--font-size-lg)", marginBottom: "8px" }}>
               {en ? `${result.created} record(s) saved.` : `${result.created} kayıt kaydedildi.`}
             </p>

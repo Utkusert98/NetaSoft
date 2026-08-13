@@ -2,6 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 
 import { useState, useEffect, useCallback } from "react";
+import { BarChart3, Package, Trash2, AlertTriangle } from "lucide-react";
 
 interface AuditLogRow {
   id: string;
@@ -256,8 +257,8 @@ export default function DenetimKayitlariPage() {
         </p>
 
         <div className="card" style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
-          <h3 style={{ fontSize: "var(--font-size-md)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>
-            📊 {lang === "en" ? "Sales Report Imports" : "Satış Raporu İçe Aktarmaları"}
+          <h3 style={{ fontSize: "var(--font-size-md)", fontWeight: 700, marginBottom: "var(--spacing-3)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <BarChart3 size={17} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Sales Report Imports" : "Satış Raporu İçe Aktarmaları"}
           </h3>
           {uploadsLoading ? (
             <div style={{ textAlign: "center", padding: "24px" }}><div className="spinner" style={{ margin: "0 auto" }} /></div>
@@ -294,7 +295,7 @@ export default function DenetimKayitlariPage() {
                           <button
                             type="button"
                             className="btn btn-secondary"
-                            style={{ color: "var(--color-danger)", fontSize: "12px", padding: "6px 12px" }}
+                            style={{ color: "var(--color-danger)", fontSize: "12px", padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: "4px" }}
                             disabled={deletingKey === key}
                             onClick={() => setConfirmDelete({
                               kind: "sales",
@@ -304,7 +305,7 @@ export default function DenetimKayitlariPage() {
                                 : `${b.recordCount} satış kaydı${b.fileName ? ` (${b.fileName})` : ""} (${fmtDate(b.dateRangeStart)} – ${fmtDate(b.dateRangeEnd)})`,
                             })}
                           >
-                            🗑 {lang === "en" ? "Delete" : "Sil"}
+                            <Trash2 size={12} /> {lang === "en" ? "Delete" : "Sil"}
                           </button>
                         </td>
                       </tr>
@@ -317,8 +318,8 @@ export default function DenetimKayitlariPage() {
         </div>
 
         <div className="card" style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)", padding: "var(--spacing-6)" }}>
-          <h3 style={{ fontSize: "var(--font-size-md)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>
-            📦 {lang === "en" ? "Inventory Analysis Reports" : "Envanter Analizi Raporları"}
+          <h3 style={{ fontSize: "var(--font-size-md)", fontWeight: 700, marginBottom: "var(--spacing-3)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Package size={17} style={{ color: "var(--color-text-muted)" }} /> {lang === "en" ? "Inventory Analysis Reports" : "Envanter Analizi Raporları"}
           </h3>
           {uploadsLoading ? (
             <div style={{ textAlign: "center", padding: "24px" }}><div className="spinner" style={{ margin: "0 auto" }} /></div>
@@ -347,11 +348,11 @@ export default function DenetimKayitlariPage() {
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          style={{ color: "var(--color-danger)", fontSize: "12px", padding: "6px 12px" }}
+                          style={{ color: "var(--color-danger)", fontSize: "12px", padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: "4px" }}
                           disabled={deletingKey === r.id}
                           onClick={() => setConfirmDelete({ kind: "inventory", key: r.id, label: r.fileName })}
                         >
-                          🗑 {lang === "en" ? "Delete" : "Sil"}
+                          <Trash2 size={12} /> {lang === "en" ? "Delete" : "Sil"}
                         </button>
                       </td>
                     </tr>
@@ -375,8 +376,8 @@ export default function DenetimKayitlariPage() {
             style={{ background: "var(--color-surface)", borderRadius: "var(--radius-lg)", padding: "var(--spacing-6)", width: "100%", maxWidth: "440px" }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "var(--spacing-3)" }}>
-              ⚠️ {lang === "en" ? "Confirm Deletion" : "Silme Onayı"}
+            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "var(--spacing-3)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <AlertTriangle size={18} style={{ color: "var(--color-danger)" }} /> {lang === "en" ? "Confirm Deletion" : "Silme Onayı"}
             </h3>
             <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", marginBottom: "var(--spacing-5)", lineHeight: 1.6 }}>
               {lang === "en"

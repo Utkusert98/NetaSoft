@@ -5,6 +5,7 @@ import { useState, useCallback } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 import { useLangContext } from "@/app/providers/LangProvider";
 
@@ -98,7 +99,7 @@ function GirisForm() {
             gap: "var(--spacing-2)",
           }}
         >
-          ⚠️ {errors.general}
+          <AlertTriangle size={15} style={{ flexShrink: 0 }} /> {errors.general}
         </div>
       )}
 
@@ -118,7 +119,7 @@ function GirisForm() {
           disabled={loading}
         />
         {errors.email && (
-          <span className="form-error" role="alert">⚠ {errors.email}</span>
+          <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.email}</span>
         )}
       </div>
 
@@ -150,11 +151,11 @@ function GirisForm() {
               color: "var(--color-text-muted)", fontSize: "18px", padding: "4px",
             }}
           >
-            {showPassword ? "🙈" : "👁"}
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
         {errors.password && (
-          <span className="form-error" role="alert">⚠ {errors.password}</span>
+          <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.password}</span>
         )}
       </div>
 
@@ -181,7 +182,7 @@ function GirisForm() {
             {lang === "en" ? "Enter The 6-Digit Code" : "6 Haneli Kodu Giriniz"}
           </p>
           {errors.otpCode && (
-            <span className="form-error" role="alert">⚠ {errors.otpCode}</span>
+            <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.otpCode}</span>
           )}
         </div>
       )}

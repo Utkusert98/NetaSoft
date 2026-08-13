@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, Sparkles, Banknote, Landmark, TrendingUp, FileText,
   CircleDollarSign, Users, ArrowLeftRight, CalendarDays, Receipt, Package,
-  History, Settings, LogOut, type LucideIcon,
+  History, Settings, LogOut, Menu, X, type LucideIcon,
 } from "lucide-react";
 import { NetaSoftIcon, NetaSoftLogoFull } from "@/components/ui/NetaSoftLogo";
 import { useLangContext } from "@/app/providers/LangProvider";
@@ -176,7 +176,7 @@ export default function Sidebar() {
           aria-label={open ? (lang === "en" ? "Close Menu" : "Menüyü Kapat") : (lang === "en" ? "Open Menu" : "Menüyü Aç")}
           aria-expanded={open}
         >
-          {open ? "✕" : "☰"}
+          {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </header>
 

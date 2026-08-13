@@ -3,6 +3,10 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  PartyPopper, AlertTriangle, Eye, EyeOff, CheckCircle2, Circle,
+  BarChart3, FolderOpen, Lock, type LucideIcon,
+} from "lucide-react";
 import { NetaSoftLogoFull, NetaSoftIcon } from "@/components/ui/NetaSoftLogo";
 import { calculatePasswordStrength } from "@/lib/validators/auth";
 import { useLangContext } from "@/app/providers/LangProvider";
@@ -131,7 +135,7 @@ export default function KayitPage() {
       <div className="auth-page">
         <div className="auth-form-side" style={{ justifyContent: "center", alignItems: "center" }}>
           <div style={{ textAlign: "center", animation: "fadeIn 0.5s ease" }}>
-            <div style={{ fontSize: "80px", marginBottom: "24px" }}>🎉</div>
+            <div style={{ marginBottom: "24px", display: "flex", justifyContent: "center", color: "var(--color-success)" }}><PartyPopper size={72} /></div>
             <h2 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 800, marginBottom: "12px", color: "var(--color-success)" }}>
               {lang === "en" ? "Account Created!" : "Hesabınız Oluşturuldu!"}
             </h2>
@@ -177,9 +181,12 @@ export default function KayitPage() {
                 color: "var(--color-danger)",
                 fontSize: "var(--font-size-sm)",
                 fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
               }}
             >
-              ⚠️ {errors.general}
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} /> {errors.general}
             </div>
           )}
 
@@ -200,7 +207,7 @@ export default function KayitPage() {
                 disabled={loading}
               />
               {errors.pharmacyName && (
-                <span className="form-error" role="alert">⚠ {errors.pharmacyName}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.pharmacyName}</span>
               )}
             </div>
 
@@ -220,7 +227,7 @@ export default function KayitPage() {
                 disabled={loading}
               />
               {errors.pharmacistName && (
-                <span className="form-error" role="alert">⚠ {errors.pharmacistName}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.pharmacistName}</span>
               )}
             </div>
 
@@ -240,7 +247,7 @@ export default function KayitPage() {
                 disabled={loading}
               />
               {errors.email && (
-                <span className="form-error" role="alert">⚠ {errors.email}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.email}</span>
               )}
             </div>
 
@@ -272,11 +279,11 @@ export default function KayitPage() {
                     color: "var(--color-text-muted)", fontSize: "18px",
                   }}
                 >
-                  {showPassword ? "🙈" : "👁"}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {errors.password && (
-                <span className="form-error" role="alert">⚠ {errors.password}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.password}</span>
               )}
 
               {formData.password && (
@@ -351,11 +358,11 @@ export default function KayitPage() {
                     color: "var(--color-text-muted)", fontSize: "18px",
                   }}
                 >
-                  {showConfirm ? "🙈" : "👁"}
+                  {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {errors.confirmPassword && (
-                <span className="form-error" role="alert">⚠ {errors.confirmPassword}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {errors.confirmPassword}</span>
               )}
               {formData.confirmPassword && formData.password === formData.confirmPassword && (
                 <span style={{ color: "var(--color-success)", fontSize: "var(--font-size-xs)", fontWeight: 500 }}>
@@ -383,7 +390,7 @@ export default function KayitPage() {
                 </span>
               </label>
               {kvkkError && (
-                <span className="form-error" role="alert">⚠ {kvkkError}</span>
+                <span className="form-error" role="alert" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={12} /> {kvkkError}</span>
               )}
             </div>
 
@@ -450,18 +457,18 @@ export default function KayitPage() {
           </p>
 
           <div style={{ marginTop: "48px", display: "flex", flexDirection: "column", gap: "16px", textAlign: "left" }}>
-            {(lang === "en"
+            {((lang === "en"
               ? [
-                  { icon: "📊", title: "Real-Time Reports", desc: "See your financial status instantly" },
-                  { icon: "📁", title: "Smart File Import", desc: "Easily import your Excel/PDF data" },
-                  { icon: "🔒", title: "Bank-Level Security", desc: "Your data is encrypted and secure" },
+                  { icon: BarChart3, title: "Real-Time Reports", desc: "See your financial status instantly" },
+                  { icon: FolderOpen, title: "Smart File Import", desc: "Easily import your Excel/PDF data" },
+                  { icon: Lock, title: "Bank-Level Security", desc: "Your data is encrypted and secure" },
                 ]
               : [
-                  { icon: "📊", title: "Gerçek Zamanlı Raporlar", desc: "Finansal durumunuzu anında görün" },
-                  { icon: "📁", title: "Akıllı Dosya İçe Aktarma", desc: "Excel/PDF verilerinizi kolayca aktarın" },
-                  { icon: "🔒", title: "Banka Düzeyinde Güvenlik", desc: "Verileriniz şifreli ve güvende" },
+                  { icon: BarChart3, title: "Gerçek Zamanlı Raporlar", desc: "Finansal durumunuzu anında görün" },
+                  { icon: FolderOpen, title: "Akıllı Dosya İçe Aktarma", desc: "Excel/PDF verilerinizi kolayca aktarın" },
+                  { icon: Lock, title: "Banka Düzeyinde Güvenlik", desc: "Verileriniz şifreli ve güvende" },
                 ]
-            ).map((feature) => (
+            ) as Array<{ icon: LucideIcon; title: string; desc: string }>).map((feature) => (
               <div key={feature.title} style={{
                 display: "flex",
                 gap: "16px",
@@ -471,7 +478,7 @@ export default function KayitPage() {
                 padding: "16px",
                 backdropFilter: "blur(10px)",
               }}>
-                <span style={{ fontSize: "28px", flexShrink: 0 }}>{feature.icon}</span>
+                <feature.icon size={26} style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: "4px" }}>{feature.title}</div>
                   <div style={{ fontSize: "var(--font-size-sm)", opacity: 0.7 }}>{feature.desc}</div>
