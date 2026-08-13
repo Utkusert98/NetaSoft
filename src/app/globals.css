@@ -711,19 +711,153 @@ h6 { font-size: var(--font-size-base); }
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+/* Sohbet giriş kutusu — Gemini/ChatGPT benzeri tek "hap" (pill): metin alanı
+   + ikon butonlar aynı zeminde. Hem karşılama ekranında (büyük, ortalanmış)
+   hem aktif sohbette (alt kısma sabit, normal boyut) aynı JSX/mantık
+   kullanılır — sadece `.netai-input-pill-hero` varyant sınıfı boyutu
+   büyütür (bkz. ai-destek/page.tsx `inputPill()`). */
+.netai-input-pill {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 8px 8px 18px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  transition: border-color var(--transition-fast);
+  margin-bottom: var(--spacing-5);
+}
 .netai-input-pill:focus-within {
   border-color: #9fe870;
 }
+.ai-chat-input {
+  flex: 1;
+  resize: none;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-family);
+  color: #e7e9ee;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  outline: none;
+  max-height: 120px;
+}
+.ai-chat-input::placeholder { color: rgba(231, 233, 238, 0.4); }
+
+.netai-mic-btn,
+.netai-send-btn {
+  height: 40px;
+  width: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
+}
 .netai-mic-btn {
-  transition: background 0.15s, color 0.15s, transform 0.15s;
+  background: transparent;
+  color: rgba(231, 233, 238, 0.75);
 }
 .netai-mic-btn.netai-mic-listening {
+  background: linear-gradient(135deg, #163300, #4e9b3f);
+  color: #9fe870;
   animation: netai-mic-pulse 1.2s ease-in-out infinite;
 }
+.netai-mic-btn:disabled { cursor: not-allowed; opacity: 0.6; }
 @keyframes netai-mic-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
+
+.netai-send-btn {
+  background: linear-gradient(120deg, #9fe870, #4e9b3f);
+  color: #0b0c10;
+}
+.netai-send-btn:disabled {
+  cursor: not-allowed;
+  background: rgba(159, 232, 112, 0.25);
+}
+
+/* Karşılama (boş) ekranı — kullanıcının referans aldığı tasarıma göre: sohbet
+   başlamadan önce dikey ortalanmış büyük başlık + giriş kutusu + hazır soru
+   kartları. İlk mesaj gönderilir gönderilmez normal, üstten hizalı sohbet
+   akışına geçilir (bkz. ai-destek/page.tsx `isEmpty`). */
+.netai-hero-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-4) 0;
+}
+.netai-hero-title {
+  font-size: clamp(24px, 4vw, 34px);
+  margin-top: var(--spacing-3);
+}
+.netai-hero-subtitle {
+  color: rgba(231, 233, 238, 0.6);
+  font-size: var(--font-size-sm);
+  max-width: 440px;
+  margin: 6px 0 var(--spacing-5);
+}
+.netai-input-pill-hero {
+  width: 100%;
+  max-width: 640px;
+  padding: 10px 10px 10px 22px;
+  border-radius: 32px;
+  margin-bottom: 0;
+}
+.netai-input-pill-hero .ai-chat-input { font-size: var(--font-size-base); padding: 12px 0; }
+.netai-input-pill-hero .netai-mic-btn,
+.netai-input-pill-hero .netai-send-btn { width: 44px; height: 44px; }
+
+.netai-quick-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 640px;
+  margin-top: var(--spacing-5);
+}
+.netai-quick-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 220px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(231, 233, 238, 0.8);
+  text-align: left;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.netai-quick-card:hover {
+  border-color: rgba(159, 232, 112, 0.4);
+  background: rgba(159, 232, 112, 0.06);
+  transform: translateY(-2px);
+}
+.netai-quick-card-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(159, 232, 112, 0.12);
+  color: #9fe870;
+}
+
 @media (max-width: 768px) {
   .ai-destek-main {
     /* Mobilde sabit sidebar header'ı değil, .mobile-topbar (56px) + safe-area kullanılır */
@@ -731,6 +865,8 @@ h6 { font-size: var(--font-size-base); }
     height: calc(100dvh - 56px - env(safe-area-inset-top));
     padding-bottom: max(var(--spacing-4), env(safe-area-inset-bottom));
   }
+  .netai-quick-card { width: 100%; max-width: 320px; }
+  .netai-hero-empty { padding: var(--spacing-3) 0; }
 }
 
 /* ================================

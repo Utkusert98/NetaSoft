@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, Send, Sparkles, Volume2, VolumeX, Plus, MessageSquare, PanelLeft, Trash2 } from "lucide-react";
+import { Mic, Send, Sparkles, Volume2, VolumeX, Plus, MessageSquare, PanelLeft, Trash2, TrendingUp, Landmark, FileText, Receipt, type LucideIcon } from "lucide-react";
 import { useLangContext } from "@/app/providers/LangProvider";
 import type { Lang } from "@/lib/hooks/useLang";
 import { useVoiceSettings } from "@/lib/hooks/useVoiceSettings";
@@ -36,6 +36,10 @@ const QUICK_ACTIONS: Record<Lang, string[]> = {
   ],
 };
 
+// QUICK_ACTIONS ile aynı sırada — her hazır soru için bir ikon (bkz. karşılama
+// ekranındaki kart tasarımı).
+const QUICK_ACTION_ICONS: LucideIcon[] = [TrendingUp, Landmark, FileText, Receipt];
+
 const FOLLOW_UP_SUGGESTIONS: Record<Lang, string[][]> = {
   tr: [
     ["SGK ödemelerimin detayını ver", "Bu ayki en büyük giderim ne?", "Geçen aya göre durumum nasıl?"],
@@ -55,6 +59,7 @@ const UI_TEXT: Record<Lang, {
   title: string;
   subtitle: string;
   placeholder: string;
+  heroPlaceholder: string;
   send: string;
   welcome: string;
   thinking: string;
@@ -73,6 +78,7 @@ const UI_TEXT: Record<Lang, {
     title: "NetAI",
     subtitle: "Eczane finansı hakkında sorularınızı sorun — tüm kayıtlarınıza göre analiz yapar. Sesli de konuşabilirsiniz.",
     placeholder: "Eczane finansı hakkında sorunuzu yazın... (Enter ile gönder)",
+    heroPlaceholder: "Bir şey sorun...",
     send: "Gönder",
     welcome: "Merhaba! Ben NetAI, NetaSoft'un eczane asistanınım.\n\nSGK takibi, senet vadeleri, kârlılık analizi ve tüm finansal geçmişiniz hakkında sorularınızı yanıtlayabilirim.\n\nNasıl yardımcı olabilirim?",
     thinking: "NetAI analiz ediyor...",
@@ -91,6 +97,7 @@ const UI_TEXT: Record<Lang, {
     title: "NetAI",
     subtitle: "Ask questions about your pharmacy finances — analyzes all your records. You can also talk by voice.",
     placeholder: "Type your question about pharmacy finance... (Enter to send)",
+    heroPlaceholder: "Ask anything...",
     send: "Send",
     welcome: "Hello! I'm NetAI, NetaSoft's pharmacy assistant.\n\nI can answer questions about SGK tracking, promissory note due dates, profitability analysis, and your complete financial history.\n\nHow can I assist you?",
     thinking: "NetAI is analyzing...",
@@ -523,6 +530,47 @@ export default function AiDestek() {
     }
   };
 
+  // Sohbet henüz başlamadıysa (sadece karşılama mesajı var) ortalanmış,
+  // Gemini/ChatGPT tarzı bir "boş ekran" gösterilir; ilk mesaj gönderilir
+  // gönderilmez normal, üstten hizalı sohbet akışına geçilir.
+  const isEmpty = messages.length <= 1;
+
+  const inputPill = (hero: boolean) => (
+    <div className={`netai-input-pill ${hero ? "netai-input-pill-hero" : ""}`}>
+      <textarea
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={hero ? ui.heroPlaceholder : ui.placeholder}
+        disabled={loading}
+        rows={1}
+        className="ai-chat-input"
+      />
+      {micSupported && (
+        <button
+          type="button"
+          onClick={toggleListening}
+          disabled={loading}
+          title={listening ? ui.micStop : ui.micStart}
+          aria-label={listening ? ui.micStop : ui.micStart}
+          className={`netai-mic-btn ${listening ? "netai-mic-listening" : ""}`}
+        >
+          <Mic size={18} />
+        </button>
+      )}
+      <button
+        onClick={() => void sendMessage(input)}
+        disabled={loading || !input.trim()}
+        aria-label={ui.send}
+        title={ui.send}
+        className="netai-send-btn"
+      >
+        <Send size={17} />
+      </button>
+    </div>
+  );
+
   return (
     <main className="ai-destek-main netai-page">
       {/* Kenar parıltısı — boşta soluk bir "nefes alma", dinlerken/düşünürken belirgin nabız.
@@ -601,173 +649,110 @@ export default function AiDestek() {
           <Sparkles size={17} />
         </button>
       </div>
-      <p className="netai-subtitle">{ui.subtitle}</p>
+      {isEmpty ? (
+        /* Karşılama ekranı — kullanıcının attığı referans görsele göre:
+           dikey ortalanmış büyük başlık + giriş kutusu + hazır soru
+           kartları. Backend/çalışma mantığı DEĞİŞMEDİ — sadece sunum. */
+        <div className="netai-hero-empty">
+          <NetAiOrb size={52} active={listening || loading} />
+          <h2 className="netai-brand-text netai-hero-title">{ui.title}</h2>
+          <p className="netai-hero-subtitle">{ui.subtitle}</p>
+          {inputPill(true)}
+          <div className="netai-quick-cards">
+            {QUICK_ACTIONS[lang].map((q, i) => {
+              const Icon = QUICK_ACTION_ICONS[i] ?? Sparkles;
+              return (
+                <button key={q} type="button" className="netai-quick-card" onClick={() => void sendMessage(q)}>
+                  <span className="netai-quick-card-icon"><Icon size={16} /></span>
+                  <span>{q}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Chat area — koyu stüdyo zeminiyle uyumlu, ferah bir mesaj akışı */}
+          <div style={{
+            flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
+            padding: "var(--spacing-5)", background: "rgba(255,255,255,0.015)",
+            borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.06)",
+            marginBottom: "var(--spacing-4)",
+          }}>
+            {messages.map((msg) => (
+              <div key={msg.id}>
+                {msg.role === "assistant"
+                  ? (
+                    <AssistantMessage
+                      content={msg.content}
+                      canSpeak={ttsSupported && voiceSettings.enabled}
+                      speaking={speakingId === msg.id}
+                      onSpeak={() => speak(msg.id, msg.content)}
+                      speakLabel={ui.speak}
+                    />
+                  )
+                  : <UserMessage content={msg.content} />}
 
-      {/* Chat area — koyu stüdyo zeminiyle uyumlu, ferah bir mesaj akışı */}
-      <div style={{
-        flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", gap: "var(--spacing-4)",
-        padding: "var(--spacing-5)", background: "rgba(255,255,255,0.015)",
-        borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.06)",
-        marginBottom: "var(--spacing-4)",
-      }}>
-        {messages.map((msg) => (
-          <div key={msg.id}>
-            {msg.role === "assistant"
-              ? (
-                <AssistantMessage
-                  content={msg.content}
-                  canSpeak={ttsSupported && voiceSettings.enabled}
-                  speaking={speakingId === msg.id}
-                  onSpeak={() => speak(msg.id, msg.content)}
-                  speakLabel={ui.speak}
-                />
-              )
-              : <UserMessage content={msg.content} />}
+                {/* Follow-up suggestions after assistant message */}
+                {msg.role === "assistant" && msg.followUps && msg.followUps.length > 0 && !loading && (
+                  <div style={{ marginTop: "10px", marginLeft: "48px" }}>
+                    <p style={{ fontSize: "11px", color: "rgba(231,233,238,0.5)", marginBottom: "6px", fontWeight: 500 }}>
+                      {ui.suggestions}
+                    </p>
+                    <div className="netai-chip-row">
+                      {msg.followUps.map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => void sendMessage(q)}
+                          style={{
+                            fontSize: "12px", padding: "5px 12px",
+                            borderRadius: "var(--radius-full)",
+                            border: "1px solid rgba(159,232,112,0.4)",
+                            background: "transparent",
+                            color: "#9fe870",
+                            cursor: "pointer", fontWeight: 500,
+                            transition: "background 0.15s, color 0.15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "#9fe870"; e.currentTarget.style.color = "#0b0c10"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9fe870"; }}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
 
-            {/* Follow-up suggestions after assistant message */}
-            {msg.role === "assistant" && msg.followUps && msg.followUps.length > 0 && !loading && (
-              <div style={{ marginTop: "10px", marginLeft: "48px" }}>
-                <p style={{ fontSize: "11px", color: "rgba(231,233,238,0.5)", marginBottom: "6px", fontWeight: 500 }}>
-                  {ui.suggestions}
-                </p>
-                <div className="netai-chip-row">
-                  {msg.followUps.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => void sendMessage(q)}
-                      style={{
-                        fontSize: "12px", padding: "5px 12px",
-                        borderRadius: "var(--radius-full)",
-                        border: "1px solid rgba(159,232,112,0.4)",
-                        background: "transparent",
-                        color: "#9fe870",
-                        cursor: "pointer", fontWeight: 500,
-                        transition: "background 0.15s, color 0.15s",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "#9fe870"; e.currentTarget.style.color = "#0b0c10"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9fe870"; }}
-                    >
-                      {q}
-                    </button>
-                  ))}
+            {displayedText && (
+              <AssistantMessage content={displayedText + "▍"} canSpeak={false} speaking={false} onSpeak={() => {}} speakLabel={ui.speak} />
+            )}
+
+            {loading && !displayedText && (
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <NetAiOrb active />
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(255,255,255,0.04)", borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ display: "flex", gap: "5px" }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: "#9fe870", opacity: 0.6,
+                        animation: `bounce 1s ${i * 0.15}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: "12px", color: "rgba(231,233,238,0.6)", fontWeight: 500 }}>{ui.thinking}</span>
                 </div>
               </div>
             )}
+
+            <div ref={bottomRef} />
           </div>
-        ))}
 
-        {displayedText && (
-          <AssistantMessage content={displayedText + "▍"} canSpeak={false} speaking={false} onSpeak={() => {}} speakLabel={ui.speak} />
-        )}
-
-        {loading && !displayedText && (
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <NetAiOrb active />
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(255,255,255,0.04)", borderRadius: "var(--radius-lg)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ display: "flex", gap: "5px" }}>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} style={{
-                    width: 8, height: 8, borderRadius: "50%",
-                    background: "#9fe870", opacity: 0.6,
-                    animation: `bounce 1s ${i * 0.15}s infinite`,
-                  }} />
-                ))}
-              </div>
-              <span style={{ fontSize: "12px", color: "rgba(231,233,238,0.6)", fontWeight: 500 }}>{ui.thinking}</span>
-            </div>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Quick actions — only on first load. Yan yana kaydırmalı (yığılıp üst üste
-          binmesin diye) — bkz. globals.css .netai-chip-row. */}
-      {messages.length <= 2 && !loading && (
-        <div className="netai-chip-row" style={{ marginBottom: "var(--spacing-3)" }}>
-          {QUICK_ACTIONS[lang].map((q) => (
-            <button
-              key={q}
-              onClick={() => void sendMessage(q)}
-              style={{
-                fontSize: "var(--font-size-xs)", padding: "6px 12px",
-                borderRadius: "var(--radius-full)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                background: "rgba(255,255,255,0.04)",
-                color: "rgba(231,233,238,0.85)", cursor: "pointer", fontWeight: 500,
-                transition: "background 0.15s, border-color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(159,232,112,0.1)"; e.currentTarget.style.borderColor = "rgba(159,232,112,0.4)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+          {inputPill(false)}
+        </>
       )}
-
-      {/* Input — Gemini benzeri tek "hap" (pill) kutu: metin alanı + ikon butonlar aynı zeminde */}
-      <div style={{
-        display: "flex", alignItems: "flex-end", gap: "6px",
-        padding: "8px 8px 8px 18px", marginBottom: "var(--spacing-5)",
-        borderRadius: "28px", border: "1px solid rgba(255,255,255,0.14)",
-        background: "rgba(255,255,255,0.05)", transition: "border-color var(--transition-fast)",
-      }}
-      className="netai-input-pill"
-      >
-        <textarea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={ui.placeholder}
-          disabled={loading}
-          rows={1}
-          className="ai-chat-input"
-          style={{
-            flex: 1, resize: "none", padding: "10px 0",
-            border: "none", background: "transparent", fontFamily: "var(--font-family)",
-            color: "#e7e9ee",
-            fontSize: "var(--font-size-sm)", lineHeight: 1.6,
-            outline: "none", maxHeight: "120px",
-          }}
-        />
-        {micSupported && (
-          <button
-            type="button"
-            onClick={toggleListening}
-            disabled={loading}
-            title={listening ? ui.micStop : ui.micStart}
-            aria-label={listening ? ui.micStop : ui.micStart}
-            className={`netai-mic-btn ${listening ? "netai-mic-listening" : ""}`}
-            style={{
-              height: 40, width: 40, flexShrink: 0, borderRadius: "50%", border: "none",
-              background: listening ? "linear-gradient(135deg, #163300, #4e9b3f)" : "transparent",
-              color: listening ? "#9fe870" : "rgba(231,233,238,0.75)",
-              cursor: loading ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: loading ? 0.6 : 1, transition: "background 0.15s, color 0.15s",
-            }}
-          >
-            <Mic size={18} />
-          </button>
-        )}
-        <button
-          onClick={() => void sendMessage(input)}
-          disabled={loading || !input.trim()}
-          aria-label={ui.send}
-          title={ui.send}
-          style={{
-            height: 40, width: 40, flexShrink: 0, borderRadius: "50%", border: "none",
-            background: loading || !input.trim() ? "rgba(159,232,112,0.25)" : "linear-gradient(120deg, #9fe870, #4e9b3f)",
-            color: "#0b0c10",
-            cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <Send size={17} />
-        </button>
-      </div>
 
       <style jsx>{`
         @keyframes bounce {
