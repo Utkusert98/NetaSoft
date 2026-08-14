@@ -78,14 +78,18 @@ export default function KasaBulkUploadModal({
   const invalidCount = rows.length - validRows.length;
 
   const handleSave = async () => {
-    if (validRows.length === 0) return;
+    if (validRows.length === 0 || !file) return;
     setSaving(true);
     setParseError("");
     try {
+      // Bu yüklemenin tüm satırları aynı importBatchId'yi taşır — kullanıcı
+      // yanlış eşleştirilmiş/istenmeyen bir dosyayı tek tek gün gün silmek
+      // yerine "İçe Aktarma Geçmişi"nden tek bir işlemle geri alabilsin diye
+      // (Satış Raporu'ndaki aynı desen).
       const res = await fetch("/api/v1/finans/kasa/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept-Language": lang },
-        body: JSON.stringify({ rows: validRows }),
+        body: JSON.stringify({ rows: validRows, importBatchId: crypto.randomUUID(), fileName: file.name }),
       });
       const json = await res.json() as { success: boolean; error?: string; data?: { created: number; skippedDates: string[] } };
       if (!res.ok || !json.success || !json.data) {

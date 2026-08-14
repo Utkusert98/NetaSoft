@@ -2,7 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect, type CSSProperties } from "react";
-import { Trash2, CalendarPlus, Upload, Banknote, ClipboardList } from "lucide-react";
+import { Trash2, CalendarPlus, Upload, Banknote, ClipboardList, History } from "lucide-react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -49,6 +49,55 @@ export default function KasaPage() {
   const [histEnd, setHistEnd] = useState("");
 
   const [bulkOpen, setBulkOpen] = useState(false);
+
+  // İçe Aktarma Geçmişi — kullanıcı yanlış eşleştirilmiş/istenmeyen bir
+  // dosyayı tek tek gün gün silmek yerine tek bir işlemle TÜM yüklemeyi
+  // geri alabilsin diye eklendi (gerçek bir kullanıcı talebiyle; Satış
+  // Raporu'ndaki "İçe Aktarma Geçmişi" ile aynı desen).
+  interface ImportBatch {
+    importBatchId: string | null;
+    fileName: string | null;
+    importDate: string | null;
+    recordCount: number;
+    dateRangeStart: string | null;
+    dateRangeEnd: string | null;
+    totalAmount: number;
+  }
+  const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+  const [batchDeleteTarget, setBatchDeleteTarget] = useState<ImportBatch | null>(null);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  const fetchBatches = async () => {
+    setBatchesLoading(true);
+    try {
+      const res = await fetch("/api/v1/finans/kasa/batches", { headers: { "Accept-Language": lang } });
+      const json = await res.json() as { success: boolean; data?: { batches: ImportBatch[] } };
+      if (json.success && json.data) setBatches(json.data.batches);
+    } catch { /* silent */ } finally { setBatchesLoading(false); }
+  };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void fetchBatches(); }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDeleteBatch = async () => {
+    if (!batchDeleteTarget?.importBatchId) return;
+    setBatchDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/finans/kasa/batches/${encodeURIComponent(batchDeleteTarget.importBatchId)}`, {
+        method: "DELETE",
+        headers: { "Accept-Language": lang },
+      });
+      if (!res.ok) throw new Error(lang === "en" ? "Delete failed" : "Silme işlemi başarısız");
+      setBatchDeleteTarget(null);
+      await fetchBatches();
+      await fetchRecords();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
 
   const fetchRecords = async () => {
     try {
@@ -417,6 +466,63 @@ export default function KasaPage() {
         )}
       </div>
 
+      {/* İçe Aktarma Geçmişi — kullanıcı yanlış eşleştirilmiş/istenmeyen bir
+          dosyayı tek tek gün gün silmek yerine tek bir işlemle TÜM yüklemeyi
+          geri alabilsin diye (bkz. Satış Raporu'ndaki aynı özellik). Toplu
+          yüklemeler dışında (tek form girişi, eski kayıtlar) hiç yükleme
+          yoksa bölüm hiç gösterilmez. */}
+      {(batchesLoading || batches.length > 0) && (
+        <div className="card" style={{ marginTop: "var(--spacing-5)", padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", fontWeight: 700, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <History size={16} style={{ color: "var(--color-text-muted)" }} />
+            {lang === "en" ? "Import History" : "İçe Aktarma Geçmişi"}
+          </div>
+          {batchesLoading ? (
+            <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>{lang === "en" ? "Import Date" : "Yükleme Tarihi"}</th>
+                    <th>{lang === "en" ? "File Name" : "Dosya Adı"}</th>
+                    <th>{lang === "en" ? "Date Range" : "Tarih Aralığı"}</th>
+                    <th>{lang === "en" ? "Record Count" : "Kayıt Sayısı"}</th>
+                    <th>{lang === "en" ? "Total" : "Toplam"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map(b => (
+                    <tr key={`${b.importBatchId ?? "_none_"}_${b.fileName ?? ""}`}>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {b.importDate ? format(new Date(b.importDate), "dd MMM yyyy HH:mm", { locale }) : "—"}
+                      </td>
+                      <td style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.fileName ?? undefined}>
+                        {b.fileName ?? "—"}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                        {b.dateRangeStart && b.dateRangeEnd
+                          ? `${format(new Date(b.dateRangeStart), "dd MMM yyyy", { locale })} – ${format(new Date(b.dateRangeEnd), "dd MMM yyyy", { locale })}`
+                          : "—"}
+                      </td>
+                      <td>{b.recordCount.toLocaleString("tr-TR")}</td>
+                      <td style={{ fontWeight: 700 }}>{fmt(b.totalAmount)}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button onClick={() => setBatchDeleteTarget(b)}
+                          style={{ padding: "3px 8px", fontSize: "11px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+                          {lang === "en" ? "Delete This Import" : "Bu Yüklemeyi Sil"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* EDIT MODAL */}
       {editRecord && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
@@ -515,8 +621,33 @@ export default function KasaPage() {
         <KasaBulkUploadModal
           lang={lang}
           onClose={() => setBulkOpen(false)}
-          onSaved={() => void fetchRecords()}
+          onSaved={() => { void fetchRecords(); void fetchBatches(); }}
         />
+      )}
+
+      {/* BATCH DELETE CONFIRM MODAL */}
+      {batchDeleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "420px" }}>
+            <h3 style={{ fontSize: "var(--font-size-lg)", fontWeight: 600, marginBottom: "12px" }}>
+              {lang === "en" ? "Confirm Delete" : "Silmeyi Onayla"}
+            </h3>
+            <p style={{ color: "var(--color-text-muted)", fontSize: "14px", marginBottom: "24px" }}>
+              {lang === "en"
+                ? <>This entire import (<strong>{batchDeleteTarget.fileName ?? "—"}</strong>, {batchDeleteTarget.recordCount} record(s)) will be deleted. This action cannot be undone.</>
+                : <><strong>{batchDeleteTarget.fileName ?? "—"}</strong> dosyasından yüklenen TÜM {batchDeleteTarget.recordCount} kayıt silinecek. Bu işlem geri alınamaz.</>}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <button className="btn" onClick={() => setBatchDeleteTarget(null)} style={{ border: "1px solid var(--color-border)" }}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
+              <button className="btn" onClick={() => void handleDeleteBatch()} disabled={batchDeleting}
+                style={{ background: "var(--color-danger)", color: "white", border: "none" }}>
+                {batchDeleting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

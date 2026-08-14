@@ -14,7 +14,16 @@ const rowSchema = z.object({
   notes: z.string().optional(),
 });
 
-const bulkSchema = z.object({ rows: z.array(rowSchema).min(1).max(50000) });
+const bulkSchema = z.object({
+  rows: z.array(rowSchema).min(1).max(50000),
+  // Bu yüklemeye ait tüm satırları tek bir grupta işaretlemek için — kullanıcı
+  // yanlış eşleştirilmiş/istenmeyen bir dosyayı tek tek gün gün silmek yerine
+  // "İçe Aktarma Geçmişi"nden tek bir işlemle TÜM yüklemeyi geri alabilsin
+  // diye (Satış Raporu'ndaki aynı desen). İstemci üretir (crypto.randomUUID),
+  // sunucu yalnızca olduğu gibi saklar.
+  importBatchId: z.string().optional(),
+  fileName: z.string().optional(),
+});
 
 // Binlerce satırlık dosyalarda (ör. günlük yerine işlem/fiş bazlı bir dosya
 // yanlışlıkla yüklendiğinde) TÜM tarihleri tek bir Prisma `in` sorgusuna ve
@@ -77,7 +86,7 @@ export async function POST(req: Request): Promise<Response> {
 
       const toCreate: Array<{
         pharmacyId: string; registerDate: Date; posAmount: number; cashAmount: number;
-        wireAmount: number; notes: string | null;
+        wireAmount: number; notes: string | null; importBatchId: string | null; fileName: string | null;
       }> = [];
 
       for (const r of rowsChunk) {
@@ -94,6 +103,8 @@ export async function POST(req: Request): Promise<Response> {
           cashAmount: r.cashAmount,
           wireAmount: r.wireAmount,
           notes: r.notes ?? null,
+          importBatchId: validated.importBatchId ?? null,
+          fileName: validated.fileName ?? null,
         });
       }
 
