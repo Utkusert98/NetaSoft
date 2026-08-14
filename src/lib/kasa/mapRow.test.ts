@@ -63,4 +63,16 @@ describe("mapKasaRow", () => {
     expect(parsed.posAmount).toBe(1000);
     expect(parsed.cashAmount).toBe(200);
   });
+
+  it("işlem/fiş bazlı bir Z-raporunda \"Kredi\" sütununu POS (kredi kartı) tutarı olarak yakalar", () => {
+    const headers = ["İşlem Tarihi", "Nakit", "Kredi", "Havale", "Pos Z No"];
+    const row = ["01.11.2025", "0", "1629", "0", "476"];
+    const { row: parsed, colMap } = mapKasaRow(headers, row);
+    // "Kredi" gerçek bir kredi kartı tutarı sütunudur — önceden hiçbir alana
+    // eşleşmiyor, POS tutarı sessizce 0 kalıp ciro kayboluyordu (gerçek bir
+    // kullanıcı dosyasında ₺15,6M'lik bir sütunün tamamen atlandığı tespit
+    // edildi). "Pos Z No" ise hâlâ eşleşmemeli.
+    expect(parsed.posAmount).toBe(1629);
+    expect(colMap.pos).toBe("Kredi");
+  });
 });
