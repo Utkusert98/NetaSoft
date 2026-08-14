@@ -694,6 +694,15 @@ model DailyRegister {
 
   notes String? @db.Text
 
+  // Toplu Excel/CSV yüklemelerini gruplamak için — Satış Raporu'ndaki
+  // (`SaleRecord.importBatchId`/`fileName`) aynı deseni izler. Bu sayede
+  // kullanıcı yanlış eşleştirilmiş/istenmeyen bir dosyayı tek tek gün gün
+  // silmek yerine tek bir işlemle TÜM yüklemeyi geri alabilir (gerçek bir
+  // kullanıcı talebiyle eklendi). Tekil form girişlerinde (bulk yükleme
+  // dışında) ve eski kayıtlarda null kalır.
+  importBatchId String? @map("import_batch_id")
+  fileName      String? @map("file_name")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
