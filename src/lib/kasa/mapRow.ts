@@ -47,8 +47,15 @@ function norm(h: string): string {
 // numarası sütunlarıyla karışabilen) kısa/genel kelimeler exact-only'e alındı.
 const DATE_ALIASES = ["tarih", "z raporu tarihi", "kasa tarihi", "date"];
 const DATE_EXACT_ONLY = ["gun"];
+// "Kredi" (tek başına, "Kredi Kartı" değil) bazı Z-raporu dışa aktarımlarında
+// (ör. kredi kartı/POS tahsilat sütunu) kullanılan gerçek bir başlıktır —
+// eklenmeden önce bu sütun HİÇBİR alana eşleşmiyor, POS tutarı sessizce 0
+// kalıyor ve kredi kartı cirosunun TAMAMI kayıp gidiyordu (gerçek bir
+// kullanıcı dosyasında ₺15,6M'lik bir sütunün tamamen atlandığı tespit
+// edildi — bu, "pos"/"kasa"/"kart" için yapılan exact-only kısıtlamanın
+// FAZLA katı kaçtığı, meşru bir sütunu da reddettiği bir durumdu).
 const POS_ALIASES = ["kredi karti", "pos tutar", "pos tutari"];
-const POS_EXACT_ONLY = ["pos", "kart"];
+const POS_EXACT_ONLY = ["pos", "kart", "kredi"];
 const CASH_ALIASES = ["nakit tutar", "nakit tutari", "cash"];
 const CASH_EXACT_ONLY = ["nakit", "kasa"];
 const WIRE_ALIASES = ["havale", "eft", "havale eft", "havale/eft", "wire"];
