@@ -105,15 +105,29 @@ export default function KasaBulkUploadModal({
         headers: { "Content-Type": "application/json", "Accept-Language": lang },
         body: JSON.stringify({ rows: validRows, importBatchId: crypto.randomUUID(), fileName: file.name }),
       });
-      const json = await res.json() as { success: boolean; error?: string; data?: { created: number; skippedDates: string[] } };
-      if (!res.ok || !json.success || !json.data) {
-        setParseError(json.error ?? (en ? "Save failed." : "Kaydetme başarısız oldu."));
+      // Doğrudan res.json() yerine önce metin olarak okunur — sunucu/platform
+      // JSON olmayan bir hata sayfası döndürdüğünde (ör. Vercel'in kendi 5xx
+      // sayfası), bu ham metin kullanıcıya HTTP durum koduyla birlikte
+      // gösterilir. Önceden bu durumda hep aynı genel "Sunucu hatası, lütfen
+      // tekrar deneyin" mesajı çıkıyordu ve gerçek nedeni teşhis etmek
+      // (ör. zaman aşımı mı, istek boyutu mu, veritabanı hatası mı)
+      // mümkün olmuyordu.
+      const rawText = await res.text();
+      let json: { success: boolean; error?: string; data?: { created: number; skippedDates: string[] } } | null = null;
+      try { json = rawText ? JSON.parse(rawText) : null; } catch { /* JSON olmayan yanıt — aşağıda ham metin gösterilir */ }
+
+      if (!res.ok || !json?.success || !json?.data) {
+        const detail = json?.error ?? (rawText ? rawText.slice(0, 300) : "");
+        setParseError(
+          `${en ? `Save failed (HTTP ${res.status}).` : `Kaydetme başarısız oldu (HTTP ${res.status}).`}${detail ? ` ${detail}` : ""}`
+        );
         return;
       }
       setResult(json.data);
       onSaved();
-    } catch {
-      setParseError(en ? "Server error, please try again." : "Sunucu hatası, lütfen tekrar deneyin.");
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setParseError(`${en ? "Server/network error:" : "Sunucu/ağ hatası:"} ${detail}`);
     } finally {
       setSaving(false);
     }
