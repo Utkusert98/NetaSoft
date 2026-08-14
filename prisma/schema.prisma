@@ -709,7 +709,18 @@ model DailyRegister {
 
   pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
 
-  @@unique([pharmacyId, registerDate])
+  // Not: benzersizlik burada `@@unique` ile DEĞİL, yalnızca (silinmemiş)
+  // AKTİF kayıtları kapsayan kısmi bir benzersiz index ile veritabanı
+  // seviyesinde (bkz. prisma/migrations/20260814160000_...) sağlanıyor —
+  // Prisma'nın şema dili kısmi (WHERE koşullu) index'i ifade edemiyor.
+  // Önceki düz `@@unique([pharmacyId, registerDate])`, soft-delete edilmiş
+  // (deleted_at dolu) bir kaydın tarihini SONSUZA KADAR işgal ediyordu:
+  // kullanıcı bir günü silip aynı tarihi tekrar (elle ya da toplu
+  // yükleyerek) eklemeye çalıştığında, silinmiş kayıt her yerde (listede,
+  // "zaten var mı" ön kontrolünde) GÖRÜNMEZ olmasına rağmen benzersizlik
+  // kısıtını hâlâ işgal ettiği için ekleme sessizce (hata vermeden,
+  // `skipDuplicates` yüzünden) atlanıyordu — gerçek bir üretim olayıyla
+  // tespit edildi.
   @@index([pharmacyId, registerDate])
   @@index([deletedAt])
   @@map("daily_registers")
