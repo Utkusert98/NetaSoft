@@ -59,9 +59,23 @@ type CreateRow = {
 // iki alanla ilgiliyse (sütun/alan mevcut değil), importBatchId/fileName
 // OLMADAN sessizce tekrar denenir — kullanıcının kaydı kaybolmaz, yalnızca
 // o yükleme İçe Aktarma Geçmişi'nde görünmez.
-async function createManyResilient(rows: CreateRow[]): Promise<void> {
+// `skipDuplicates: true` — asıl güvenlik ağı burasıdır: (pharmacyId,
+// registerDate) benzersizlik kısıtını ihlal eden satırlar Postgres
+// tarafından ATLANIR, TÜM `createMany` çağrısı reddedilmez. Aşağıdaki
+// route'ta ayrıca bir "önceden var mı" kontrolü (existingKeys) de var —
+// ama o yalnızca kullanıcıya HANGİ tarihlerin atlandığını göstermek için
+// bir tahmindir; gerçek doğruluk garantisi burada. Bu ayrım gerçek bir
+// üretim çökmesiyle tespit edildi: kullanıcı aynı dosyayı birden fazla kez
+// denedi, ilk deneme muhtemelen (kaydetme sonrası ayrı bir hata yüzünden
+// kullanıcıya "başarısız" gibi görünse de) kısmen/tamamen kaydolmuştu;
+// ikinci denemede TEK bir çakışan tarih bile tüm 202 satırlık `createMany`
+// çağrısını "Unique constraint failed" ile çökertiyordu — halbuki
+// `skipDuplicates` ile bu durumda yalnızca o tek tarih atlanır, kalan
+// tüm satırlar sorunsuz kaydedilir.
+async function createManyResilient(rows: CreateRow[]): Promise<number> {
   try {
-    await prisma.dailyRegister.createMany({ data: rows });
+    const { count } = await prisma.dailyRegister.createMany({ data: rows, skipDuplicates: true });
+    return count;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const looksLikeMissingBatchColumns =
@@ -69,9 +83,11 @@ async function createManyResilient(rows: CreateRow[]): Promise<void> {
       /does not exist|unknown argument|unknown field|column/i.test(msg);
     if (!looksLikeMissingBatchColumns) throw err;
     console.error("Kasa Bulk: importBatchId/fileName sütunları olmadan yeniden deneniyor (muhtemelen migration henüz uygulanmadı):", msg);
-    await prisma.dailyRegister.createMany({
+    const { count } = await prisma.dailyRegister.createMany({
       data: rows.map(({ importBatchId: _importBatchId, fileName: _fileName, ...rest }) => rest),
+      skipDuplicates: true,
     });
+    return count;
   }
 }
 
@@ -141,8 +157,10 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       if (toCreate.length > 0) {
-        await createManyResilient(toCreate);
-        createdCount += toCreate.length;
+        // Dönen `count`, gerçekten eklenen satır sayısıdır — `skipDuplicates`
+        // yüzünden bu, `toCreate.length`'ten AZ olabilir (existingKeys
+        // kontrolü bir çakışmayı kaçırmışsa bile burada güvenle atlanır).
+        createdCount += await createManyResilient(toCreate);
       }
     }
 
