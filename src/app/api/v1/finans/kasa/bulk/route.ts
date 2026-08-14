@@ -160,7 +160,14 @@ export async function POST(req: Request): Promise<Response> {
     if (error instanceof z.ZodError) {
       return apiError(translateZod(error.issues[0]?.message ?? "Geçersiz veri", lang), "VALIDATION_ERROR", 422);
     }
-    console.error("Kasa Bulk POST Error:", error instanceof Error ? error.message : error);
-    return apiError(m("serverError", lang), "SERVER_ERROR", 500);
+    // Bu, kullanıcının KENDİ isteğinin hata detayı — üçüncü bir tarafa değil,
+    // hatayı bildiren kişiye gösteriliyor. Önceden yalnızca genel bir "Sunucu
+    // hatası" metni döndürülüyordu; gerçek neden (zaman aşımı mı, veritabanı
+    // kısıtı mı, başka bir şey mi) Vercel'in kendi dashboard'una erişimi
+    // olmayan biri için tamamen görünmezdi ve teşhis birden fazla tur
+    // sürüyordu. Gerçek hata mesajı artık doğrudan yanıta eklenir.
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("Kasa Bulk POST Error:", detail);
+    return apiError(`${m("serverError", lang)}: ${detail}`, "SERVER_ERROR", 500);
   }
 }
