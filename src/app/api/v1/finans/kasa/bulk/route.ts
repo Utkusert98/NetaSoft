@@ -43,6 +43,38 @@ function chunk<T>(arr: T[], size: number): T[][] {
 // zarar vermez.
 export const maxDuration = 60;
 
+type CreateRow = {
+  pharmacyId: string; registerDate: Date; posAmount: number; cashAmount: number;
+  wireAmount: number; notes: string | null; importBatchId: string | null; fileName: string | null;
+};
+
+// `import_batch_id`/`file_name` sütunları İçe Aktarma Geçmişi özelliğiyle
+// birlikte eklendi (bkz. prisma/migrations/20260814150000_...). Eğer bir
+// dağıtımda (deploy sırası/zamanlaması nedeniyle) yeni uygulama kodu canlıya
+// alınmış ama veritabanı migration'ı henüz uygulanmamışsa, bu iki alanı
+// yazmaya çalışmak "sütun mevcut değil" tarzı bir veritabanı hatasıyla
+// TÜM toplu kaydetmeyi engelliyordu — halbuki asıl kritik olan kasa
+// tutarlarının kaydedilmesi, içe aktarma geçmişi izlemesi ikincil bir
+// özelliktir. Bu yüzden önce tam veriyle denenir; hata mesajı gerçekten bu
+// iki alanla ilgiliyse (sütun/alan mevcut değil), importBatchId/fileName
+// OLMADAN sessizce tekrar denenir — kullanıcının kaydı kaybolmaz, yalnızca
+// o yükleme İçe Aktarma Geçmişi'nde görünmez.
+async function createManyResilient(rows: CreateRow[]): Promise<void> {
+  try {
+    await prisma.dailyRegister.createMany({ data: rows });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const looksLikeMissingBatchColumns =
+      /import_batch_id|importBatchId|file_name|fileName/i.test(msg) &&
+      /does not exist|unknown argument|unknown field|column/i.test(msg);
+    if (!looksLikeMissingBatchColumns) throw err;
+    console.error("Kasa Bulk: importBatchId/fileName sütunları olmadan yeniden deneniyor (muhtemelen migration henüz uygulanmadı):", msg);
+    await prisma.dailyRegister.createMany({
+      data: rows.map(({ importBatchId: _importBatchId, fileName: _fileName, ...rest }) => rest),
+    });
+  }
+}
+
 // POST /api/v1/finans/kasa/bulk — Onaylanan Kasa (Z-raporu) satırlarını toplu
 // kaydeder. `daily_registers`'ta (pharmacyId, registerDate) benzersiz olduğu
 // için — mevcut bir güne ait kayıt varsa o satır SESSİZCE ATLANIR (üzerine
@@ -109,7 +141,7 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       if (toCreate.length > 0) {
-        await prisma.dailyRegister.createMany({ data: toCreate });
+        await createManyResilient(toCreate);
         createdCount += toCreate.length;
       }
     }
