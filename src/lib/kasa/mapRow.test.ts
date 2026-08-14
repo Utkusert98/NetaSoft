@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapKasaRow } from "./mapRow";
+import { mapKasaRow, aggregateKasaRowsByDate, type ParsedKasaRow } from "./mapRow";
 
 describe("mapKasaRow", () => {
   it("Tarih/POS/Nakit/Havale başlıklı standart bir satırı doğru ayrıştırır", () => {
@@ -74,5 +74,46 @@ describe("mapKasaRow", () => {
     // edildi). "Pos Z No" ise hâlâ eşleşmemeli.
     expect(parsed.posAmount).toBe(1629);
     expect(colMap.pos).toBe("Kredi");
+  });
+});
+
+describe("aggregateKasaRowsByDate", () => {
+  const mk = (date: string, pos: number, cash: number, wire: number, notes?: string): ParsedKasaRow => ({
+    registerDate: `${date}T00:00:00.000Z`, posAmount: pos, cashAmount: cash, wireAmount: wire, notes,
+    rawDateValue: date, dateInvalid: false,
+  });
+
+  it("aynı güne ait birden fazla işlem satırını TEK bir günlük kayda toplar (kasa kapatma senaryosu)", () => {
+    const rows = [
+      mk("2025-11-01", 200, 0, 0),
+      mk("2025-11-01", 0, 300, 0),
+      mk("2025-11-01", 150, 0, 50),
+      mk("2025-11-02", 1000, 200, 0),
+    ];
+    const result = aggregateKasaRowsByDate(rows);
+    expect(result).toHaveLength(2);
+    const day1 = result.find(r => r.registerDate.startsWith("2025-11-01"));
+    expect(day1?.posAmount).toBe(350);
+    expect(day1?.cashAmount).toBe(300);
+    expect(day1?.wireAmount).toBe(50);
+    const day2 = result.find(r => r.registerDate.startsWith("2025-11-02"));
+    expect(day2?.posAmount).toBe(1000);
+  });
+
+  it("tek satırlık günleri olduğu gibi bırakır", () => {
+    const rows = [mk("2025-11-01", 500, 100, 0)];
+    const result = aggregateKasaRowsByDate(rows);
+    expect(result).toHaveLength(1);
+    expect(result[0].posAmount).toBe(500);
+  });
+
+  it("boş notu ilk dolu nottan doldurur, ikinci notu üzerine yazmaz", () => {
+    const rows = [
+      mk("2025-11-01", 100, 0, 0, undefined),
+      mk("2025-11-01", 100, 0, 0, "İlk not"),
+      mk("2025-11-01", 100, 0, 0, "İkinci not"),
+    ];
+    const result = aggregateKasaRowsByDate(rows);
+    expect(result[0].notes).toBe("İlk not");
   });
 });
