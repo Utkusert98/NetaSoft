@@ -107,3 +107,34 @@ export function mapKasaRow(headers: string[], row: unknown[]): { row: ParsedKasa
     },
   };
 }
+
+/**
+ * Aynı güne ait BİRDEN FAZLA satırı (işlem/fiş bazlı bir kasa kapatma
+ * dışa aktarımında olduğu gibi — her satır o günün tek bir tahsilatı) tek
+ * bir günlük kayda toplar: POS/Nakit/Havale tutarları TOPLANIR. Bir
+ * kullanıcı talebiyle eklendi ("kasa kapatma olduğu için aynı gün
+ * toplanması lazım") — önceden aynı tarihten birden fazla satır varsa
+ * yalnızca ilki alınıp gerisi SESSİZCE ATLANIYORDU (bkz. `/api/v1/finans/
+ * kasa/bulk`), bu da işlem bazlı dosyalarda günlük toplamların gerçekte
+ * olduğundan çok düşük görünmesine yol açıyordu.
+ *
+ * Yalnızca `dateInvalid` olmayan (tarihi başarıyla ayrıştırılmış) satırlar
+ * verilmelidir — çağıran taraf geçersiz tarihli satırları önceden filtrelemiş
+ * olmalı, aksi halde hepsi aynı "geçersiz" anahtar altında toplanır.
+ */
+export function aggregateKasaRowsByDate(rows: ParsedKasaRow[]): ParsedKasaRow[] {
+  const byDate = new Map<string, ParsedKasaRow>();
+  for (const r of rows) {
+    const dateKey = r.registerDate.slice(0, 10);
+    const existing = byDate.get(dateKey);
+    if (existing) {
+      existing.posAmount += r.posAmount;
+      existing.cashAmount += r.cashAmount;
+      existing.wireAmount += r.wireAmount;
+      if (!existing.notes && r.notes) existing.notes = r.notes;
+    } else {
+      byDate.set(dateKey, { ...r, registerDate: `${dateKey}T00:00:00.000Z` });
+    }
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.registerDate.localeCompare(b.registerDate));
+}

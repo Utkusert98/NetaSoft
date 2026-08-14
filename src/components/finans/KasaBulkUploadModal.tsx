@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Upload, X, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { mapKasaRow, type ParsedKasaRow, type KasaColumnMap } from "@/lib/kasa/mapRow";
+import { mapKasaRow, aggregateKasaRowsByDate, type ParsedKasaRow, type KasaColumnMap } from "@/lib/kasa/mapRow";
 import { parseKasaFileClient, isClientParseableKasaFile } from "@/lib/kasa/parseFile";
 
 const fmtTL = (v: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(v);
@@ -31,6 +31,11 @@ export default function KasaBulkUploadModal({
   const [colMap, setColMap] = useState<KasaColumnMap | null>(null);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ created: number; skippedDates: string[] } | null>(null);
+  // Ayrıştırılan ham satır sayısı — aynı güne ait birden fazla satır varsa
+  // (işlem/fiş bazlı bir kasa kapatma dışa aktarımında olduğu gibi) bu,
+  // aggregateKasaRowsByDate sonrası `rows.length`'ten BÜYÜK olur; kullanıcıya
+  // "X işlem satırı Y güne toplandı" diye şeffafça gösterilir.
+  const [sourceRowCount, setSourceRowCount] = useState(0);
 
   // Dosya tamamen tarayıcıda ayrıştırılır — sunucuya hiçbir dosya yüklenmez
   // (Satış Raporu'ndaki aynı desen, bkz. @/lib/kasa/parseFile). Önceden
@@ -64,7 +69,16 @@ export default function KasaBulkUploadModal({
         if (!map) map = mapped.colMap;
         return mapped.row;
       });
-      setRows(parsedRows);
+      setSourceRowCount(parsedRows.length);
+      // Aynı güne ait birden fazla satır (işlem/fiş bazlı bir kasa kapatma
+      // dışa aktarımında olduğu gibi) TEK bir günlük kayda toplanır —
+      // Kasa'nın kendisi zaten günde tek kayıt tuttuğu için (kullanıcı
+      // talebiyle: "kasa kapatma olduğu için aynı gün toplanması lazım").
+      // Tarihi ayrıştırılamayan satırlar toplamaya dahil edilmez, kullanıcıya
+      // ayrıca (aşağıdaki uyarıda) gösterilmeye devam eder.
+      const validParsed = parsedRows.filter(r => !r.dateInvalid);
+      const invalidParsed = parsedRows.filter(r => r.dateInvalid);
+      setRows([...aggregateKasaRowsByDate(validParsed), ...invalidParsed]);
       setColMap(map);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : (en ? "File could not be read." : "Dosya okunamadı."));
@@ -128,8 +142,8 @@ export default function KasaBulkUploadModal({
           <>
             <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-4)", lineHeight: 1.6 }}>
               {en
-                ? "Upload a CSV/Excel file with columns for Date, POS, Cash, and Wire/EFT (column names are matched flexibly, e.g. \"Tarih\", \"POS\", \"Nakit\", \"Havale\"). Existing dates already recorded will be skipped automatically — nothing gets overwritten."
-                : "Tarih, POS, Nakit ve Havale/EFT sütunlarını içeren bir CSV/Excel dosyası yükleyin (sütun adları esnek eşleştirilir, ör. \"Tarih\", \"POS\", \"Nakit\", \"Havale\"). Zaten kaydı olan tarihler otomatik atlanır — hiçbir şeyin üzerine yazılmaz."}
+                ? "Upload a CSV/Excel file with columns for Date, POS, Cash, and Wire/EFT (column names are matched flexibly, e.g. \"Tarih\", \"POS\", \"Nakit\", \"Havale\"). If the file has multiple rows for the same day (a transaction-level register-closing export), they are summed into one daily total. Existing dates already recorded will be skipped automatically — nothing gets overwritten."
+                : "Tarih, POS, Nakit ve Havale/EFT sütunlarını içeren bir CSV/Excel dosyası yükleyin (sütun adları esnek eşleştirilir, ör. \"Tarih\", \"POS\", \"Nakit\", \"Havale\"). Aynı güne ait birden fazla satır varsa (işlem bazlı bir kasa kapatma dışa aktarımında olduğu gibi) tek bir günlük toplama toplanır. Zaten kaydı olan tarihler otomatik atlanır — hiçbir şeyin üzerine yazılmaz."}
             </p>
 
             <input
@@ -195,7 +209,11 @@ export default function KasaBulkUploadModal({
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-                    {en ? `${validRows.length} valid row(s) will be saved.` : `${validRows.length} geçerli satır kaydedilecek.`}
+                    {sourceRowCount > validRows.length
+                      ? (en
+                          ? `${sourceRowCount} transaction row(s) combined into ${validRows.length} daily record(s) to be saved.`
+                          : `${sourceRowCount} işlem satırı, kaydedilecek ${validRows.length} günlük kayda toplandı.`)
+                      : (en ? `${validRows.length} valid row(s) will be saved.` : `${validRows.length} geçerli satır kaydedilecek.`)}
                   </span>
                   <button
                     type="button"
