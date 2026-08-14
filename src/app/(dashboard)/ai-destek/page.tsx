@@ -648,6 +648,11 @@ export default function AiDestek() {
   // Gemini/ChatGPT tarzı bir "boş ekran" gösterilir; ilk mesaj gönderilir
   // gönderilmez normal, üstten hizalı sohbet akışına geçilir.
   const isEmpty = messages.length <= 1;
+  // Sohbet akışında gösterilecek mesajlar — "welcome" karşılama metni
+  // yalnızca boş karşılama ekranında (isEmpty true iken, netai-hero-title/
+  // subtitle olarak) gösterilir; kullanıcı ilk soruyu sorduktan sonra bu
+  // metin ayrıca bir sohbet balonu olarak TEKRAR görünmemeli.
+  const visibleMessages = messages.filter((m) => m.id !== "welcome");
 
   const inputPill = (hero: boolean) => (
     <div className={`netai-input-pill ${hero ? "netai-input-pill-hero" : ""}`}>
@@ -823,7 +828,11 @@ export default function AiDestek() {
             padding: "var(--spacing-4) 0",
             marginBottom: "var(--spacing-4)",
           }}>
-            {messages.map((msg, i) => (
+            {/* "welcome" karşılama mesajı yalnızca boş (henüz mesaj gönderilmemiş)
+                karşılama ekranında (netai-hero-title/subtitle) gösterilir —
+                kullanıcı bir soru sorduktan sonra sohbet geçmişinde ayrıca bir
+                balon olarak tekrar görünmemeli (gerçek kullanıcı geri bildirimi). */}
+            {visibleMessages.map((msg, i) => (
               <div key={msg.id}>
                 {msg.role === "assistant"
                   ? (
@@ -836,7 +845,7 @@ export default function AiDestek() {
                       copyLabel={ui.copy}
                       copiedLabel={ui.copied}
                       regenerateLabel={ui.regenerate}
-                      onRegenerate={!loading && i === messages.length - 1 ? () => void regenerate(msg.id) : undefined}
+                      onRegenerate={!loading && i === visibleMessages.length - 1 ? () => void regenerate(msg.id) : undefined}
                     />
                   )
                   : <UserMessage content={msg.content} />}
