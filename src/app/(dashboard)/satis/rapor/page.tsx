@@ -969,6 +969,22 @@ export default function SatisRaporPage() {
   const activePresetKey = useMemo(() => matchPreset(startDate, endDate), [startDate, endDate]);
   const pendingDiffersFromApplied = pendingStartDate !== startDate || pendingEndDate !== endDate;
 
+  // "Tahmini Bu Ay Ciro" / "Günlük Tahmini Ciro" — yalnızca seçili dönem
+  // içinde bulunduğumuz ayın başlangıcıyla eşleşiyorsa anlamlıdır (Gösterge
+  // Paneli'ndeki "Günlük Ort. Ciro"/"30 Günlük Tahmini" ile aynı mantık).
+  // `endDate`'in ayın SON gününe (31'ine) eşit olması ŞART KOŞULMAZ — sayfa
+  // açılışında filtre otomatik olarak gerçek en son satış tarihine daralıyor
+  // (yukarıdaki mount effect'e bakın), bu da devam eden bir ayda neredeyse
+  // her zaman "bugün" veya öncesi olur, ayın son günü değil.
+  const currentMonthStartStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+  const currentMonthEndStr = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const periodIsCurrentMonth =
+    startDate === currentMonthStartStr && endDate >= currentMonthStartStr && endDate <= currentMonthEndStr;
+  const daysInThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysElapsedThisMonth = Math.min(now.getDate(), daysInThisMonth);
+  const dailyAvgCiro = summary && periodIsCurrentMonth ? summary.totalRevenue / Math.max(1, daysElapsedThisMonth) : null;
+  const projectedMonthRevenue = dailyAvgCiro !== null ? dailyAvgCiro * daysInThisMonth : null;
+
   const resetUpload = () => {
     setFile(null); setStep("select"); setParseError("");
     setPreviewRows([]); setColumnMap(null); setHeaders([]); setDataRows([]);
@@ -1761,7 +1777,7 @@ export default function SatisRaporPage() {
           </div>
 
           {summary && (
-            <div className="responsive-grid responsive-grid-3-cols" style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-5)" }}>
+            <div className={`responsive-grid ${periodIsCurrentMonth ? "responsive-grid-5-cols" : "responsive-grid-3-cols"}`} style={{ gap: "var(--spacing-4)", marginBottom: "var(--spacing-5)" }}>
               <div className="card" style={{ padding: "var(--spacing-4)" }}>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Total Revenue" : "Toplam Ciro"}</div>
                 <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 800, color: "var(--color-primary)" }}>{fmt(summary.totalRevenue)}</div>
@@ -1792,6 +1808,31 @@ export default function SatisRaporPage() {
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>{summary.retailCount.toLocaleString("tr-TR")} {lang === "en" ? "sales" : "satış"}</div>
               </div>
+              {/* Yalnızca seçili dönem TAM OLARAK içinde bulunduğumuz ay ise
+                  gösterilir — geçmiş bir ay ya da özel bir aralık seçiliyken
+                  "bu ay" etiketi yanıltıcı olurdu. Dashboard'daki (Gösterge
+                  Paneli) "Günlük Ort. Ciro" / "30 Günlük Tahmini" ile aynı
+                  mantık: bugüne kadarki günlük ortalama, ayın kalan
+                  günlerine ekstrapole edilir (gerçek bir kullanıcı
+                  talebiyle eklendi). */}
+              {periodIsCurrentMonth && dailyAvgCiro !== null && projectedMonthRevenue !== null && (
+                <>
+                  <div className="card" style={{ padding: "var(--spacing-4)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Projected Month Revenue" : "Tahmini Bu Ay Ciro"}</div>
+                    <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "var(--color-income-green)" }}>{fmt(projectedMonthRevenue)}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                      {lang === "en" ? "Based on daily average so far" : "Şimdiye kadarki günlük ortalamaya göre"}
+                    </div>
+                  </div>
+                  <div className="card" style={{ padding: "var(--spacing-4)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px" }}>{lang === "en" ? "Projected Daily Revenue" : "Günlük Tahmini Ciro"}</div>
+                    <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700 }}>{fmt(dailyAvgCiro)}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                      {daysElapsedThisMonth.toLocaleString("tr-TR")} {lang === "en" ? "day(s) elapsed" : "gün geçti"}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
