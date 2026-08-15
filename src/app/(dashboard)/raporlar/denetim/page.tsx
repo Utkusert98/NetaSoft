@@ -33,6 +33,7 @@ const ENTITY_LABELS: Record<string, string> = {
   SaleRecordBatch: "Satış Raporu İçe Aktarma",
   DailyRegisterBatch: "Kasa Toplu İçe Aktarma",
   InventoryReport: "Envanter Raporu",
+  FixedExpenseRecurring: "Düzenli Ödeme Serisi",
 };
 
 interface SalesBatchRow {

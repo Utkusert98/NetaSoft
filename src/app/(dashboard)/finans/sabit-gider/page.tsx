@@ -2,7 +2,7 @@
 import { useLangContext } from "@/app/providers/LangProvider";
 import { t, tx } from "@/lib/i18n/translations";
 import { useState, useEffect } from "react";
-import { ClipboardList, Trash2 } from "lucide-react";
+import { ClipboardList, Trash2, Repeat, History } from "lucide-react";
 import { format } from "date-fns";
 import { tr as trLocale, enUS } from "date-fns/locale";
 import DateRangePicker from "@/components/ui/DateRangePicker";
@@ -15,6 +15,16 @@ type Expense = {
   amount: number;
   expenseDate: string;
   notes?: string;
+};
+
+type RecurringSeries = {
+  recurringId: string;
+  type: string;
+  customType: string | null;
+  count: number;
+  total: number;
+  startDate: string;
+  endDate: string;
 };
 
 export default function SabitGiderPage() {
@@ -41,6 +51,23 @@ export default function SabitGiderPage() {
     notes: "",
   });
 
+  // "Düzenli Ödeme" — kira, kredi kartı borcu gibi sözleşme boyunca sabit
+  // tutarlı bir gideri, seçilen sıklıkta (aylık/yıllık/günlük) tarih
+  // aralığına yayarak tek seferde birden fazla FixedExpense satırı olarak
+  // oluşturur (gerçek bir kullanıcı talebiyle eklendi).
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
+  const [recurringForm, setRecurringForm] = useState({
+    type: "RENT", customType: "", amount: "", frequency: "MONTHLY" as "MONTHLY" | "YEARLY" | "DAILY",
+    startDate: "", endDate: "", notes: "",
+  });
+  const [recurringSubmitting, setRecurringSubmitting] = useState(false);
+  const [recurringError, setRecurringError] = useState("");
+  const [recurringResult, setRecurringResult] = useState<number | null>(null);
+  const [recurringSeries, setRecurringSeries] = useState<RecurringSeries[]>([]);
+  const [recurringSeriesLoading, setRecurringSeriesLoading] = useState(false);
+  const [recurringDeleteTarget, setRecurringDeleteTarget] = useState<RecurringSeries | null>(null);
+  const [recurringDeleting, setRecurringDeleting] = useState(false);
+
   const fetchExpenses = async () => {
     try {
       const res = await fetch("/api/v1/finans/sabit-gider", { headers: { "Accept-Language": lang } });
@@ -50,11 +77,21 @@ export default function SabitGiderPage() {
     finally { setLoading(false); }
   };
 
+  const fetchRecurringSeries = async () => {
+    setRecurringSeriesLoading(true);
+    try {
+      const res = await fetch("/api/v1/finans/sabit-gider/recurring", { headers: { "Accept-Language": lang } });
+      const json = await res.json();
+      if (json.success) setRecurringSeries(json.data);
+    } catch (e) { console.error(e); }
+    finally { setRecurringSeriesLoading(false); }
+  };
+
   // Mount üzerinde tek seferlik async veri çekimi — setState çağrısı fetch tamamlandıktan
   // sonra (await sonrası) gerçekleşir, senkron değildir; bu yüzden kural burada
   // yanlış pozitif üretir.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void fetchExpenses(); }, []);
+  useEffect(() => { void fetchExpenses(); void fetchRecurringSeries(); }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -81,6 +118,61 @@ export default function SabitGiderPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openRecurringModal = () => {
+    setRecurringError("");
+    setRecurringResult(null);
+    setRecurringForm({
+      type: "RENT", customType: "", amount: "", frequency: "MONTHLY",
+      startDate: new Date().toISOString().split("T")[0], endDate: "", notes: "",
+    });
+    setShowRecurringModal(true);
+  };
+
+  const handleRecurringSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recurringForm.startDate || !recurringForm.endDate) return;
+    setRecurringSubmitting(true);
+    setRecurringError("");
+    setRecurringResult(null);
+    try {
+      const res = await fetch("/api/v1/finans/sabit-gider/recurring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Language": lang },
+        body: JSON.stringify({
+          type: recurringForm.type,
+          customType: recurringForm.type === "OTHER" ? recurringForm.customType : undefined,
+          amount: parseFloat(recurringForm.amount),
+          frequency: recurringForm.frequency,
+          startDate: recurringForm.startDate,
+          endDate: recurringForm.endDate,
+          notes: recurringForm.notes || undefined,
+          recurringId: crypto.randomUUID(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+      setRecurringResult(json.data.created);
+      await Promise.all([fetchExpenses(), fetchRecurringSeries()]);
+    } catch (err: unknown) {
+      setRecurringError(err instanceof Error ? err.message : (lang === "en" ? "An error occurred" : "Bir hata oluştu"));
+    } finally {
+      setRecurringSubmitting(false);
+    }
+  };
+
+  const handleRecurringDelete = async () => {
+    if (!recurringDeleteTarget) return;
+    setRecurringDeleting(true);
+    try {
+      await fetch(`/api/v1/finans/sabit-gider/recurring/${encodeURIComponent(recurringDeleteTarget.recurringId)}`, {
+        method: "DELETE", headers: { "Accept-Language": lang },
+      });
+      setRecurringDeleteTarget(null);
+      await Promise.all([fetchExpenses(), fetchRecurringSeries()]);
+    } catch (e) { console.error(e); }
+    finally { setRecurringDeleting(false); }
   };
 
   const handleDelete = async () => {
@@ -248,6 +340,17 @@ export default function SabitGiderPage() {
               {submitting ? (lang === "en" ? "Saving..." : "Kaydediliyor...") : (lang === "en" ? "Save Expense" : "Gider Kaydet")}
             </button>
           </form>
+
+          {/* Kira, kredi kartı borcu gibi sözleşme boyunca sabit tutarlı
+              giderleri her ay elle tek tek girmek yerine tarih aralığına
+              yayarak tek seferde oluşturmak için (gerçek bir kullanıcı
+              talebiyle eklendi). */}
+          <button type="button" onClick={openRecurringModal}
+            className="btn btn-full"
+            style={{ marginTop: "var(--spacing-3)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", border: "1px solid var(--color-border)" }}>
+            <Repeat size={15} />
+            {lang === "en" ? "Add Recurring Payment" : "Düzenli Ödeme Ekle"}
+          </button>
         </div>
 
         {/* Bu Ay */}
@@ -317,6 +420,165 @@ export default function SabitGiderPage() {
           </div>
         )}
       </div>
+
+      {/* Düzenli Ödemeler — kullanıcı sözleşme değişince/bittiğinde tek tek
+          ay ay silmek yerine tüm seriyi tek işlemle geri alabilsin diye
+          (Kasa'daki "İçe Aktarma Geçmişi" ile aynı desen). Hiç düzenli
+          ödeme yoksa bölüm hiç gösterilmez. */}
+      {(recurringSeriesLoading || recurringSeries.length > 0) && (
+        <div className="card" style={{ marginTop: "var(--spacing-5)", padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", fontWeight: 700, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <History size={16} style={{ color: "var(--color-text-muted)" }} />
+            {lang === "en" ? "Recurring Payments" : "Düzenli Ödemeler"}
+          </div>
+          {recurringSeriesLoading ? (
+            <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table" style={{ width: "100%", fontSize: "13px" }}>
+                <thead>
+                  <tr>
+                    <th>{lang === "en" ? "Type" : "Tür"}</th>
+                    <th>{lang === "en" ? "Date Range" : "Tarih Aralığı"}</th>
+                    <th>{lang === "en" ? "Record Count" : "Kayıt Sayısı"}</th>
+                    <th>{lang === "en" ? "Total" : "Toplam"}</th>
+                    <th style={{ textAlign: "right" }}>{lang === "en" ? "Actions" : "İşlem"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recurringSeries.map(s => (
+                    <tr key={s.recurringId}>
+                      <td>
+                        <span style={{ padding: "4px 8px", background: "var(--color-bg)", borderRadius: "4px", fontSize: "12px", fontWeight: 500 }}>
+                          {getTypeLabel(s.type, s.customType ?? undefined)}
+                        </span>
+                      </td>
+                      <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                        {format(new Date(`${s.startDate}T00:00:00.000Z`), "dd MMM yyyy", { locale })} – {format(new Date(`${s.endDate}T00:00:00.000Z`), "dd MMM yyyy", { locale })}
+                      </td>
+                      <td>{s.count.toLocaleString("tr-TR")}</td>
+                      <td style={{ fontWeight: 700 }}>{fmt(s.total)}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button onClick={() => setRecurringDeleteTarget(s)}
+                          style={{ padding: "3px 8px", fontSize: "11px", background: "var(--color-danger)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+                          {lang === "en" ? "Delete This Series" : "Bu Seriyi Sil"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Düzenli Ödeme Modal */}
+      {showRecurringModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "460px", maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "var(--spacing-6)" }}>
+            <h3 style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Repeat size={18} />
+              {lang === "en" ? "Add Recurring Payment" : "Düzenli Ödeme Ekle"}
+            </h3>
+            <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "var(--spacing-4)" }}>
+              {lang === "en"
+                ? "For fixed-amount expenses over a contract period (rent, credit card debt, etc.) — creates one entry per month/year/day across the range."
+                : "Sözleşme boyunca sabit tutarlı giderler için (kira, kredi kartı borcu vb.) — seçilen aralıkta ay/yıl/gün başına bir kayıt oluşturur."}
+            </p>
+
+            {recurringResult !== null && (
+              <div style={{ padding: "12px", background: "var(--color-income-bg, rgba(74,222,128,0.1))", color: "var(--color-income-green)", borderRadius: "var(--radius-md)", marginBottom: "16px", fontSize: "14px", fontWeight: 600 }}>
+                {lang === "en" ? `${recurringResult} record(s) created.` : `${recurringResult} kayıt oluşturuldu.`}
+              </div>
+            )}
+            {recurringError && (
+              <div style={{ padding: "12px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", marginBottom: "16px", fontSize: "14px" }}>
+                {recurringError}
+              </div>
+            )}
+
+            <form onSubmit={(e) => void handleRecurringSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Expense Type" : "Gider Türü"}</label>
+                <select className="form-input" value={recurringForm.type} onChange={e => setRecurringForm(p => ({ ...p, type: e.target.value }))}>
+                  <option value="RENT">{lang === "en" ? "Rent" : "Kira"}</option>
+                  <option value="INVOICE">{lang === "en" ? "Invoice" : "Fatura"}</option>
+                  <option value="ACCOUNTING">{lang === "en" ? "Accounting" : "Muhasebe"}</option>
+                  <option value="TAX">{lang === "en" ? "Tax" : "Vergi"}</option>
+                  <option value="OTHER">{lang === "en" ? "Other" : "Diğer"}</option>
+                </select>
+              </div>
+              {recurringForm.type === "OTHER" && (
+                <div className="form-group">
+                  <label className="form-label">{lang === "en" ? "Custom Expense Type" : "Özel Gider Türü"}</label>
+                  <input type="text" className="form-input" value={recurringForm.customType}
+                    onChange={e => setRecurringForm(p => ({ ...p, customType: e.target.value }))} required />
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Amount per period (₺)" : "Dönem Başına Tutar (₺)"}</label>
+                <input type="number" step="0.01" min="0.01" className="form-input" value={recurringForm.amount}
+                  onChange={e => setRecurringForm(p => ({ ...p, amount: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Frequency" : "Sıklık"}</label>
+                <select className="form-input" value={recurringForm.frequency}
+                  onChange={e => setRecurringForm(p => ({ ...p, frequency: e.target.value as typeof recurringForm.frequency }))}>
+                  <option value="MONTHLY">{lang === "en" ? "Monthly" : "Aylık"}</option>
+                  <option value="YEARLY">{lang === "en" ? "Yearly" : "Yıllık"}</option>
+                  <option value="DAILY">{lang === "en" ? "Daily" : "Günlük"}</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Date Range" : "Tarih Aralığı"}</label>
+                <DateRangePicker startDate={recurringForm.startDate} endDate={recurringForm.endDate} lang={lang}
+                  onChange={(start, end) => setRecurringForm(p => ({ ...p, startDate: start, endDate: end }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{lang === "en" ? "Notes" : "Notlar"}</label>
+                <textarea className="form-input" rows={2} value={recurringForm.notes}
+                  onChange={e => setRecurringForm(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+              <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "4px" }}>
+                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowRecurringModal(false)}>
+                  {lang === "en" ? "Close" : "Kapat"}
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}
+                  disabled={recurringSubmitting || !recurringForm.startDate || !recurringForm.endDate}>
+                  {recurringSubmitting ? (lang === "en" ? "Creating..." : "Oluşturuluyor...") : (lang === "en" ? "Create" : "Oluştur")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Düzenli Ödeme Serisi Silme Onayı */}
+      {recurringDeleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "var(--spacing-4)" }}>
+          <div className="card" style={{ width: "100%", maxWidth: "380px", padding: "var(--spacing-6)", textAlign: "center" }}>
+            <div style={{ marginBottom: "12px", display: "flex", justifyContent: "center", color: "var(--color-danger)" }}><Trash2 size={36} /></div>
+            <h3 style={{ fontWeight: 700, marginBottom: "8px" }}>
+              {lang === "en" ? "Delete Recurring Series" : "Düzenli Ödeme Serisini Sil"}
+            </h3>
+            <p style={{ color: "var(--color-text-muted)", marginBottom: "var(--spacing-5)", fontSize: "14px" }}>
+              {lang === "en"
+                ? <>All {recurringDeleteTarget.count} record(s) in this series will be deleted. This action cannot be undone.</>
+                : <>Bu seriye ait TÜM {recurringDeleteTarget.count} kayıt silinecek. Bu işlem geri alınamaz.</>}
+            </p>
+            <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => setRecurringDeleteTarget(null)}>
+                {lang === "en" ? "Cancel" : "İptal"}
+              </button>
+              <button className="btn" style={{ flex: 1, background: "var(--color-danger)", color: "white" }}
+                onClick={() => void handleRecurringDelete()} disabled={recurringDeleting}>
+                {recurringDeleting ? (lang === "en" ? "Deleting..." : "Siliniyor...") : (lang === "en" ? "Yes, Delete" : "Evet, Sil")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editExpense && (
