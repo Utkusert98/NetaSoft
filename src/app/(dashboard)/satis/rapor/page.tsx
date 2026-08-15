@@ -969,17 +969,17 @@ export default function SatisRaporPage() {
   const activePresetKey = useMemo(() => matchPreset(startDate, endDate), [startDate, endDate]);
   const pendingDiffersFromApplied = pendingStartDate !== startDate || pendingEndDate !== endDate;
 
-  // "Tahmini Bu Ay Ciro" / "Günlük Tahmini Ciro" — yalnızca seçili dönem
-  // içinde bulunduğumuz ayın başlangıcıyla eşleşiyorsa anlamlıdır (Gösterge
-  // Paneli'ndeki "Günlük Ort. Ciro"/"30 Günlük Tahmini" ile aynı mantık).
-  // `endDate`'in ayın SON gününe (31'ine) eşit olması ŞART KOŞULMAZ — sayfa
-  // açılışında filtre otomatik olarak gerçek en son satış tarihine daralıyor
-  // (yukarıdaki mount effect'e bakın), bu da devam eden bir ayda neredeyse
-  // her zaman "bugün" veya öncesi olur, ayın son günü değil.
-  const currentMonthStartStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
-  const currentMonthEndStr = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-  const periodIsCurrentMonth =
-    startDate === currentMonthStartStr && endDate >= currentMonthStartStr && endDate <= currentMonthEndStr;
+  // "Tahmini Bu Ay Ciro" / "Günlük Tahmini Ciro" — YALNIZCA "Bu Ay" hazır
+  // aralık butonu aktifken gösterilir. Önceki sürüm bunu `startDate`'in ayın
+  // 1'i olup olmadığına bakarak (gevşek) belirliyordu — ama "Son 7 Gün" /
+  // "Son 30 Gün" gibi diğer preset'ler de, ayın erken günlerinde (ör. ayın
+  // 5'i iken "Son 7 Gün" = 1'i–5'i) TESADÜFEN ayın 1'inden başlayabiliyordu;
+  // bu durumda "Bu Ay" tahmin kartları YANLIŞ preset altında da görünüyordu
+  // (gerçek bir kullanıcı geri bildirimiyle tespit edildi). `activePresetKey`
+  // (`matchPreset`) TAM eşleşme arar — yalnızca kullanıcı gerçekten "Bu Ay"
+  // butonuna bastığında (ya da uygulanmış aralık ona tam denk geldiğinde)
+  // "thisMonth" döner, başka hiçbir preset'le çakışmaz.
+  const periodIsCurrentMonth = activePresetKey === "thisMonth";
   const daysInThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysElapsedThisMonth = Math.min(now.getDate(), daysInThisMonth);
   const dailyAvgCiro = summary && periodIsCurrentMonth ? summary.totalRevenue / Math.max(1, daysElapsedThisMonth) : null;
