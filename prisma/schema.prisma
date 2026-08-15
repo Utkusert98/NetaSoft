@@ -602,6 +602,13 @@ model FixedExpense {
   expenseDate DateTime @map("expense_date")
   notes       String?  @db.Text
 
+  // "Düzenli Ödeme" (kira, kredi kartı borcu vb. — tutar sözleşme boyunca
+  // sabit) ile oluşturulan satırları gruplamak için — Kasa'daki
+  // `importBatchId` ile aynı desen. Kullanıcı sözleşme değişince/bittiğinde
+  // tek tek ay ay silmek yerine tüm seriyi tek işlemle geri alabilir. Tekil
+  // gider girişlerinde null kalır.
+  recurringId String? @map("recurring_id")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -610,6 +617,7 @@ model FixedExpense {
 
   @@index([pharmacyId, expenseDate])
   @@index([pharmacyId, type])
+  @@index([pharmacyId, recurringId])
   @@index([deletedAt])
   @@map("fixed_expenses")
 }
