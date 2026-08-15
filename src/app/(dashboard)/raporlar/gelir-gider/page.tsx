@@ -176,7 +176,7 @@ export default function GelirGiderPage() {
               {data.monthly.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No records for this period." : "Bu dönemde kayıt yok."}</p>
               ) : (
-                <div style={{ height: 300 }}>
+                <div style={{ height: 330 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={data.monthly} margin={{ left: 10, right: 10, top: 4, bottom: 4 }}>
                       <defs>
@@ -188,7 +188,15 @@ export default function GelirGiderPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+                      {/* `interval={0}` — geniş bir "Özel Aralık" seçildiğinde
+                          (ör. Kasım 2025'ten günümüze, 10 ay) Recharts'ın
+                          varsayılan davranışı bazı ay etiketlerini SESSİZCE
+                          atlıyordu, zaman çizelgesini yanıltıcı hale
+                          getiriyordu (gerçek bir kullanıcı geri bildirimiyle
+                          tespit edildi). Açılı etiketler tüm ayların
+                          çakışmadan sığmasını sağlar. */}
+                      <XAxis dataKey="month" interval={0} angle={-35} textAnchor="end" height={44}
+                        tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Legend formatter={(v: string) => ({ gelir: lang === "en" ? "Income" : "Gelir", gider: lang === "en" ? "Expense" : "Gider", kar: lang === "en" ? "Profit" : "Kâr" }[v] ?? v)} />
@@ -315,11 +323,18 @@ export default function GelirGiderPage() {
               {data.monthly.length === 0 ? (
                 <p style={{ color: "var(--color-text-muted)", textAlign: "center", padding: "40px" }}>{lang === "en" ? "No data." : "Veri yok."}</p>
               ) : (
-                <div style={{ height: 200 }}>
+                <div style={{ height: 250 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.monthly} margin={{ left: 4, right: 4, top: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                      {/* `interval={0}` — bu grafik geniş aralıklarda ay
+                          etiketlerinin çoğunu SESSİZCE atlıyordu (ör. 10 aylık
+                          bir aralıkta yalnızca 3 ay görünüyordu — gerçek bir
+                          kullanıcı geri bildirimiyle tespit edildi). Bu kart
+                          diğerlerinden daha dar olduğu için (tek sütunlu grid)
+                          -35° yeterli boşluk bırakmıyordu, etiketler
+                          birbirine giriyordu — -60° ile düzeltildi. */}
+                      <XAxis dataKey="month" interval={0} angle={-60} textAnchor="end" height={55} tick={{ fontSize: 9 }} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                       <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                       <Legend formatter={(v: string) => ({ sabitGider: lang === "en" ? "Fixed Expense" : "Sabit Gider", personelGider: lang === "en" ? "Staff" : "Personel" }[v] ?? v)} />

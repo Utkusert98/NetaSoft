@@ -429,7 +429,7 @@ export default function DashboardClient({ data, pharmacistName }: {
       <div className="responsive-grid responsive-grid-2-1" style={{ gap: "var(--spacing-5)", marginBottom: "var(--spacing-5)" }}>
         {/* Aylık Trend */}
         <ChartCard title={tx(d.trend, lang)}>
-          <div style={{ height: 260 }}>
+          <div style={{ height: 290 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyTrend} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
                 <defs>
@@ -443,7 +443,14 @@ export default function DashboardClient({ data, pharmacistName }: {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+                {/* `interval={0}` — çok aylık verilerde Recharts'ın varsayılan
+                    davranışı bazı ay etiketlerini SESSİZCE atlıyordu (ör. 10
+                    aylık bir aralıkta yalnızca 3-4 ay görünüyordu), bu da
+                    zaman çizelgesini yanıltıcı hale getiriyordu (gerçek bir
+                    kullanıcı geri bildirimiyle tespit edildi). Açılı etiketler
+                    tüm ayların çakışmadan sığmasını sağlar. */}
+                <XAxis dataKey="month" interval={0} angle={-35} textAnchor="end" height={44}
+                  tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip formatter={((v: number) => formatCurrency(v)) as ChartFormatter} contentStyle={TOOLTIP_STYLE} />
                 <Legend formatter={(v) => v === "gelir" ? tx(d.income, lang) : v === "gider" ? tx(d.expense, lang) : tx(d.profit, lang)} />

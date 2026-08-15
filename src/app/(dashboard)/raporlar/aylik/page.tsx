@@ -345,11 +345,16 @@ export default function AylikOzetPage() {
               <h3 style={{ fontWeight: 700, marginBottom: "var(--spacing-5)", fontSize: "var(--font-size-base)" }}>
                 {lang === "en" ? `${year} Monthly Income / Expense Comparison` : `${year} Yılı Aylık Gelir / Gider Karşılaştırması`}
               </h3>
-              <div style={{ height: 250 }}>
+              <div style={{ height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={yearTrend} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
+                    {/* `interval={0}` — 12 aylık bu grafikte dar ekranlarda
+                        Recharts bazı ay etiketlerini SESSİZCE atlıyordu
+                        (gerçek bir kullanıcı geri bildirimiyle tespit
+                        edildi). Açılı etiketler tümünün sığmasını sağlar. */}
+                    <XAxis dataKey="month" interval={0} angle={-35} textAnchor="end" height={44}
+                      tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--color-text-muted)" }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                     <Tooltip formatter={((v: number) => fmt(v)) as ChartFormatter} contentStyle={TT} />
                     <Bar dataKey="gelir" name={lang === "en" ? "Income" : "Gelir"} fill="#4e7c3f" radius={[3, 3, 0, 0]} />
